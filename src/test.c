@@ -20,7 +20,7 @@
 static u8_t mac_addr[] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab};
 struct netif netif;
 // uint8_t default_device = 0;
-usb_device_t device = NULL;
+usb_device_t usb_device = NULL;
 
 bool ecm_start(void)
 {
@@ -32,7 +32,7 @@ bool ecm_start(void)
     netif_add(&netif, &addr, &netmask, &gateway, NULL, my_netif_init, netif_input);
     netif.name[0] = 'e';
     netif.name[1] = 'n';
-    netif.num = devnum;
+    netif.num = 0;
     netif_create_ip6_linklocal_address(&netif, 1);
     netif.ip6_autoconfig_enabled = 1;
     netif_set_status_callback(&netif, netif_status_callback);
@@ -44,8 +44,6 @@ bool ecm_start(void)
 usb_error_t ecm_handle_usb_event(usb_event_t event, void *event_data,
                                  usb_callback_data_t *callback_data)
 {
-
-    usb_error_t err;
 
     /* Enable newly connected devices */
     switch (event)
@@ -77,9 +75,6 @@ usb_error_t ecm_handle_usb_event(usb_event_t event, void *event_data,
     case USB_DEVICE_SUSPENDED_EVENT:
     case USB_DEVICE_DISABLED_EVENT:
     case USB_DEVICE_DISCONNECTED_EVENT:
-        srl_Close(&srl);
-        RESET_FLAG(gamestate.inet.flags, INET_ACTIVE);
-        MARK_FRAME_DIRTY;
         return USB_SUCCESS;
     }
     return USB_SUCCESS;
