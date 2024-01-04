@@ -1,9 +1,0 @@
-## TO-DO List for TI-84+ CE ##
-
-1. Read up to get a better understanding of USB. Reference: https://beyondlogic.org/usbnutshell/usb1.shtml
-2. Implement ECM protocol for sending Ethernet frames over USB. Reference: https://www.usb.org/document-library/class-definitions-communication-devices-12
-2b. Poke around USBDRVCE for appropriate commands.
-3. Set up lwIP to use ECM as protocol for transmission.
-4. Build a test modulue to verify code works.
-5. Convert code to a LIBLOAD dylib or applib.
-Done
