@@ -6,5 +6,6 @@
     "files.trimTrailingWhitespace": true,
     "files.associations": {
         "*.h": "c"
-    }
+    },
+    "GitHooks.hooksDirectory": "/Users/acagliano/CEdev/source/lwip-ce/.git/hooks"
 }

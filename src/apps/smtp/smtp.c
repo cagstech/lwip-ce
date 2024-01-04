@@ -1046,7 +1046,7 @@ smtp_prepare_helo(struct smtp_session *s, u16_t *tx_buf_len, struct altcp_pcb *p
 }
 
 #if SMTP_SUPPORT_AUTH_PLAIN || SMTP_SUPPORT_AUTH_LOGIN
-/** Parse last server response (in rx_buf) for supported authentication method,
+/** Parse last server response (in buf) for supported authentication method,
  * create data to send out (to tx_buf), set tx_data_len correctly
  * and return the next state.
  */
