@@ -1,0 +1,4270 @@
+# 1 "src/core/tcp.c"
+# 1 "<built-in>" 1
+# 1 "<built-in>" 3
+# 341 "<built-in>" 3
+# 1 "<command line>" 1
+# 1 "<built-in>" 2
+# 1 "src/core/tcp.c" 2
+# 100 "src/core/tcp.c"
+# 1 "src/include/lwip/opt.h" 1
+# 51 "src/include/lwip/opt.h"
+# 1 "src/include/lwipopts.h" 1
+# 52 "src/include/lwip/opt.h" 2
+# 1 "src/include/lwip/debug.h" 1
+# 40 "src/include/lwip/debug.h"
+# 1 "src/include/lwip/arch.h" 1
+# 48 "src/include/lwip/arch.h"
+# 1 "src/include/arch/cc.h" 1
+# 49 "src/include/lwip/arch.h" 2
+# 82 "src/include/lwip/arch.h"
+# 1 "/home/john/installs/CEdev/include/stdio.h" 1 3
+
+
+
+# 1 "/home/john/installs/CEdev/include/cdefs.h" 1 3
+# 34 "/home/john/installs/CEdev/include/cdefs.h" 3
+typedef unsigned int size_t;
+# 5 "/home/john/installs/CEdev/include/stdio.h" 2 3
+# 1 "/home/john/installs/CEdev/include/stdarg.h" 1 3
+
+
+
+
+
+typedef __builtin_va_list __gnuc_va_list;
+
+
+
+
+typedef __builtin_va_list va_list;
+# 6 "/home/john/installs/CEdev/include/stdio.h" 2 3
+
+
+
+
+typedef struct
+{
+    unsigned char slot;
+    unsigned char eof;
+    unsigned char err;
+} FILE;
+# 39 "/home/john/installs/CEdev/include/stdio.h" 3
+char inchar(void);
+
+void outchar(char character);
+
+FILE *fopen(const char *__restrict filename,
+    const char *__restrict mode);
+
+int fclose(FILE *stream);
+
+int fflush(FILE *stream);
+
+int ferror(FILE *stream);
+
+int feof(FILE *stream);
+
+void clearerr(FILE *stream);
+
+int fputs(const char *__restrict str, FILE *__restrict stream);
+
+size_t fread(void *ptr, size_t size, size_t count, FILE *__restrict stream);
+
+size_t fwrite(const void *__restrict ptr, size_t size, size_t count,
+    FILE *__restrict stream);
+
+long int ftell(FILE *stream) __attribute__((__warn_unused_result__));
+
+int fseek(FILE *stream, long int offset, int origin);
+
+int fgetc(FILE *stream);
+
+
+int fputc(int c, FILE *stream);
+
+
+char *fgets(char *__restrict str, int num, FILE *__restrict stream);
+
+int remove(const char *filename);
+
+void rewind(FILE *stream);
+
+
+int getchar(void);
+
+int putchar(int character);
+
+int puts(const char *str);
+
+int printf(const char *__restrict format, ...)
+    __attribute__((format(__printf__, 1, 2)));
+
+int vprintf(const char *__restrict format, va_list va)
+    __attribute__((format(__printf__, 1, 0)));
+
+int vsprintf(char *__restrict buffer, const char *__restrict format,
+    va_list va)
+    __attribute__((format(__printf__, 1, 0)));
+
+int snprintf(char* buffer, size_t count, const char *__restrict format, ...)
+    __attribute__((format(__printf__, 3, 4)));
+
+int vsnprintf(char* buffer, size_t count, const char *__restrict format,
+    va_list va)
+    __attribute__((format(__printf__, 3, 0)));
+
+int sprintf(char *__restrict buffer,
+    const char *__restrict format, ...)
+    __attribute__ ((format (__printf__, 2, 3)));
+# 83 "src/include/lwip/arch.h" 2
+# 1 "/home/john/installs/CEdev/include/stdlib.h" 1 3
+
+
+
+
+
+typedef struct {
+  int quot;
+  int rem;
+} div_t;
+
+typedef struct {
+  long quot;
+  long rem;
+} ldiv_t;
+
+typedef struct {
+  long long rem;
+  long long quot;
+} lldiv_t;
+
+typedef char __align;
+union header {
+  struct {
+    union header *ptr;
+    unsigned int size;
+  } s;
+  __align x;
+};
+typedef union header _HEADER;
+# 42 "/home/john/installs/CEdev/include/stdlib.h" 3
+void *calloc(size_t nmemb, size_t size) __attribute__((malloc));
+
+void *malloc(size_t size) __attribute__((malloc));
+
+void *realloc(void *ptr, size_t size) __attribute__((warn_unused_result));
+
+void free(void *ptr) __attribute__((__nothrow__, __leaf__));
+
+double atof(const char *nptr) __attribute__((nonnull(1)));
+
+int atoi(const char *nptr) __attribute__((nonnull(1)));
+
+long atol(const char *nptr) __attribute__((nonnull(1)));
+
+long long atoll(const char *nptr) __attribute__((nonnull(1)));
+
+float strtof(const char *__restrict nptr,
+             char **__restrict endptr) __attribute__((nonnull(1)));
+
+double strtod(const char *__restrict nptr,
+              char **__restrict endptr) __attribute__((nonnull(1)));
+
+long strtol(const char *__restrict nptr,
+            char **__restrict endptr, int base) __attribute__((nonnull(1)));
+
+long long strtoll(const char *__restrict nptr,
+                  char **__restrict endptr,
+                  int base) __attribute__((nonnull(1)));
+
+unsigned long strtoul(const char *__restrict nptr,
+                      char **__restrict endptr, int base)
+                      __attribute__((nonnull(1)));
+
+unsigned long long strtoull(const char *__restrict nptr,
+                            char **__restrict endptr, int base)
+                            __attribute__((nonnull(1)));
+
+void srand(unsigned int seed);
+
+int rand(void);
+
+void *bsearch(void *key, void *base, size_t nmemb, size_t size,
+              int (*compar)(const void *, const void *))
+              __attribute__((nonnull(1, 2, 5)));
+
+void qsort(void *base, size_t nmemb, size_t size,
+           int (*compar)(const void *, const void *))
+           __attribute__((nonnull(1, 4)));
+
+void abort(void) __attribute__((__nothrow__, __leaf__)) __attribute__((noreturn));
+
+int atexit(void (*)(void)) __attribute__((__nothrow__, __leaf__));
+
+int on_exit(void (*)(int, void *), void *) __attribute__((__nothrow__, __leaf__));
+
+void exit(int) __attribute__((__nothrow__, __leaf__)) __attribute__((noreturn));
+
+int at_quick_exit(void (*)(void)) __attribute__((__nothrow__, __leaf__));
+
+void quick_exit(int) __attribute__((__nothrow__, __leaf__)) __attribute__((noreturn));
+
+void _Exit(int) __attribute__((__nothrow__, __leaf__)) __attribute__((noreturn));
+
+int abs(int n);
+
+long labs(long n);
+
+long long llabs(long long n);
+
+div_t div(int numer, int denom);
+
+ldiv_t ldiv(long numer, long denom);
+
+lldiv_t lldiv(long long numer, long long denom);
+# 84 "src/include/lwip/arch.h" 2
+# 107 "src/include/lwip/arch.h"
+# 1 "/home/john/installs/CEdev/include/stddef.h" 1 3
+
+
+
+
+
+
+
+typedef int ptrdiff_t;
+
+
+
+
+typedef short wchar_t;
+
+
+
+typedef struct {
+    long long __max_align_ll __attribute__((__aligned__(__alignof__( long long))));
+    long double __max_align_ld __attribute__((__aligned__(__alignof__(long double))));
+
+
+
+} max_align_t;
+# 108 "src/include/lwip/arch.h" 2
+# 120 "src/include/lwip/arch.h"
+# 1 "/home/john/installs/CEdev/include/stdint.h" 1 3
+
+
+
+
+
+typedef signed char int8_t;
+
+
+
+
+typedef unsigned char uint8_t;
+
+
+
+typedef signed char int_fast8_t;
+
+
+
+typedef unsigned char uint_fast8_t;
+
+
+typedef signed char int_least8_t;
+
+
+
+typedef unsigned char uint_least8_t;
+
+
+
+typedef short int16_t;
+
+
+
+
+typedef unsigned short uint16_t;
+
+
+
+typedef short int_fast16_t;
+
+
+
+typedef unsigned short uint_fast16_t;
+
+
+typedef short int_least16_t;
+
+
+
+typedef unsigned short uint_least16_t;
+
+
+
+
+typedef int int24_t;
+
+
+
+
+typedef unsigned int uint24_t;
+
+
+
+
+
+typedef long int int32_t;
+
+
+
+
+typedef long unsigned int uint32_t;
+
+
+
+typedef long int int_fast32_t;
+
+
+
+typedef long unsigned int uint_fast32_t;
+
+
+typedef long int int_least32_t;
+
+
+
+typedef long unsigned int uint_least32_t;
+
+
+
+
+
+
+typedef signed __int48 int48_t;
+
+
+
+
+
+
+typedef unsigned __int48 uint48_t;
+
+
+
+
+
+typedef long long int int64_t;
+
+
+
+
+typedef long long unsigned int uint64_t;
+
+
+
+typedef long long int int_fast64_t;
+
+
+
+typedef long long unsigned int uint_fast64_t;
+
+
+typedef long long int int_least64_t;
+
+
+
+typedef long long unsigned int uint_least64_t;
+# 144 "/home/john/installs/CEdev/include/stdint.h" 3
+typedef long long int intmax_t;
+
+
+
+
+typedef long long unsigned int uintmax_t;
+
+
+
+
+typedef int intptr_t;
+
+
+
+typedef unsigned int uintptr_t;
+# 121 "src/include/lwip/arch.h" 2
+
+
+
+
+typedef uint8_t u8_t;
+typedef int8_t s8_t;
+typedef uint16_t u16_t;
+typedef int16_t s16_t;
+typedef uint32_t u32_t;
+typedef int32_t s32_t;
+
+typedef uint64_t u64_t;
+typedef int64_t s64_t;
+
+typedef uintptr_t mem_ptr_t;
+# 148 "src/include/lwip/arch.h"
+# 1 "/home/john/installs/CEdev/include/inttypes.h" 1 3
+# 175 "/home/john/installs/CEdev/include/inttypes.h" 3
+extern intmax_t imaxabs(intmax_t __n)
+    __attribute__((__nothrow__, __leaf__)) __attribute__((__const__));
+
+typedef struct {
+    intmax_t rem;
+    intmax_t quot;
+} imaxdiv_t;
+extern imaxdiv_t imaxdiv(intmax_t __numer, intmax_t __denom)
+    __attribute__((__nothrow__, __leaf__)) __attribute__((__const__));
+# 149 "src/include/lwip/arch.h" 2
+# 185 "src/include/lwip/arch.h"
+# 1 "/home/john/installs/CEdev/include/limits.h" 1 3
+# 186 "src/include/lwip/arch.h" 2
+# 202 "src/include/lwip/arch.h"
+typedef int ssize_t;
+# 228 "src/include/lwip/arch.h"
+# 1 "/home/john/installs/CEdev/include/ctype.h" 1 3
+
+
+
+
+
+
+
+int isalnum(int c);
+
+int isalpha(int c);
+
+int iscntrl(int c);
+
+int isdigit(int c);
+
+int isgraph(int c);
+
+int islower(int c);
+
+int isprint(int c);
+
+int ispunct(int c);
+
+int isspace(int c);
+
+int isupper(int c);
+
+int tolower(int c);
+
+int toupper(int c);
+
+int isascii(int c);
+
+int isxdigit(int c);
+# 229 "src/include/lwip/arch.h" 2
+# 41 "src/include/lwip/debug.h" 2
+# 1 "src/include/lwip/opt.h" 1
+# 42 "src/include/lwip/debug.h" 2
+# 53 "src/include/lwip/opt.h" 2
+# 101 "src/core/tcp.c" 2
+
+
+
+# 1 "src/include/lwip/def.h" 1
+# 96 "src/include/lwip/def.h"
+u16_t lwip_htons(u16_t x);
+
+
+
+
+u32_t lwip_htonl(u32_t x);
+# 133 "src/include/lwip/def.h"
+void lwip_itoa(char* result, size_t bufsize, int number);
+
+
+
+int lwip_strnicmp(const char* str1, const char* str2, size_t len);
+
+
+
+int lwip_stricmp(const char* str1, const char* str2);
+
+
+
+char* lwip_strnstr(const char* buffer, const char* token, size_t n);
+
+
+
+char* lwip_strnistr(const char* buffer, const char* token, size_t n);
+# 105 "src/core/tcp.c" 2
+# 1 "src/include/lwip/mem.h" 1
+# 67 "src/include/lwip/mem.h"
+typedef u16_t mem_size_t;
+
+
+
+
+void mem_init(void);
+void *mem_trim(void *mem, mem_size_t size);
+void *mem_malloc(mem_size_t size);
+void *mem_calloc(mem_size_t count, mem_size_t size);
+void mem_free(void *mem);
+# 106 "src/core/tcp.c" 2
+# 1 "src/include/lwip/memp.h" 1
+# 49 "src/include/lwip/memp.h"
+# 1 "src/include/lwip/priv/memp_std.h" 1
+# 50 "src/include/lwip/memp.h" 2
+
+
+typedef enum {
+
+# 1 "src/include/lwip/priv/memp_std.h" 1
+# 42 "src/include/lwip/priv/memp_std.h"
+MEMP_RAW_PCB,
+
+
+
+MEMP_UDP_PCB,
+
+
+
+MEMP_TCP_PCB,
+MEMP_TCP_PCB_LISTEN,
+MEMP_TCP_SEG,
+
+
+
+MEMP_ALTCP_PCB,
+
+
+
+MEMP_REASSDATA,
+
+
+MEMP_FRAG_PBUF,
+# 94 "src/include/lwip/priv/memp_std.h"
+MEMP_ARP_QUEUE,
+
+
+
+MEMP_IGMP_GROUP,
+
+
+
+MEMP_SYS_TIMEOUT,
+# 113 "src/include/lwip/priv/memp_std.h"
+MEMP_ND6_QUEUE,
+
+
+
+MEMP_IP6_REASSDATA,
+
+
+
+MEMP_MLD6_GROUP,
+# 133 "src/include/lwip/priv/memp_std.h"
+MEMP_PBUF,
+MEMP_PBUF_POOL,
+# 55 "src/include/lwip/memp.h" 2
+ MEMP_MAX
+} memp_t;
+
+# 1 "src/include/lwip/priv/memp_priv.h" 1
+# 48 "src/include/lwip/priv/memp_priv.h"
+# 1 "src/include/lwip/priv/mem_priv.h" 1
+# 49 "src/include/lwip/priv/memp_priv.h" 2
+# 69 "src/include/lwip/priv/memp_priv.h"
+struct memp {
+  struct memp *next;
+
+
+
+
+};
+# 108 "src/include/lwip/priv/memp_priv.h"
+struct memp_desc {
+
+
+  const char *desc;
+
+
+
+  struct stats_mem *stats;
+
+
+
+  u16_t size;
+
+
+
+  u16_t num;
+
+
+  u8_t *base;
+
+
+  struct memp **tab;
+
+};
+# 147 "src/include/lwip/priv/memp_priv.h"
+void memp_init_pool(const struct memp_desc *desc);
+
+
+
+
+
+void *memp_malloc_pool(const struct memp_desc *desc);
+
+void memp_free_pool(const struct memp_desc* desc, void *mem);
+# 59 "src/include/lwip/memp.h" 2
+# 1 "src/include/lwip/stats.h" 1
+# 43 "src/include/lwip/stats.h"
+# 1 "src/include/lwip/memp.h" 1
+# 44 "src/include/lwip/stats.h" 2
+# 64 "src/include/lwip/stats.h"
+struct stats_proto {
+  u16_t xmit;
+  u16_t recv;
+  u16_t fw;
+  u16_t drop;
+  u16_t chkerr;
+  u16_t lenerr;
+  u16_t memerr;
+  u16_t rterr;
+  u16_t proterr;
+  u16_t opterr;
+  u16_t err;
+  u16_t cachehit;
+};
+
+
+struct stats_igmp {
+  u16_t xmit;
+  u16_t recv;
+  u16_t drop;
+  u16_t chkerr;
+  u16_t lenerr;
+  u16_t memerr;
+  u16_t proterr;
+  u16_t rx_v1;
+  u16_t rx_group;
+  u16_t rx_general;
+  u16_t rx_report;
+  u16_t tx_join;
+  u16_t tx_leave;
+  u16_t tx_report;
+};
+
+
+struct stats_mem {
+
+  const char *name;
+
+  u16_t err;
+  mem_size_t avail;
+  mem_size_t used;
+  mem_size_t max;
+  u16_t illegal;
+};
+
+
+struct stats_syselem {
+  u16_t used;
+  u16_t max;
+  u16_t err;
+};
+
+
+struct stats_sys {
+  struct stats_syselem sem;
+  struct stats_syselem mutex;
+  struct stats_syselem mbox;
+};
+
+
+struct stats_mib2 {
+
+  u32_t ipinhdrerrors;
+  u32_t ipinaddrerrors;
+  u32_t ipinunknownprotos;
+  u32_t ipindiscards;
+  u32_t ipindelivers;
+  u32_t ipoutrequests;
+  u32_t ipoutdiscards;
+  u32_t ipoutnoroutes;
+  u32_t ipreasmoks;
+  u32_t ipreasmfails;
+  u32_t ipfragoks;
+  u32_t ipfragfails;
+  u32_t ipfragcreates;
+  u32_t ipreasmreqds;
+  u32_t ipforwdatagrams;
+  u32_t ipinreceives;
+
+
+  u32_t tcpactiveopens;
+  u32_t tcppassiveopens;
+  u32_t tcpattemptfails;
+  u32_t tcpestabresets;
+  u32_t tcpoutsegs;
+  u32_t tcpretranssegs;
+  u32_t tcpinsegs;
+  u32_t tcpinerrs;
+  u32_t tcpoutrsts;
+
+
+  u32_t udpindatagrams;
+  u32_t udpnoports;
+  u32_t udpinerrors;
+  u32_t udpoutdatagrams;
+
+
+  u32_t icmpinmsgs;
+  u32_t icmpinerrors;
+  u32_t icmpindestunreachs;
+  u32_t icmpintimeexcds;
+  u32_t icmpinparmprobs;
+  u32_t icmpinsrcquenchs;
+  u32_t icmpinredirects;
+  u32_t icmpinechos;
+  u32_t icmpinechoreps;
+  u32_t icmpintimestamps;
+  u32_t icmpintimestampreps;
+  u32_t icmpinaddrmasks;
+  u32_t icmpinaddrmaskreps;
+  u32_t icmpoutmsgs;
+  u32_t icmpouterrors;
+  u32_t icmpoutdestunreachs;
+  u32_t icmpouttimeexcds;
+  u32_t icmpoutechos;
+  u32_t icmpoutechoreps;
+};
+
+
+
+
+
+struct stats_mib2_netif_ctrs {
+
+  u32_t ifinoctets;
+
+
+  u32_t ifinucastpkts;
+
+
+  u32_t ifinnucastpkts;
+
+
+
+  u32_t ifindiscards;
+
+
+
+
+  u32_t ifinerrors;
+
+
+
+
+
+
+  u32_t ifinunknownprotos;
+
+  u32_t ifoutoctets;
+
+
+
+  u32_t ifoutucastpkts;
+
+
+
+  u32_t ifoutnucastpkts;
+
+
+
+  u32_t ifoutdiscards;
+
+
+
+  u32_t ifouterrors;
+};
+
+
+struct stats_ {
+
+
+  struct stats_proto link;
+
+
+
+  struct stats_proto etharp;
+
+
+
+  struct stats_proto ip_frag;
+
+
+
+  struct stats_proto ip;
+
+
+
+  struct stats_proto icmp;
+
+
+
+  struct stats_igmp igmp;
+
+
+
+  struct stats_proto udp;
+
+
+
+  struct stats_proto tcp;
+
+
+
+  struct stats_mem mem;
+
+
+
+  struct stats_mem *memp[MEMP_MAX];
+
+
+
+  struct stats_sys sys;
+
+
+
+  struct stats_proto ip6;
+
+
+
+  struct stats_proto icmp6;
+
+
+
+  struct stats_proto ip6_frag;
+
+
+
+  struct stats_igmp mld6;
+
+
+
+  struct stats_proto nd6;
+
+
+
+  struct stats_mib2 mib2;
+
+};
+
+
+extern struct stats_ lwip_stats;
+
+
+void stats_init(void);
+# 472 "src/include/lwip/stats.h"
+void stats_display(void);
+void stats_display_proto(struct stats_proto *proto, const char *name);
+void stats_display_igmp(struct stats_igmp *igmp, const char *name);
+void stats_display_mem(struct stats_mem *mem, const char *name);
+void stats_display_memp(struct stats_mem *mem, int index);
+void stats_display_sys(struct stats_sys *sys);
+# 60 "src/include/lwip/memp.h" 2
+
+extern const struct memp_desc* const memp_pools[MEMP_MAX];
+# 141 "src/include/lwip/memp.h"
+void memp_init(void);
+
+
+
+
+
+void *memp_malloc(memp_t type);
+
+void memp_free(memp_t type, void *mem);
+# 107 "src/core/tcp.c" 2
+# 1 "src/include/lwip/tcp.h" 1
+# 45 "src/include/lwip/tcp.h"
+# 1 "src/include/lwip/tcpbase.h" 1
+# 53 "src/include/lwip/tcpbase.h"
+typedef u16_t tcpwnd_size_t;
+
+
+enum tcp_state {
+  CLOSED = 0,
+  LISTEN = 1,
+  SYN_SENT = 2,
+  SYN_RCVD = 3,
+  ESTABLISHED = 4,
+  FIN_WAIT_1 = 5,
+  FIN_WAIT_2 = 6,
+  CLOSE_WAIT = 7,
+  CLOSING = 8,
+  LAST_ACK = 9,
+  TIME_WAIT = 10
+};
+# 80 "src/include/lwip/tcpbase.h"
+const char* tcp_debug_state_str(enum tcp_state s);
+# 46 "src/include/lwip/tcp.h" 2
+
+# 1 "src/include/lwip/pbuf.h" 1
+# 42 "src/include/lwip/pbuf.h"
+# 1 "src/include/lwip/err.h" 1
+# 53 "src/include/lwip/err.h"
+typedef enum {
+
+  ERR_OK = 0,
+
+  ERR_MEM = -1,
+
+  ERR_BUF = -2,
+
+  ERR_TIMEOUT = -3,
+
+  ERR_RTE = -4,
+
+  ERR_INPROGRESS = -5,
+
+  ERR_VAL = -6,
+
+  ERR_WOULDBLOCK = -7,
+
+  ERR_USE = -8,
+
+  ERR_ALREADY = -9,
+
+  ERR_ISCONN = -10,
+
+  ERR_CONN = -11,
+
+  ERR_IF = -12,
+
+
+  ERR_ABRT = -13,
+
+  ERR_RST = -14,
+
+  ERR_CLSD = -15,
+
+  ERR_ARG = -16
+} err_enum_t;
+
+
+
+
+
+
+typedef s8_t err_t;
+# 43 "src/include/lwip/pbuf.h" 2
+# 89 "src/include/lwip/pbuf.h"
+typedef enum {
+
+
+
+  PBUF_TRANSPORT = 0 + (14 + 0) + 40 + 20,
+
+
+
+  PBUF_IP = 0 + (14 + 0) + 40,
+
+
+
+
+  PBUF_LINK = 0 + (14 + 0),
+
+
+
+
+
+  PBUF_RAW_TX = 0,
+
+
+  PBUF_RAW = 0
+} pbuf_layer;
+# 145 "src/include/lwip/pbuf.h"
+typedef enum {
+
+
+
+
+
+
+  PBUF_RAM = (0x0200 | 0x80 | 0x00),
+
+
+
+  PBUF_ROM = 0x01,
+
+
+
+  PBUF_REF = (0x40 | 0x01),
+
+
+
+
+
+
+  PBUF_POOL = (0x0100 | 0x80 | 0x02)
+} pbuf_type;
+# 186 "src/include/lwip/pbuf.h"
+struct pbuf {
+
+  struct pbuf *next;
+
+
+  void *payload;
+# 200 "src/include/lwip/pbuf.h"
+  u16_t tot_len;
+
+
+  u16_t len;
+
+
+
+
+  u8_t type_internal;
+
+
+  u8_t flags;
+
+
+
+
+
+
+  u8_t ref;
+
+
+  u8_t if_idx;
+
+
+
+};
+
+
+
+
+
+
+struct pbuf_rom {
+
+  struct pbuf *next;
+
+
+  const void *payload;
+};
+
+
+
+typedef void (*pbuf_free_custom_fn)(struct pbuf *p);
+
+
+struct pbuf_custom {
+
+  struct pbuf pbuf;
+
+  pbuf_free_custom_fn custom_free_function;
+};
+
+
+
+
+
+
+
+extern volatile u8_t pbuf_free_ooseq_pending;
+void pbuf_free_ooseq(void);
+# 275 "src/include/lwip/pbuf.h"
+struct pbuf *pbuf_alloc(pbuf_layer l, u16_t length, pbuf_type type);
+struct pbuf *pbuf_alloc_reference(void *payload, u16_t length, pbuf_type type);
+
+struct pbuf *pbuf_alloced_custom(pbuf_layer l, u16_t length, pbuf_type type,
+                                 struct pbuf_custom *p, void *payload_mem,
+                                 u16_t payload_mem_len);
+
+void pbuf_realloc(struct pbuf *p, u16_t size);
+
+
+
+u8_t pbuf_header(struct pbuf *p, s16_t header_size);
+u8_t pbuf_header_force(struct pbuf *p, s16_t header_size);
+u8_t pbuf_add_header(struct pbuf *p, size_t header_size_increment);
+u8_t pbuf_add_header_force(struct pbuf *p, size_t header_size_increment);
+u8_t pbuf_remove_header(struct pbuf *p, size_t header_size);
+struct pbuf *pbuf_free_header(struct pbuf *q, u16_t size);
+void pbuf_ref(struct pbuf *p);
+u8_t pbuf_free(struct pbuf *p);
+u16_t pbuf_clen(const struct pbuf *p);
+void pbuf_cat(struct pbuf *head, struct pbuf *tail);
+void pbuf_chain(struct pbuf *head, struct pbuf *tail);
+struct pbuf *pbuf_dechain(struct pbuf *p);
+err_t pbuf_copy(struct pbuf *p_to, const struct pbuf *p_from);
+err_t pbuf_copy_partial_pbuf(struct pbuf *p_to, const struct pbuf *p_from, u16_t copy_len, u16_t offset);
+u16_t pbuf_copy_partial(const struct pbuf *p, void *dataptr, u16_t len, u16_t offset);
+void *pbuf_get_contiguous(const struct pbuf *p, void *buffer, size_t bufsize, u16_t len, u16_t offset);
+err_t pbuf_take(struct pbuf *buf, const void *dataptr, u16_t len);
+err_t pbuf_take_at(struct pbuf *buf, const void *dataptr, u16_t len, u16_t offset);
+struct pbuf *pbuf_skip(struct pbuf* in, u16_t in_offset, u16_t* out_offset);
+struct pbuf *pbuf_coalesce(struct pbuf *p, pbuf_layer layer);
+struct pbuf *pbuf_clone(pbuf_layer l, pbuf_type type, struct pbuf *p);
+# 315 "src/include/lwip/pbuf.h"
+u8_t pbuf_get_at(const struct pbuf* p, u16_t offset);
+int pbuf_try_get_at(const struct pbuf* p, u16_t offset);
+void pbuf_put_at(struct pbuf* p, u16_t offset, u8_t data);
+u16_t pbuf_memcmp(const struct pbuf* p, u16_t offset, const void* s2, u16_t n);
+u16_t pbuf_memfind(const struct pbuf* p, const void* mem, u16_t mem_len, u16_t start_offset);
+u16_t pbuf_strstr(const struct pbuf* p, const char* substr);
+# 48 "src/include/lwip/tcp.h" 2
+# 1 "src/include/lwip/ip.h" 1
+# 44 "src/include/lwip/ip.h"
+# 1 "src/include/lwip/ip_addr.h" 1
+# 43 "src/include/lwip/ip_addr.h"
+# 1 "src/include/lwip/ip4_addr.h" 1
+# 51 "src/include/lwip/ip4_addr.h"
+struct ip4_addr {
+  u32_t addr;
+};
+
+
+
+typedef struct ip4_addr ip4_addr_t;
+
+
+struct netif;
+# 160 "src/include/lwip/ip4_addr.h"
+u8_t ip4_addr_isbroadcast_u32(u32_t addr, const struct netif *netif);
+
+
+u8_t ip4_addr_netmask_valid(u32_t netmask);
+# 213 "src/include/lwip/ip4_addr.h"
+u32_t ipaddr_addr(const char *cp);
+int ip4addr_aton(const char *cp, ip4_addr_t *addr);
+
+char *ip4addr_ntoa(const ip4_addr_t *addr);
+char *ip4addr_ntoa_r(const ip4_addr_t *addr, char *buf, int buflen);
+# 44 "src/include/lwip/ip_addr.h" 2
+# 1 "src/include/lwip/ip6_addr.h" 1
+# 50 "src/include/lwip/ip6_addr.h"
+# 1 "src/include/lwip/ip6_zone.h" 1
+# 138 "src/include/lwip/ip6_zone.h"
+enum lwip_ipv6_scope_type
+{
+
+  IP6_UNKNOWN = 0,
+
+  IP6_UNICAST = 1,
+
+  IP6_MULTICAST = 2
+};
+# 51 "src/include/lwip/ip6_addr.h" 2
+
+
+
+
+
+
+
+
+struct ip6_addr {
+  u32_t addr[4];
+
+  u8_t zone;
+
+};
+
+
+typedef struct ip6_addr ip6_addr_t;
+# 359 "src/include/lwip/ip6_addr.h"
+int ip6addr_aton(const char *cp, ip6_addr_t *addr);
+
+char *ip6addr_ntoa(const ip6_addr_t *addr);
+char *ip6addr_ntoa_r(const ip6_addr_t *addr, char *buf, int buflen);
+# 45 "src/include/lwip/ip_addr.h" 2
+# 54 "src/include/lwip/ip_addr.h"
+enum lwip_ip_addr_type {
+
+  IPADDR_TYPE_V4 = 0U,
+
+  IPADDR_TYPE_V6 = 6U,
+
+  IPADDR_TYPE_ANY = 46U
+};
+
+
+
+
+
+
+
+typedef struct ip_addr {
+  union {
+    ip6_addr_t ip6;
+    ip4_addr_t ip4;
+  } u_addr;
+
+  u8_t type;
+} ip_addr_t;
+
+extern const ip_addr_t ip_addr_any_type;
+# 263 "src/include/lwip/ip_addr.h"
+char *ipaddr_ntoa(const ip_addr_t *addr);
+char *ipaddr_ntoa_r(const ip_addr_t *addr, char *buf, int buflen);
+int ipaddr_aton(const char *cp, ip_addr_t *addr);
+# 398 "src/include/lwip/ip_addr.h"
+extern const ip_addr_t ip_addr_any;
+extern const ip_addr_t ip_addr_broadcast;
+# 434 "src/include/lwip/ip_addr.h"
+extern const ip_addr_t ip6_addr_any;
+# 45 "src/include/lwip/ip.h" 2
+
+# 1 "src/include/lwip/netif.h" 1
+# 113 "src/include/lwip/netif.h"
+enum lwip_internal_netif_client_data_index
+{
+
+
+   LWIP_NETIF_CLIENT_DATA_INDEX_DHCP,
+
+
+   LWIP_NETIF_CLIENT_DATA_INDEX_AUTOIP,
+
+
+   LWIP_NETIF_CLIENT_DATA_INDEX_ACD,
+
+
+   LWIP_NETIF_CLIENT_DATA_INDEX_IGMP,
+
+
+
+
+
+
+
+   LWIP_NETIF_CLIENT_DATA_INDEX_MLD6,
+
+
+   LWIP_NETIF_CLIENT_DATA_INDEX_MAX
+};
+# 155 "src/include/lwip/netif.h"
+struct netif;
+
+
+
+enum netif_mac_filter_action {
+
+  NETIF_DEL_MAC_FILTER = 0,
+
+  NETIF_ADD_MAC_FILTER = 1
+};
+
+
+
+
+
+
+typedef err_t (*netif_init_fn)(struct netif *netif);
+# 181 "src/include/lwip/netif.h"
+typedef err_t (*netif_input_fn)(struct pbuf *p, struct netif *inp);
+# 192 "src/include/lwip/netif.h"
+typedef err_t (*netif_output_fn)(struct netif *netif, struct pbuf *p,
+       const ip4_addr_t *ipaddr);
+# 205 "src/include/lwip/netif.h"
+typedef err_t (*netif_output_ip6_fn)(struct netif *netif, struct pbuf *p,
+       const ip6_addr_t *ipaddr);
+# 215 "src/include/lwip/netif.h"
+typedef err_t (*netif_linkoutput_fn)(struct netif *netif, struct pbuf *p);
+
+typedef void (*netif_status_callback_fn)(struct netif *netif);
+
+
+typedef err_t (*netif_igmp_mac_filter_fn)(struct netif *netif,
+       const ip4_addr_t *group, enum netif_mac_filter_action action);
+
+
+
+typedef err_t (*netif_mld_mac_filter_fn)(struct netif *netif,
+       const ip6_addr_t *group, enum netif_mac_filter_action action);
+
+
+
+
+u8_t netif_alloc_client_data_id(void);
+# 247 "src/include/lwip/netif.h"
+typedef u8_t netif_addr_idx_t;
+# 269 "src/include/lwip/netif.h"
+struct netif {
+
+
+  struct netif *next;
+
+
+
+
+  ip_addr_t ip_addr;
+  ip_addr_t netmask;
+  ip_addr_t gw;
+
+
+
+  ip_addr_t ip6_addr[3];
+
+
+  u8_t ip6_addr_state[3];
+
+
+
+
+  u32_t ip6_addr_valid_life[3];
+  u32_t ip6_addr_pref_life[3];
+
+
+
+
+  netif_input_fn input;
+
+
+
+
+
+  netif_output_fn output;
+
+
+
+
+  netif_linkoutput_fn linkoutput;
+
+
+
+
+
+  netif_output_ip6_fn output_ip6;
+
+
+
+
+  netif_status_callback_fn status_callback;
+
+
+
+
+  netif_status_callback_fn link_callback;
+
+
+
+
+
+
+
+  void *state;
+
+  void* client_data[LWIP_NETIF_CLIENT_DATA_INDEX_MAX + (1)];
+# 344 "src/include/lwip/netif.h"
+  u16_t mtu;
+
+
+  u16_t mtu6;
+
+
+  u8_t hwaddr[6U];
+
+  u8_t hwaddr_len;
+
+  u8_t flags;
+
+  char name[2];
+
+
+  u8_t num;
+
+
+  u8_t ip6_autoconfig_enabled;
+
+
+
+  u8_t rs_count;
+
+
+
+  u8_t link_type;
+
+  u32_t link_speed;
+
+  u32_t ts;
+
+  struct stats_mib2_netif_ctrs mib2_counters;
+
+
+
+
+  netif_igmp_mac_filter_fn igmp_mac_filter;
+
+
+
+
+  netif_mld_mac_filter_fn mld_mac_filter;
+
+
+  struct acd *acd_list;
+
+
+
+
+
+
+  struct pbuf *loop_first;
+  struct pbuf *loop_last;
+
+  u16_t loop_cnt_current;
+
+
+
+
+
+
+};
+# 423 "src/include/lwip/netif.h"
+extern struct netif *netif_list;
+
+
+
+extern struct netif *netif_default;
+
+void netif_init(void);
+
+struct netif *netif_add_noaddr(struct netif *netif, void *state, netif_init_fn init, netif_input_fn input);
+
+
+struct netif *netif_add(struct netif *netif,
+                            const ip4_addr_t *ipaddr, const ip4_addr_t *netmask, const ip4_addr_t *gw,
+                            void *state, netif_init_fn init, netif_input_fn input);
+void netif_set_addr(struct netif *netif, const ip4_addr_t *ipaddr, const ip4_addr_t *netmask,
+                    const ip4_addr_t *gw);
+
+
+
+void netif_remove(struct netif * netif);
+
+
+
+
+
+struct netif *netif_find(const char *name);
+
+void netif_set_default(struct netif *netif);
+
+
+void netif_set_ipaddr(struct netif *netif, const ip4_addr_t *ipaddr);
+void netif_set_netmask(struct netif *netif, const ip4_addr_t *netmask);
+void netif_set_gw(struct netif *netif, const ip4_addr_t *gw);
+# 474 "src/include/lwip/netif.h"
+void netif_set_up(struct netif *netif);
+void netif_set_down(struct netif *netif);
+
+
+
+
+
+
+void netif_set_status_callback(struct netif *netif, netif_status_callback_fn status_callback);
+
+
+
+
+
+void netif_set_link_up(struct netif *netif);
+void netif_set_link_down(struct netif *netif);
+
+
+
+
+void netif_set_link_callback(struct netif *netif, netif_status_callback_fn link_callback);
+# 522 "src/include/lwip/netif.h"
+err_t netif_loop_output(struct netif *netif, struct pbuf *p);
+void netif_poll(struct netif *netif);
+
+void netif_poll_all(void);
+
+
+
+err_t netif_input(struct pbuf *p, struct netif *inp);
+
+
+
+
+
+
+void netif_ip6_addr_set(struct netif *netif, s8_t addr_idx, const ip6_addr_t *addr6);
+void netif_ip6_addr_set_parts(struct netif *netif, s8_t addr_idx, u32_t i0, u32_t i1, u32_t i2, u32_t i3);
+
+void netif_ip6_addr_set_state(struct netif* netif, s8_t addr_idx, u8_t state);
+s8_t netif_get_ip6_addr_match(struct netif *netif, const ip6_addr_t *ip6addr);
+void netif_create_ip6_linklocal_address(struct netif *netif, u8_t from_mac_48bit);
+err_t netif_add_ip6_address(struct netif *netif, const ip6_addr_t *ip6addr, s8_t *chosen_idx);
+# 573 "src/include/lwip/netif.h"
+u8_t netif_name_to_index(const char *name);
+char * netif_index_to_name(u8_t idx, char *name);
+struct netif* netif_get_by_index(u8_t idx);
+# 586 "src/include/lwip/netif.h"
+typedef u16_t netif_nsc_reason_t;
+# 618 "src/include/lwip/netif.h"
+typedef union
+{
+
+  struct link_changed_s
+  {
+
+    u8_t state;
+  } link_changed;
+
+  struct status_changed_s
+  {
+
+    u8_t state;
+  } status_changed;
+
+  struct ipv4_changed_s
+  {
+
+    const ip_addr_t* old_address;
+    const ip_addr_t* old_netmask;
+    const ip_addr_t* old_gw;
+  } ipv4_changed;
+
+  struct ipv6_set_s
+  {
+
+    s8_t addr_index;
+
+    const ip_addr_t* old_address;
+  } ipv6_set;
+
+  struct ipv6_addr_state_changed_s
+  {
+
+    s8_t addr_index;
+
+    u8_t old_state;
+
+    const ip_addr_t* address;
+  } ipv6_addr_state_changed;
+} netif_ext_callback_args_t;
+# 668 "src/include/lwip/netif.h"
+typedef void (*netif_ext_callback_fn)(struct netif* netif, netif_nsc_reason_t reason, const netif_ext_callback_args_t* args);
+
+
+struct netif_ext_callback;
+typedef struct netif_ext_callback
+{
+  netif_ext_callback_fn callback_fn;
+  struct netif_ext_callback* next;
+} netif_ext_callback_t;
+
+
+void netif_add_ext_callback(netif_ext_callback_t* callback, netif_ext_callback_fn fn);
+void netif_remove_ext_callback(netif_ext_callback_t* callback);
+void netif_invoke_ext_callback(struct netif* netif, netif_nsc_reason_t reason, const netif_ext_callback_args_t* args);
+# 47 "src/include/lwip/ip.h" 2
+# 1 "src/include/lwip/ip4.h" 1
+# 49 "src/include/lwip/ip4.h"
+# 1 "src/include/lwip/prot/ip4.h" 1
+# 53 "src/include/lwip/prot/ip4.h"
+struct ip4_addr_packed {
+  u32_t addr;
+} __attribute__((packed));
+
+
+
+
+
+typedef struct ip4_addr_packed ip4_addr_p_t;
+# 73 "src/include/lwip/prot/ip4.h"
+struct ip_hdr {
+
+  u8_t _v_hl;
+
+  u8_t _tos;
+
+  u16_t _len;
+
+  u16_t _id;
+
+  u16_t _offset;
+
+
+
+
+
+  u8_t _ttl;
+
+  u8_t _proto;
+
+  u16_t _chksum;
+
+  ip4_addr_p_t src;
+  ip4_addr_p_t dest;
+} __attribute__((packed));
+# 50 "src/include/lwip/ip4.h" 2
+# 65 "src/include/lwip/ip4.h"
+struct netif *ip4_route(const ip4_addr_t *dest);
+
+
+
+
+
+err_t ip4_input(struct pbuf *p, struct netif *inp);
+err_t ip4_output(struct pbuf *p, const ip4_addr_t *src, const ip4_addr_t *dest,
+       u8_t ttl, u8_t tos, u8_t proto);
+err_t ip4_output_if(struct pbuf *p, const ip4_addr_t *src, const ip4_addr_t *dest,
+       u8_t ttl, u8_t tos, u8_t proto, struct netif *netif);
+err_t ip4_output_if_src(struct pbuf *p, const ip4_addr_t *src, const ip4_addr_t *dest,
+       u8_t ttl, u8_t tos, u8_t proto, struct netif *netif);
+
+
+
+
+
+err_t ip4_output_if_opt(struct pbuf *p, const ip4_addr_t *src, const ip4_addr_t *dest,
+       u8_t ttl, u8_t tos, u8_t proto, struct netif *netif, void *ip_options,
+       u16_t optlen);
+err_t ip4_output_if_opt_src(struct pbuf *p, const ip4_addr_t *src, const ip4_addr_t *dest,
+       u8_t ttl, u8_t tos, u8_t proto, struct netif *netif, void *ip_options,
+       u16_t optlen);
+
+
+
+void ip4_set_default_multicast_netif(struct netif* default_multicast_netif);
+# 48 "src/include/lwip/ip.h" 2
+# 1 "src/include/lwip/ip6.h" 1
+# 49 "src/include/lwip/ip6.h"
+# 1 "src/include/lwip/prot/ip6.h" 1
+# 55 "src/include/lwip/prot/ip6.h"
+struct ip6_addr_packed {
+  u32_t addr[4];
+} __attribute__((packed));
+
+
+
+
+typedef struct ip6_addr_packed ip6_addr_p_t;
+# 82 "src/include/lwip/prot/ip6.h"
+struct ip6_hdr {
+
+  u32_t _v_tc_fl;
+
+  u16_t _plen;
+
+  u8_t _nexth;
+
+  u8_t _hoplim;
+
+  ip6_addr_p_t src;
+  ip6_addr_p_t dest;
+} __attribute__((packed));
+# 124 "src/include/lwip/prot/ip6.h"
+struct ip6_opt_hdr {
+
+  u8_t _opt_type;
+
+  u8_t _opt_dlen;
+} __attribute__((packed));
+# 147 "src/include/lwip/prot/ip6.h"
+struct ip6_hbh_hdr {
+
+  u8_t _nexth;
+
+  u8_t _hlen;
+} __attribute__((packed));
+# 166 "src/include/lwip/prot/ip6.h"
+struct ip6_dest_hdr {
+
+  u8_t _nexth;
+
+  u8_t _hlen;
+} __attribute__((packed));
+# 186 "src/include/lwip/prot/ip6.h"
+struct ip6_rout_hdr {
+
+  u8_t _nexth;
+
+  u8_t _hlen;
+
+  u8_t _routing_type;
+
+  u8_t _segments_left;
+} __attribute__((packed));
+# 213 "src/include/lwip/prot/ip6.h"
+struct ip6_frag_hdr {
+
+  u8_t _nexth;
+
+  u8_t reserved;
+
+  u16_t _fragment_offset;
+
+  u32_t _identification;
+} __attribute__((packed));
+# 50 "src/include/lwip/ip6.h" 2
+# 60 "src/include/lwip/ip6.h"
+struct netif *ip6_route(const ip6_addr_t *src, const ip6_addr_t *dest);
+const ip_addr_t *ip6_select_source_address(struct netif *netif, const ip6_addr_t * dest);
+err_t ip6_input(struct pbuf *p, struct netif *inp);
+err_t ip6_output(struct pbuf *p, const ip6_addr_t *src, const ip6_addr_t *dest,
+                         u8_t hl, u8_t tc, u8_t nexth);
+err_t ip6_output_if(struct pbuf *p, const ip6_addr_t *src, const ip6_addr_t *dest,
+                            u8_t hl, u8_t tc, u8_t nexth, struct netif *netif);
+err_t ip6_output_if_src(struct pbuf *p, const ip6_addr_t *src, const ip6_addr_t *dest,
+                            u8_t hl, u8_t tc, u8_t nexth, struct netif *netif);
+
+
+
+
+
+err_t ip6_options_add_hbh_ra(struct pbuf * p, u8_t nexth, u8_t value);
+# 49 "src/include/lwip/ip.h" 2
+# 1 "src/include/lwip/prot/ip.h" 1
+# 50 "src/include/lwip/ip.h" 2
+# 91 "src/include/lwip/ip.h"
+struct ip_pcb {
+
+  ip_addr_t local_ip; ip_addr_t remote_ip; u8_t netif_idx; u8_t so_options; u8_t tos; u8_t ttl ;
+};
+# 107 "src/include/lwip/ip.h"
+struct ip_globals
+{
+
+  struct netif *current_netif;
+
+  struct netif *current_input_netif;
+
+
+  const struct ip_hdr *current_ip4_header;
+
+
+
+  struct ip6_hdr *current_ip6_header;
+
+
+  u16_t current_ip_header_tot_len;
+
+  ip_addr_t current_iphdr_src;
+
+  ip_addr_t current_iphdr_dest;
+};
+extern struct ip_globals ip_data;
+# 275 "src/include/lwip/ip.h"
+err_t ip_input(struct pbuf *p, struct netif *inp);
+# 49 "src/include/lwip/tcp.h" 2
+# 1 "src/include/lwip/icmp.h" 1
+# 44 "src/include/lwip/icmp.h"
+# 1 "src/include/lwip/prot/icmp.h" 1
+# 65 "src/include/lwip/prot/icmp.h"
+struct icmp_hdr {
+  u8_t type;
+  u8_t code;
+  u16_t chksum;
+  u32_t data;
+} __attribute__((packed));
+# 89 "src/include/lwip/prot/icmp.h"
+struct icmp_echo_hdr {
+  u8_t type;
+  u8_t code;
+  u16_t chksum;
+  u16_t id;
+  u16_t seqno;
+} __attribute__((packed));
+# 45 "src/include/lwip/icmp.h" 2
+
+
+# 1 "src/include/lwip/icmp6.h" 1
+# 48 "src/include/lwip/icmp6.h"
+# 1 "src/include/lwip/prot/icmp6.h" 1
+# 47 "src/include/lwip/prot/icmp6.h"
+enum icmp6_type {
+
+  ICMP6_TYPE_DUR = 1,
+
+  ICMP6_TYPE_PTB = 2,
+
+  ICMP6_TYPE_TE = 3,
+
+  ICMP6_TYPE_PP = 4,
+
+  ICMP6_TYPE_PE1 = 100,
+
+  ICMP6_TYPE_PE2 = 101,
+
+  ICMP6_TYPE_RSV_ERR = 127,
+
+
+  ICMP6_TYPE_EREQ = 128,
+
+  ICMP6_TYPE_EREP = 129,
+
+  ICMP6_TYPE_MLQ = 130,
+
+  ICMP6_TYPE_MLR = 131,
+
+  ICMP6_TYPE_MLD = 132,
+
+  ICMP6_TYPE_RS = 133,
+
+  ICMP6_TYPE_RA = 134,
+
+  ICMP6_TYPE_NS = 135,
+
+  ICMP6_TYPE_NA = 136,
+
+  ICMP6_TYPE_RD = 137,
+
+  ICMP6_TYPE_MRA = 151,
+
+  ICMP6_TYPE_MRS = 152,
+
+  ICMP6_TYPE_MRT = 153,
+
+  ICMP6_TYPE_PE3 = 200,
+
+  ICMP6_TYPE_PE4 = 201,
+
+  ICMP6_TYPE_RSV_INF = 255
+};
+
+
+enum icmp6_dur_code {
+
+  ICMP6_DUR_NO_ROUTE = 0,
+
+  ICMP6_DUR_PROHIBITED = 1,
+
+  ICMP6_DUR_SCOPE = 2,
+
+  ICMP6_DUR_ADDRESS = 3,
+
+  ICMP6_DUR_PORT = 4,
+
+  ICMP6_DUR_POLICY = 5,
+
+  ICMP6_DUR_REJECT_ROUTE = 6
+};
+
+
+enum icmp6_te_code {
+
+  ICMP6_TE_HL = 0,
+
+  ICMP6_TE_FRAG = 1
+};
+
+
+enum icmp6_pp_code {
+
+  ICMP6_PP_FIELD = 0,
+
+  ICMP6_PP_HEADER = 1,
+
+  ICMP6_PP_OPTION = 2
+};
+
+
+
+
+
+
+struct icmp6_hdr {
+  u8_t type;
+  u8_t code;
+  u16_t chksum;
+  u32_t data;
+} __attribute__((packed));
+# 156 "src/include/lwip/prot/icmp6.h"
+struct icmp6_echo_hdr {
+  u8_t type;
+  u8_t code;
+  u16_t chksum;
+  u16_t id;
+  u16_t seqno;
+} __attribute__((packed));
+# 49 "src/include/lwip/icmp6.h" 2
+
+
+
+
+
+
+
+void icmp6_input(struct pbuf *p, struct netif *inp);
+void icmp6_dest_unreach(struct pbuf *p, enum icmp6_dur_code c);
+void icmp6_packet_too_big(struct pbuf *p, u32_t mtu);
+void icmp6_time_exceeded(struct pbuf *p, enum icmp6_te_code c);
+void icmp6_time_exceeded_with_addrs(struct pbuf *p, enum icmp6_te_code c,
+    const ip6_addr_t *src_addr, const ip6_addr_t *dest_addr);
+void icmp6_param_problem(struct pbuf *p, enum icmp6_pp_code c, const void *pointer);
+# 48 "src/include/lwip/icmp.h" 2
+
+
+
+
+
+
+
+enum icmp_dur_type {
+
+  ICMP_DUR_NET = 0,
+
+  ICMP_DUR_HOST = 1,
+
+  ICMP_DUR_PROTO = 2,
+
+  ICMP_DUR_PORT = 3,
+
+  ICMP_DUR_FRAG = 4,
+
+  ICMP_DUR_SR = 5
+};
+
+
+enum icmp_te_type {
+
+  ICMP_TE_TTL = 0,
+
+  ICMP_TE_FRAG = 1
+};
+
+
+
+void icmp_input(struct pbuf *p, struct netif *inp);
+void icmp_dest_unreach(struct pbuf *p, enum icmp_dur_type t);
+void icmp_time_exceeded(struct pbuf *p, enum icmp_te_type t);
+# 50 "src/include/lwip/tcp.h" 2
+
+
+
+
+
+
+
+
+struct tcp_pcb;
+struct tcp_pcb_listen;
+# 70 "src/include/lwip/tcp.h"
+typedef err_t (*tcp_accept_fn)(void *arg, struct tcp_pcb *newpcb, err_t err);
+# 82 "src/include/lwip/tcp.h"
+typedef err_t (*tcp_recv_fn)(void *arg, struct tcp_pcb *tpcb,
+                             struct pbuf *p, err_t err);
+# 96 "src/include/lwip/tcp.h"
+typedef err_t (*tcp_sent_fn)(void *arg, struct tcp_pcb *tpcb,
+                              u16_t len);
+# 108 "src/include/lwip/tcp.h"
+typedef err_t (*tcp_poll_fn)(void *arg, struct tcp_pcb *tpcb);
+# 120 "src/include/lwip/tcp.h"
+typedef void (*tcp_err_fn)(void *arg, err_t err);
+# 134 "src/include/lwip/tcp.h"
+typedef err_t (*tcp_connected_fn)(void *arg, struct tcp_pcb *tpcb, err_t err);
+# 173 "src/include/lwip/tcp.h"
+typedef void (*tcp_extarg_callback_pcb_destroyed_fn)(u8_t id, void *data);
+# 182 "src/include/lwip/tcp.h"
+typedef err_t (*tcp_extarg_callback_passive_open_fn)(u8_t id, struct tcp_pcb_listen *lpcb, struct tcp_pcb *cpcb);
+
+
+struct tcp_ext_arg_callbacks {
+
+  tcp_extarg_callback_pcb_destroyed_fn destroy;
+
+  tcp_extarg_callback_passive_open_fn passive_open;
+};
+# 206 "src/include/lwip/tcp.h"
+typedef u16_t tcpflags_t;
+# 223 "src/include/lwip/tcp.h"
+struct tcp_pcb_listen {
+
+  ip_addr_t local_ip; ip_addr_t remote_ip; u8_t netif_idx; u8_t so_options; u8_t tos; u8_t ttl ;
+
+  struct tcp_pcb_listen *next; void *callback_arg; enum tcp_state state; u8_t prio; u16_t local_port;
+
+
+
+  tcp_accept_fn accept;
+
+
+
+  u8_t backlog;
+  u8_t accepts_pending;
+
+};
+
+
+
+struct tcp_pcb {
+
+  ip_addr_t local_ip; ip_addr_t remote_ip; u8_t netif_idx; u8_t so_options; u8_t tos; u8_t ttl ;
+
+  struct tcp_pcb *next; void *callback_arg; enum tcp_state state; u8_t prio; u16_t local_port;
+
+
+  u16_t remote_port;
+
+  tcpflags_t flags;
+# 278 "src/include/lwip/tcp.h"
+  u8_t polltmr, pollinterval;
+  u8_t last_timer;
+  u32_t tmr;
+
+
+  u32_t rcv_nxt;
+  tcpwnd_size_t rcv_wnd;
+  tcpwnd_size_t rcv_ann_wnd;
+  u32_t rcv_ann_right_edge;
+# 295 "src/include/lwip/tcp.h"
+  s16_t rtime;
+
+  u16_t mss;
+
+
+  u32_t rttest;
+  u32_t rtseq;
+  s16_t sa, sv;
+
+  s16_t rto;
+  u8_t nrtx;
+
+
+  u8_t dupacks;
+  u32_t lastack;
+
+
+  tcpwnd_size_t cwnd;
+  tcpwnd_size_t ssthresh;
+
+
+  u32_t rto_end;
+
+
+  u32_t snd_nxt;
+  u32_t snd_wl1, snd_wl2;
+
+  u32_t snd_lbb;
+  tcpwnd_size_t snd_wnd;
+  tcpwnd_size_t snd_wnd_max;
+
+  tcpwnd_size_t snd_buf;
+
+  u16_t snd_queuelen;
+
+
+
+  u16_t unsent_oversize;
+
+
+  tcpwnd_size_t bytes_acked;
+
+
+  struct tcp_seg *unsent;
+  struct tcp_seg *unacked;
+
+  struct tcp_seg *ooseq;
+
+
+  struct pbuf *refused_data;
+
+
+  struct tcp_pcb_listen* listener;
+
+
+
+
+  tcp_sent_fn sent;
+
+  tcp_recv_fn recv;
+
+  tcp_connected_fn connected;
+
+  tcp_poll_fn poll;
+
+  tcp_err_fn errf;
+# 369 "src/include/lwip/tcp.h"
+  u32_t keep_idle;
+
+
+
+
+
+
+  u8_t persist_cnt;
+
+  u8_t persist_backoff;
+
+  u8_t persist_probe;
+
+
+  u8_t keep_cnt_sent;
+
+
+
+
+
+};
+# 411 "src/include/lwip/tcp.h"
+struct tcp_pcb * tcp_new (void);
+struct tcp_pcb * tcp_new_ip_type (u8_t type);
+
+void tcp_arg (struct tcp_pcb *pcb, void *arg);
+
+void tcp_recv (struct tcp_pcb *pcb, tcp_recv_fn recv);
+void tcp_sent (struct tcp_pcb *pcb, tcp_sent_fn sent);
+void tcp_err (struct tcp_pcb *pcb, tcp_err_fn err);
+void tcp_accept (struct tcp_pcb *pcb, tcp_accept_fn accept);
+
+void tcp_poll (struct tcp_pcb *pcb, tcp_poll_fn poll, u8_t interval);
+# 448 "src/include/lwip/tcp.h"
+void tcp_backlog_delayed(struct tcp_pcb* pcb);
+void tcp_backlog_accepted(struct tcp_pcb* pcb);
+
+
+
+
+
+
+
+void tcp_recved (struct tcp_pcb *pcb, u16_t len);
+err_t tcp_bind (struct tcp_pcb *pcb, const ip_addr_t *ipaddr,
+                              u16_t port);
+void tcp_bind_netif(struct tcp_pcb *pcb, const struct netif *netif);
+err_t tcp_connect (struct tcp_pcb *pcb, const ip_addr_t *ipaddr,
+                              u16_t port, tcp_connected_fn connected);
+
+struct tcp_pcb * tcp_listen_with_backlog_and_err(struct tcp_pcb *pcb, u8_t backlog, err_t *err);
+struct tcp_pcb * tcp_listen_with_backlog(struct tcp_pcb *pcb, u8_t backlog);
+
+
+
+void tcp_abort (struct tcp_pcb *pcb);
+err_t tcp_close (struct tcp_pcb *pcb);
+err_t tcp_shutdown(struct tcp_pcb *pcb, int shut_rx, int shut_tx);
+
+err_t tcp_write (struct tcp_pcb *pcb, const void *dataptr, u16_t len,
+                              u8_t apiflags);
+
+void tcp_setprio (struct tcp_pcb *pcb, u8_t prio);
+
+err_t tcp_output (struct tcp_pcb *pcb);
+
+err_t tcp_tcp_get_tcp_addrinfo(struct tcp_pcb *pcb, int local, ip_addr_t *addr, u16_t *port);
+# 108 "src/core/tcp.c" 2
+# 1 "src/include/lwip/priv/tcp_priv.h" 1
+# 52 "src/include/lwip/priv/tcp_priv.h"
+# 1 "src/include/lwip/prot/tcp.h" 1
+# 56 "src/include/lwip/prot/tcp.h"
+struct tcp_hdr {
+  u16_t src;
+  u16_t dest;
+  u32_t seqno;
+  u32_t ackno;
+  u16_t _hdrlen_rsvd_flags;
+  u16_t wnd;
+  u16_t chksum;
+  u16_t urgp;
+} __attribute__((packed));
+# 53 "src/include/lwip/priv/tcp_priv.h" 2
+
+
+
+
+
+
+
+
+void tcp_init (void);
+void tcp_tmr (void);
+
+
+
+
+void tcp_slowtmr (void);
+void tcp_fasttmr (void);
+
+
+
+
+
+void tcp_txnow (void);
+
+
+void tcp_input (struct pbuf *p, struct netif *inp);
+
+struct tcp_pcb * tcp_alloc (u8_t prio);
+void tcp_free (struct tcp_pcb *pcb);
+void tcp_abandon (struct tcp_pcb *pcb, int reset);
+err_t tcp_send_empty_ack(struct tcp_pcb *pcb);
+err_t tcp_rexmit (struct tcp_pcb *pcb);
+err_t tcp_rexmit_rto_prepare(struct tcp_pcb *pcb);
+void tcp_rexmit_rto_commit(struct tcp_pcb *pcb);
+void tcp_rexmit_rto (struct tcp_pcb *pcb);
+void tcp_rexmit_fast (struct tcp_pcb *pcb);
+u32_t tcp_update_rcv_ann_wnd(struct tcp_pcb *pcb);
+err_t tcp_process_refused_data(struct tcp_pcb *pcb);
+# 250 "src/include/lwip/priv/tcp_priv.h"
+struct tcp_seg {
+  struct tcp_seg *next;
+  struct pbuf *p;
+  u16_t len;
+# 263 "src/include/lwip/priv/tcp_priv.h"
+  u8_t flags;
+
+
+
+
+
+
+  struct tcp_hdr *tcphdr;
+};
+# 323 "src/include/lwip/priv/tcp_priv.h"
+extern struct tcp_pcb *tcp_input_pcb;
+extern u32_t tcp_ticks;
+extern u8_t tcp_active_pcbs_changed;
+
+
+union tcp_listen_pcbs_t {
+  struct tcp_pcb_listen *listen_pcbs;
+  struct tcp_pcb *pcbs;
+};
+extern struct tcp_pcb *tcp_bound_pcbs;
+extern union tcp_listen_pcbs_t tcp_listen_pcbs;
+extern struct tcp_pcb *tcp_active_pcbs;
+
+
+extern struct tcp_pcb *tcp_tw_pcbs;
+
+
+
+extern struct tcp_pcb ** const tcp_pcb_lists[4];
+# 437 "src/include/lwip/priv/tcp_priv.h"
+struct tcp_pcb *tcp_pcb_copy(struct tcp_pcb *pcb);
+void tcp_pcb_purge(struct tcp_pcb *pcb);
+void tcp_pcb_remove(struct tcp_pcb **pcblist, struct tcp_pcb *pcb);
+
+void tcp_segs_free(struct tcp_seg *seg);
+void tcp_seg_free(struct tcp_seg *seg);
+struct tcp_seg *tcp_seg_copy(struct tcp_seg *seg);
+# 459 "src/include/lwip/priv/tcp_priv.h"
+err_t tcp_send_fin(struct tcp_pcb *pcb);
+err_t tcp_enqueue_flags(struct tcp_pcb *pcb, u8_t flags);
+
+void tcp_rexmit_seg(struct tcp_pcb *pcb, struct tcp_seg *seg);
+
+void tcp_rst(const struct tcp_pcb* pcb, u32_t seqno, u32_t ackno,
+       const ip_addr_t *local_ip, const ip_addr_t *remote_ip,
+       u16_t local_port, u16_t remote_port);
+void tcp_rst_netif(struct netif *netif, u32_t seqno, u32_t ackno,
+                   const ip_addr_t *local_ip, const ip_addr_t *remote_ip,
+                   u16_t local_port, u16_t remote_port);
+
+u32_t tcp_next_iss(struct tcp_pcb *pcb);
+
+err_t tcp_keepalive(struct tcp_pcb *pcb);
+err_t tcp_split_unsent_seg(struct tcp_pcb *pcb, u16_t split);
+err_t tcp_zero_window_probe(struct tcp_pcb *pcb);
+void tcp_trigger_input_pcb_close(void);
+
+
+u16_t tcp_eff_send_mss_netif(u16_t sendmss, struct netif *outif,
+                             const ip_addr_t *dest);
+
+
+
+
+
+err_t tcp_recv_null(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err);
+# 505 "src/include/lwip/priv/tcp_priv.h"
+void tcp_timer_needed(void);
+
+void tcp_netif_ip_addr_changed(const ip_addr_t* old_addr, const ip_addr_t* new_addr);
+
+
+void tcp_free_ooseq(struct tcp_pcb *pcb);
+# 109 "src/core/tcp.c" 2
+
+
+
+
+# 1 "src/include/lwip/nd6.h" 1
+# 66 "src/include/lwip/nd6.h"
+struct pbuf;
+struct netif;
+
+void nd6_tmr(void);
+void nd6_input(struct pbuf *p, struct netif *inp);
+void nd6_clear_destination_cache(void);
+struct netif *nd6_find_route(const ip6_addr_t *ip6addr);
+err_t nd6_get_next_hop_addr_or_queue(struct netif *netif, struct pbuf *q, const ip6_addr_t *ip6addr, const u8_t **hwaddrp);
+u16_t nd6_get_destination_mtu(const ip6_addr_t *ip6addr, struct netif *netif);
+
+void nd6_reachability_hint(const ip6_addr_t *ip6addr);
+
+void nd6_cleanup_netif(struct netif *netif);
+
+void nd6_adjust_mld_membership(struct netif *netif, s8_t addr_idx, u8_t new_state);
+
+void nd6_restart_netif(struct netif *netif);
+# 114 "src/core/tcp.c" 2
+
+# 1 "/home/john/installs/CEdev/include/string.h" 1 3
+
+
+
+
+
+
+
+extern void *memcpy(void *__restrict dest, const void *__restrict src,
+                    size_t n) __attribute__((nonnull(1, 2)));
+
+void *memmove(void *dest, const void *src, size_t n)
+              __attribute__((nonnull(1, 2)));
+
+void *memset(void *s, int c, size_t n) __attribute__((nonnull(1)));
+
+int memcmp(const void *s1, const void *s2, size_t n)
+          __attribute__((nonnull(1, 2)));
+
+void *memchr(const void *s, int c, size_t n) __attribute__((nonnull(1)));
+
+char *strcpy(char *__restrict dest, const char *__restrict src)
+             __attribute__((nonnull(1, 2)));
+
+char *strncpy(char *__restrict dest, const char *__restrict src, size_t n)
+              __attribute__((nonnull(1, 2)));
+
+char *strcat(char *__restrict dest, const char *__restrict src)
+             __attribute__((nonnull(1, 2)));
+
+char *strncat(char *__restrict dest, const char *__restrict src, size_t n)
+              __attribute__((nonnull(1, 2)));
+
+char *strchr(const char *s, int c) __attribute__((nonnull(1)));
+
+char *strrchr(const char *s, int c) __attribute__((nonnull(1)));
+
+char *strpbrk(const char *s, const char *accept) __attribute__((nonnull(1, 2)));
+
+char *strstr(const char *haystack, const char *needle)
+             __attribute__((nonnull(1, 2)));
+
+char *strtok(char *__restrict s, const char *__restrict delim)
+             __attribute__((nonnull(2)));
+
+char *strdup(const char *s)
+             __attribute__ ((__malloc__)) __attribute__((nonnull(1)));
+
+char *strndup(const char *s, size_t n)
+              __attribute__ ((__malloc__)) __attribute__((nonnull(1)));
+
+size_t strcspn(const char *s, const char *reject)
+               __attribute__((nonnull(1, 2)));
+
+size_t strspn(const char *s, const char *accept)
+              __attribute__((nonnull(1, 2)));
+
+size_t strlen(const char *s)
+              __attribute__((nonnull(1)));
+
+size_t strnlen(const char *s, size_t maxlen)
+               __attribute__((nonnull(1)));
+
+int strcmp(const char *s1, const char *s2)
+           __attribute__((nonnull(1, 2)));
+
+int strncmp(const char *s1, const char *s2, size_t n)
+            __attribute__((nonnull(1, 2)));
+
+int strcasecmp(const char *s1, const char *s2)
+               __attribute__((nonnull(1, 2)));
+
+int strncasecmp(const char *s1, const char *s2, size_t n)
+                __attribute__((nonnull(1, 2)));
+# 116 "src/core/tcp.c" 2
+# 144 "src/core/tcp.c"
+static const char *const tcp_state_str[] = {
+  "CLOSED",
+  "LISTEN",
+  "SYN_SENT",
+  "SYN_RCVD",
+  "ESTABLISHED",
+  "FIN_WAIT_1",
+  "FIN_WAIT_2",
+  "CLOSE_WAIT",
+  "CLOSING",
+  "LAST_ACK",
+  "TIME_WAIT"
+};
+
+
+static u16_t tcp_port = 0xc000;
+
+
+u32_t tcp_ticks;
+static const u8_t tcp_backoff[13] =
+{ 1, 2, 3, 4, 5, 6, 7, 7, 7, 7, 7, 7, 7};
+
+static const u8_t tcp_persist_backoff[7] = { 3, 6, 12, 24, 48, 96, 120 };
+
+
+
+
+struct tcp_pcb *tcp_bound_pcbs;
+
+union tcp_listen_pcbs_t tcp_listen_pcbs;
+
+
+struct tcp_pcb *tcp_active_pcbs;
+
+struct tcp_pcb *tcp_tw_pcbs;
+
+
+struct tcp_pcb **const tcp_pcb_lists[] = {&tcp_listen_pcbs.pcbs, &tcp_bound_pcbs,
+         &tcp_active_pcbs, &tcp_tw_pcbs
+};
+
+u8_t tcp_active_pcbs_changed;
+
+
+static u8_t tcp_timer;
+static u8_t tcp_timer_ctr;
+static u16_t tcp_new_port(void);
+
+static err_t tcp_close_shutdown_fin(struct tcp_pcb *pcb);
+
+
+
+
+
+
+
+void
+tcp_init(void)
+{
+
+  tcp_port = ((u16_t)(((rand()) & (u16_t)~0xc000) + 0xc000));
+
+}
+
+
+void
+tcp_free(struct tcp_pcb *pcb)
+{
+  do { if (!(pcb->state != LISTEN)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_free: LISTEN", 212, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+
+
+  memp_free(MEMP_TCP_PCB, pcb);
+}
+
+
+static void
+tcp_free_listen(struct tcp_pcb *pcb)
+{
+  do { if (!(pcb->state != LISTEN)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_free_listen: !LISTEN", 223, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+
+
+  memp_free(MEMP_TCP_PCB_LISTEN, pcb);
+}
+
+
+
+
+void
+tcp_tmr(void)
+{
+
+  tcp_fasttmr();
+
+  if (++tcp_timer & 1) {
+
+
+    tcp_slowtmr();
+  }
+}
+
+
+
+
+
+static void
+tcp_remove_listener(struct tcp_pcb *list, struct tcp_pcb_listen *lpcb)
+{
+  struct tcp_pcb *pcb;
+
+  do { if (!(lpcb != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_remove_listener: invalid listener", 255, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+  for (pcb = list; pcb != ((void *)0); pcb = pcb->next) {
+    if (pcb->listener == lpcb) {
+      pcb->listener = ((void *)0);
+    }
+  }
+}
+
+
+
+
+
+static void
+tcp_listen_closed(struct tcp_pcb *pcb)
+{
+
+  size_t i;
+  do { if (!(pcb != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "pcb != NULL", 273, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+  do { if (!(pcb->state == LISTEN)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "pcb->state == LISTEN", 274, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+  for (i = 1; i < (sizeof(tcp_pcb_lists)/sizeof((tcp_pcb_lists)[0])); i++) {
+    tcp_remove_listener(*tcp_pcb_lists[i], (struct tcp_pcb_listen *)pcb);
+  }
+
+  (void)pcb;
+}
+# 293 "src/core/tcp.c"
+void
+tcp_backlog_delayed(struct tcp_pcb *pcb)
+{
+  do { if (!(pcb != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "pcb != NULL", 296, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+                           ;
+  if ((pcb->flags & 0x0200U) == 0) {
+    if (pcb->listener != ((void *)0)) {
+      pcb->listener->accepts_pending++;
+      do { if (!(pcb->listener->accepts_pending != 0)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "accepts_pending != 0", 301, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+      do { (pcb)->flags = (tcpflags_t)((pcb)->flags | (0x0200U)); } while(0);
+    }
+  }
+}
+# 316 "src/core/tcp.c"
+void
+tcp_backlog_accepted(struct tcp_pcb *pcb)
+{
+  do { if (!(pcb != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "pcb != NULL", 319, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+                           ;
+  if ((pcb->flags & 0x0200U) != 0) {
+    if (pcb->listener != ((void *)0)) {
+      do { if (!(pcb->listener->accepts_pending != 0)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "accepts_pending != 0", 323, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+      pcb->listener->accepts_pending--;
+      do { (pcb)->flags = (tcpflags_t)((pcb)->flags & (tcpflags_t)(~(0x0200U) & 0xffffU)); } while(0);
+    }
+  }
+}
+# 347 "src/core/tcp.c"
+static err_t
+tcp_close_shutdown(struct tcp_pcb *pcb, u8_t rst_on_unacked_data)
+{
+  do { if (!(pcb != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_close_shutdown: invalid pcb", 350, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+  if (rst_on_unacked_data && ((pcb->state == ESTABLISHED) || (pcb->state == CLOSE_WAIT))) {
+    if ((pcb->refused_data != ((void *)0)) || (pcb->rcv_wnd != (20 * 1024))) {
+
+
+      do { if (!(pcb->flags & 0x10U)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "pcb->flags & TF_RXCLOSED", 356, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+
+
+      tcp_rst(pcb, pcb->snd_nxt, pcb->rcv_nxt, &pcb->local_ip, &pcb->remote_ip,
+              pcb->local_port, pcb->remote_port);
+
+      tcp_pcb_purge(pcb);
+      do { do { if(*(&tcp_active_pcbs) == (pcb)) { (*(&tcp_active_pcbs)) = (*&tcp_active_pcbs)->next; } else { struct tcp_pcb *tcp_tmp_pcb; for (tcp_tmp_pcb = *&tcp_active_pcbs; tcp_tmp_pcb != ((void *)0); tcp_tmp_pcb = tcp_tmp_pcb->next) { if(tcp_tmp_pcb->next == (pcb)) { tcp_tmp_pcb->next = (pcb)->next; break; } } } (pcb)->next = ((void *)0); } while(0); tcp_active_pcbs_changed = 1; } while (0);
+
+      if (tcp_input_pcb == pcb) {
+
+        tcp_trigger_input_pcb_close();
+      } else {
+        tcp_free(pcb);
+      }
+      return ERR_OK;
+    }
+  }
+
+
+
+  switch (pcb->state) {
+    case CLOSED:
+
+
+
+
+
+
+
+      if (pcb->local_port != 0) {
+        do { if(*(&tcp_bound_pcbs) == (pcb)) { (*(&tcp_bound_pcbs)) = (*&tcp_bound_pcbs)->next; } else { struct tcp_pcb *tcp_tmp_pcb; for (tcp_tmp_pcb = *&tcp_bound_pcbs; tcp_tmp_pcb != ((void *)0); tcp_tmp_pcb = tcp_tmp_pcb->next) { if(tcp_tmp_pcb->next == (pcb)) { tcp_tmp_pcb->next = (pcb)->next; break; } } } (pcb)->next = ((void *)0); } while(0);
+      }
+      tcp_free(pcb);
+      break;
+    case LISTEN:
+      tcp_listen_closed(pcb);
+      tcp_pcb_remove(&tcp_listen_pcbs.pcbs, pcb);
+      tcp_free_listen(pcb);
+      break;
+    case SYN_SENT:
+      do { tcp_pcb_remove(&tcp_active_pcbs, pcb); tcp_active_pcbs_changed = 1; } while (0);
+      tcp_free(pcb);
+      ++lwip_stats.mib2.tcpattemptfails;
+      break;
+    default:
+      return tcp_close_shutdown_fin(pcb);
+  }
+  return ERR_OK;
+}
+
+static err_t
+tcp_close_shutdown_fin(struct tcp_pcb *pcb)
+{
+  err_t err;
+  do { if (!(pcb != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "pcb != NULL", 412, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+  switch (pcb->state) {
+    case SYN_RCVD:
+      err = tcp_send_fin(pcb);
+      if (err == ERR_OK) {
+        tcp_backlog_accepted(pcb);
+        ++lwip_stats.mib2.tcpattemptfails;
+        pcb->state = FIN_WAIT_1;
+      }
+      break;
+    case ESTABLISHED:
+      err = tcp_send_fin(pcb);
+      if (err == ERR_OK) {
+        ++lwip_stats.mib2.tcpestabresets;
+        pcb->state = FIN_WAIT_1;
+      }
+      break;
+    case CLOSE_WAIT:
+      err = tcp_send_fin(pcb);
+      if (err == ERR_OK) {
+        ++lwip_stats.mib2.tcpestabresets;
+        pcb->state = LAST_ACK;
+      }
+      break;
+    default:
+
+      return ERR_OK;
+  }
+
+  if (err == ERR_OK) {
+
+
+
+
+
+    tcp_output(pcb);
+  } else if (err == ERR_MEM) {
+
+    do { (pcb)->flags = (tcpflags_t)((pcb)->flags | (0x08U)); } while(0);
+
+
+
+
+
+    return ERR_OK;
+  }
+  return err;
+}
+# 483 "src/core/tcp.c"
+err_t
+tcp_close(struct tcp_pcb *pcb)
+{
+                           ;
+
+  do { if (!(pcb != ((void *)0))) { ; return ERR_ARG;}} while(0);
+                                                    ;
+
+                                   ;
+
+  if (pcb->state != LISTEN) {
+
+    do { (pcb)->flags = (tcpflags_t)((pcb)->flags | (0x10U)); } while(0);
+  }
+
+  return tcp_close_shutdown(pcb, 1);
+}
+# 514 "src/core/tcp.c"
+err_t
+tcp_shutdown(struct tcp_pcb *pcb, int shut_rx, int shut_tx)
+{
+                           ;
+
+  do { if (!(pcb != ((void *)0))) { ; return ERR_ARG;}} while(0);
+
+  if (pcb->state == LISTEN) {
+    return ERR_CONN;
+  }
+  if (shut_rx) {
+
+    do { (pcb)->flags = (tcpflags_t)((pcb)->flags | (0x10U)); } while(0);
+    if (shut_tx) {
+
+      return tcp_close_shutdown(pcb, 1);
+    }
+
+    if (pcb->refused_data != ((void *)0)) {
+      pbuf_free(pcb->refused_data);
+      pcb->refused_data = ((void *)0);
+    }
+  }
+  if (shut_tx) {
+
+
+    switch (pcb->state) {
+      case SYN_RCVD:
+      case ESTABLISHED:
+      case CLOSE_WAIT:
+        return tcp_close_shutdown(pcb, (u8_t)shut_rx);
+      default:
+
+
+        return ERR_CONN;
+    }
+  }
+  return ERR_OK;
+}
+# 562 "src/core/tcp.c"
+void
+tcp_abandon(struct tcp_pcb *pcb, int reset)
+{
+  u32_t seqno, ackno;
+
+  tcp_err_fn errf;
+
+  void *errf_arg;
+
+                           ;
+
+  do { if (!(pcb != ((void *)0))) { ; return;}} while(0);
+
+
+  do { if (!(pcb->state != LISTEN)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "don't call tcp_abort/tcp_abandon for listen-pcbs", 577, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+
+
+
+  if (pcb->state == TIME_WAIT) {
+    tcp_pcb_remove(&tcp_tw_pcbs, pcb);
+    tcp_free(pcb);
+  } else {
+    int send_rst = 0;
+    u16_t local_port = 0;
+    enum tcp_state last_state;
+    seqno = pcb->snd_nxt;
+    ackno = pcb->rcv_nxt;
+
+    errf = pcb->errf;
+
+    errf_arg = pcb->callback_arg;
+    if (pcb->state == CLOSED) {
+      if (pcb->local_port != 0) {
+
+        do { if(*(&tcp_bound_pcbs) == (pcb)) { (*(&tcp_bound_pcbs)) = (*&tcp_bound_pcbs)->next; } else { struct tcp_pcb *tcp_tmp_pcb; for (tcp_tmp_pcb = *&tcp_bound_pcbs; tcp_tmp_pcb != ((void *)0); tcp_tmp_pcb = tcp_tmp_pcb->next) { if(tcp_tmp_pcb->next == (pcb)) { tcp_tmp_pcb->next = (pcb)->next; break; } } } (pcb)->next = ((void *)0); } while(0);
+      }
+    } else {
+      send_rst = reset;
+      local_port = pcb->local_port;
+      do { tcp_pcb_remove(&tcp_active_pcbs, pcb); tcp_active_pcbs_changed = 1; } while (0);
+    }
+    if (pcb->unacked != ((void *)0)) {
+      tcp_segs_free(pcb->unacked);
+    }
+    if (pcb->unsent != ((void *)0)) {
+      tcp_segs_free(pcb->unsent);
+    }
+
+    if (pcb->ooseq != ((void *)0)) {
+      tcp_segs_free(pcb->ooseq);
+    }
+
+    tcp_backlog_accepted(pcb);
+    if (send_rst) {
+                                                                ;
+      tcp_rst(pcb, seqno, ackno, &pcb->local_ip, &pcb->remote_ip, local_port, pcb->remote_port);
+    }
+    last_state = pcb->state;
+    tcp_free(pcb);
+    do { (void)last_state; if((errf) != ((void *)0)) (errf)((errf_arg),(ERR_ABRT)); } while (0);
+  }
+}
+# 637 "src/core/tcp.c"
+void
+tcp_abort(struct tcp_pcb *pcb)
+{
+  tcp_abandon(pcb, 1);
+}
+# 661 "src/core/tcp.c"
+err_t
+tcp_bind(struct tcp_pcb *pcb, const ip_addr_t *ipaddr, u16_t port)
+{
+  int i;
+  int max_pcb_list = 4;
+  struct tcp_pcb *cpcb;
+
+  ip_addr_t zoned_ipaddr;
+
+
+                           ;
+
+
+
+  if (ipaddr == ((void *)0)) {
+    ipaddr = (&ip_addr_any);
+  }
+
+
+
+
+  do { if (!(pcb != ((void *)0))) { ; return ERR_ARG;}} while(0);
+
+  do { if (!(pcb->state == CLOSED)) { ; return ERR_VAL;}} while(0);
+# 702 "src/core/tcp.c"
+  if ((((ipaddr) != ((void *)0)) && (((&*(ipaddr))->type) == IPADDR_TYPE_V6)) && (!((((&((ipaddr)->u_addr.ip6)))->zone) != 0) && ((((((&((ipaddr)->u_addr.ip6))))->addr[0] & ((((0xffc00000UL) & (u32_t)0x000000ffUL) << 24) | (((0xffc00000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xffc00000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xffc00000UL) & (u32_t)0xff000000UL) >> 24))) == ((((0xfe800000UL) & (u32_t)0x000000ffUL) << 24) | (((0xfe800000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xfe800000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xfe800000UL) & (u32_t)0xff000000UL) >> 24))) || ((((IP6_UNICAST)) != IP6_UNICAST) && ((((((&((ipaddr)->u_addr.ip6))))->addr[0] & ((((0xff8f0000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff8f0000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff8f0000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff8f0000UL) & (u32_t)0xff000000UL) >> 24))) == ((((0xff010000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff010000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff010000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff010000UL) & (u32_t)0xff000000UL) >> 24))) || (((((&((ipaddr)->u_addr.ip6))))->addr[0] & ((((0xff8f0000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff8f0000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff8f0000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff8f0000UL) & (u32_t)0xff000000UL) >> 24))) == ((((0xff020000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff020000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff020000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff020000UL) & (u32_t)0xff000000UL) >> 24)))))))) {
+    do{ do { (zoned_ipaddr).type = (((&*ipaddr)->type)); }while(0); if((((&*ipaddr)->type) == IPADDR_TYPE_V6)){ do{(*(&((&(zoned_ipaddr))->u_addr.ip6))).addr[0] = (*(&((&(*ipaddr))->u_addr.ip6))).addr[0]; (*(&((&(zoned_ipaddr))->u_addr.ip6))).addr[1] = (*(&((&(*ipaddr))->u_addr.ip6))).addr[1]; (*(&((&(zoned_ipaddr))->u_addr.ip6))).addr[2] = (*(&((&(*ipaddr))->u_addr.ip6))).addr[2]; (*(&((&(zoned_ipaddr))->u_addr.ip6))).addr[3] = (*(&((&(*ipaddr))->u_addr.ip6))).addr[3]; (((*(&((&(zoned_ipaddr))->u_addr.ip6)))).zone = ((*(&((&(*ipaddr))->u_addr.ip6)))).zone); }while(0); }else{ ((*(&((&(zoned_ipaddr))->u_addr.ip4))).addr = (*(&((&(*ipaddr))->u_addr.ip4))).addr); do { (&((&zoned_ipaddr)->u_addr.ip6))->addr[1] = (&((&zoned_ipaddr)->u_addr.ip6))->addr[2] = (&((&zoned_ipaddr)->u_addr.ip6))->addr[3] = 0; (((&((&zoned_ipaddr)->u_addr.ip6)))->zone = 0); }while(0); }}while(0);
+    do { struct netif *selected_netif; selected_netif = ip6_route(((&((&zoned_ipaddr)->u_addr.ip6))), ((&((&zoned_ipaddr)->u_addr.ip6)))); if (selected_netif != ((void *)0)) { ((((((&((&zoned_ipaddr)->u_addr.ip6)))))->zone = ((((((((&((&zoned_ipaddr)->u_addr.ip6)))))->addr[0] & ((((0xffc00000UL) & (u32_t)0x000000ffUL) << 24) | (((0xffc00000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xffc00000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xffc00000UL) & (u32_t)0xff000000UL) >> 24))) == ((((0xfe800000UL) & (u32_t)0x000000ffUL) << 24) | (((0xfe800000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xfe800000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xfe800000UL) & (u32_t)0xff000000UL) >> 24))) || ((((IP6_UNKNOWN)) != IP6_UNICAST) && (((((((&((&zoned_ipaddr)->u_addr.ip6)))))->addr[0] & ((((0xff8f0000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff8f0000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff8f0000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff8f0000UL) & (u32_t)0xff000000UL) >> 24))) == ((((0xff010000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff010000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff010000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff010000UL) & (u32_t)0xff000000UL) >> 24))) || ((((((&((&zoned_ipaddr)->u_addr.ip6)))))->addr[0] & ((((0xff8f0000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff8f0000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff8f0000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff8f0000UL) & (u32_t)0xff000000UL) >> 24))) == ((((0xff020000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff020000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff020000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff020000UL) & (u32_t)0xff000000UL) >> 24)))))) ? ((u8_t)((selected_netif)->num + 1)) : 0))); } } while (0);
+    ipaddr = &zoned_ipaddr;
+  }
+
+
+  if (port == 0) {
+    port = tcp_new_port();
+    if (port == 0) {
+      return ERR_BUF;
+    }
+  } else {
+
+    for (i = 0; i < max_pcb_list; i++) {
+      for (cpcb = *tcp_pcb_lists[i]; cpcb != ((void *)0); cpcb = cpcb->next) {
+        if (cpcb->local_port == port) {
+
+
+
+
+
+
+
+          {
+
+            if (((((ipaddr) != ((void *)0)) && (((&*(ipaddr))->type) == IPADDR_TYPE_V6)) == (((&cpcb->local_ip)->type) == IPADDR_TYPE_V6)) &&
+                ((((&cpcb->local_ip) == ((void *)0)) ? 1 : (((((&cpcb->local_ip) != ((void *)0)) && (((&*(&cpcb->local_ip))->type) == IPADDR_TYPE_V6))) ? ((((&((&cpcb->local_ip)->u_addr.ip6))) == ((void *)0)) || (((*((&((&cpcb->local_ip)->u_addr.ip6)))).addr[0] == 0) && ((*((&((&cpcb->local_ip)->u_addr.ip6)))).addr[1] == 0) && ((*((&((&cpcb->local_ip)->u_addr.ip6)))).addr[2] == 0) && ((*((&((&cpcb->local_ip)->u_addr.ip6)))).addr[3] == 0))) : (((&((&cpcb->local_ip)->u_addr.ip4))) == ((void *)0) || ((*((&((&cpcb->local_ip)->u_addr.ip4)))).addr == ((u32_t)0x00000000UL))))) ||
+                 (((ipaddr) == ((void *)0)) ? 1 : (((((ipaddr) != ((void *)0)) && (((&*(ipaddr))->type) == IPADDR_TYPE_V6))) ? ((((&((ipaddr)->u_addr.ip6))) == ((void *)0)) || (((*((&((ipaddr)->u_addr.ip6)))).addr[0] == 0) && ((*((&((ipaddr)->u_addr.ip6)))).addr[1] == 0) && ((*((&((ipaddr)->u_addr.ip6)))).addr[2] == 0) && ((*((&((ipaddr)->u_addr.ip6)))).addr[3] == 0))) : (((&((ipaddr)->u_addr.ip4))) == ((void *)0) || ((*((&((ipaddr)->u_addr.ip4)))).addr == ((u32_t)0x00000000UL))))) ||
+                 ((((&cpcb->local_ip)->type) != ((ipaddr)->type)) ? 0 : ((((&*(&cpcb->local_ip))->type) == IPADDR_TYPE_V6) ? ((((((&((&cpcb->local_ip)->u_addr.ip6))))->addr[0] == (((&((ipaddr)->u_addr.ip6))))->addr[0]) && ((((&((&cpcb->local_ip)->u_addr.ip6))))->addr[1] == (((&((ipaddr)->u_addr.ip6))))->addr[1]) && ((((&((&cpcb->local_ip)->u_addr.ip6))))->addr[2] == (((&((ipaddr)->u_addr.ip6))))->addr[2]) && ((((&((&cpcb->local_ip)->u_addr.ip6))))->addr[3] == (((&((ipaddr)->u_addr.ip6))))->addr[3])) && ((((&((&cpcb->local_ip)->u_addr.ip6))))->zone == (((&((ipaddr)->u_addr.ip6))))->zone)) : (((&((&cpcb->local_ip)->u_addr.ip4)))->addr == ((&((ipaddr)->u_addr.ip4)))->addr))))) {
+              return ERR_USE;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (!(((ipaddr) == ((void *)0)) ? 1 : (((((ipaddr) != ((void *)0)) && (((&*(ipaddr))->type) == IPADDR_TYPE_V6))) ? ((((&((ipaddr)->u_addr.ip6))) == ((void *)0)) || (((*((&((ipaddr)->u_addr.ip6)))).addr[0] == 0) && ((*((&((ipaddr)->u_addr.ip6)))).addr[1] == 0) && ((*((&((ipaddr)->u_addr.ip6)))).addr[2] == 0) && ((*((&((ipaddr)->u_addr.ip6)))).addr[3] == 0))) : (((&((ipaddr)->u_addr.ip4))) == ((void *)0) || ((*((&((ipaddr)->u_addr.ip4)))).addr == ((u32_t)0x00000000UL)))))
+
+      || (((ipaddr)->type) != ((&pcb->local_ip)->type))
+
+     ) {
+    do{ do { if((&pcb->local_ip) != ((void *)0)) { do { (*(&pcb->local_ip)).type = (((ipaddr)->type)); }while(0); }}while(0); if((((ipaddr) != ((void *)0)) && (((&*(ipaddr))->type) == IPADDR_TYPE_V6))){ do{((&((&pcb->local_ip)->u_addr.ip6)))->addr[0] = ((&((ipaddr)->u_addr.ip6))) == ((void *)0) ? 0 : ((&((ipaddr)->u_addr.ip6)))->addr[0]; ((&((&pcb->local_ip)->u_addr.ip6)))->addr[1] = ((&((ipaddr)->u_addr.ip6))) == ((void *)0) ? 0 : ((&((ipaddr)->u_addr.ip6)))->addr[1]; ((&((&pcb->local_ip)->u_addr.ip6)))->addr[2] = ((&((ipaddr)->u_addr.ip6))) == ((void *)0) ? 0 : ((&((ipaddr)->u_addr.ip6)))->addr[2]; ((&((&pcb->local_ip)->u_addr.ip6)))->addr[3] = ((&((ipaddr)->u_addr.ip6))) == ((void *)0) ? 0 : ((&((ipaddr)->u_addr.ip6)))->addr[3]; ((((&((&pcb->local_ip)->u_addr.ip6))))->zone = (((&((ipaddr)->u_addr.ip6))) == ((void *)0) ? 0 : (((&((ipaddr)->u_addr.ip6)))->zone))); }while(0); }else{ (((&((&pcb->local_ip)->u_addr.ip4)))->addr = (((&((ipaddr)->u_addr.ip4))) == ((void *)0) ? 0 : ((&((ipaddr)->u_addr.ip4)))->addr)); do { (&((&pcb->local_ip)->u_addr.ip6))->addr[1] = (&((&pcb->local_ip)->u_addr.ip6))->addr[2] = (&((&pcb->local_ip)->u_addr.ip6))->addr[3] = 0; (((&((&pcb->local_ip)->u_addr.ip6)))->zone = 0); }while(0); }}while(0);
+  }
+  pcb->local_port = port;
+  do { (pcb)->next = *&tcp_bound_pcbs; *(&tcp_bound_pcbs) = (pcb); tcp_timer_needed(); } while (0);
+                                                                     ;
+  return ERR_OK;
+}
+# 763 "src/core/tcp.c"
+void
+tcp_bind_netif(struct tcp_pcb *pcb, const struct netif *netif)
+{
+                           ;
+  if (netif != ((void *)0)) {
+    pcb->netif_idx = ((u8_t)((netif)->num + 1));
+  } else {
+    pcb->netif_idx = (0);
+  }
+}
+
+
+
+
+
+static err_t
+tcp_accept_null(void *arg, struct tcp_pcb *pcb, err_t err)
+{
+  (void)arg;
+  (void)err;
+
+  do { if (!(pcb != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_accept_null: invalid pcb", 784, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+  tcp_abort(pcb);
+
+  return ERR_ABRT;
+}
+# 825 "src/core/tcp.c"
+struct tcp_pcb *
+tcp_listen_with_backlog(struct tcp_pcb *pcb, u8_t backlog)
+{
+                           ;
+  return tcp_listen_with_backlog_and_err(pcb, backlog, ((void *)0));
+}
+# 848 "src/core/tcp.c"
+struct tcp_pcb *
+tcp_listen_with_backlog_and_err(struct tcp_pcb *pcb, u8_t backlog, err_t *err)
+{
+  struct tcp_pcb_listen *lpcb = ((void *)0);
+  err_t res;
+
+  (void)backlog;
+
+                           ;
+
+  do { if (!(pcb != ((void *)0))) { ; res = ERR_ARG; goto done;}} while(0);
+  do { if (!(pcb->state == CLOSED)) { ; res = ERR_CLSD; goto done;}} while(0);
+
+
+  if (pcb->state == LISTEN) {
+    lpcb = (struct tcp_pcb_listen *)pcb;
+    res = ERR_ALREADY;
+    goto done;
+  }
+# 883 "src/core/tcp.c"
+  lpcb = (struct tcp_pcb_listen *)memp_malloc(MEMP_TCP_PCB_LISTEN);
+  if (lpcb == ((void *)0)) {
+    res = ERR_MEM;
+    goto done;
+  }
+  lpcb->callback_arg = pcb->callback_arg;
+  lpcb->local_port = pcb->local_port;
+  lpcb->state = LISTEN;
+  lpcb->prio = pcb->prio;
+  lpcb->so_options = pcb->so_options;
+  lpcb->netif_idx = pcb->netif_idx;
+  lpcb->ttl = pcb->ttl;
+  lpcb->tos = pcb->tos;
+
+
+
+
+  do { (lpcb->remote_ip).type = (pcb->local_ip.type); }while(0);
+
+  do{ do { (lpcb->local_ip).type = (((&pcb->local_ip)->type)); }while(0); if((((&pcb->local_ip)->type) == IPADDR_TYPE_V6)){ do{(*(&((&(lpcb->local_ip))->u_addr.ip6))).addr[0] = (*(&((&(pcb->local_ip))->u_addr.ip6))).addr[0]; (*(&((&(lpcb->local_ip))->u_addr.ip6))).addr[1] = (*(&((&(pcb->local_ip))->u_addr.ip6))).addr[1]; (*(&((&(lpcb->local_ip))->u_addr.ip6))).addr[2] = (*(&((&(pcb->local_ip))->u_addr.ip6))).addr[2]; (*(&((&(lpcb->local_ip))->u_addr.ip6))).addr[3] = (*(&((&(pcb->local_ip))->u_addr.ip6))).addr[3]; (((*(&((&(lpcb->local_ip))->u_addr.ip6)))).zone = ((*(&((&(pcb->local_ip))->u_addr.ip6)))).zone); }while(0); }else{ ((*(&((&(lpcb->local_ip))->u_addr.ip4))).addr = (*(&((&(pcb->local_ip))->u_addr.ip4))).addr); do { (&((&lpcb->local_ip)->u_addr.ip6))->addr[1] = (&((&lpcb->local_ip)->u_addr.ip6))->addr[2] = (&((&lpcb->local_ip)->u_addr.ip6))->addr[3] = 0; (((&((&lpcb->local_ip)->u_addr.ip6)))->zone = 0); }while(0); }}while(0);
+  if (pcb->local_port != 0) {
+    do { if(*(&tcp_bound_pcbs) == (pcb)) { (*(&tcp_bound_pcbs)) = (*&tcp_bound_pcbs)->next; } else { struct tcp_pcb *tcp_tmp_pcb; for (tcp_tmp_pcb = *&tcp_bound_pcbs; tcp_tmp_pcb != ((void *)0); tcp_tmp_pcb = tcp_tmp_pcb->next) { if(tcp_tmp_pcb->next == (pcb)) { tcp_tmp_pcb->next = (pcb)->next; break; } } } (pcb)->next = ((void *)0); } while(0);
+  }
+
+
+
+
+  tcp_free(pcb);
+
+  lpcb->accept = tcp_accept_null;
+
+
+  lpcb->accepts_pending = 0;
+  do { do { if (!((lpcb)->state == LISTEN)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "pcb->state == LISTEN (called for wrong pcb?)", 916, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0); ((struct tcp_pcb_listen *)(lpcb))->backlog = ((backlog) ? (backlog) : 1); } while(0);
+
+  do { ((struct tcp_pcb *)lpcb)->next = *&tcp_listen_pcbs.pcbs; *(&tcp_listen_pcbs.pcbs) = ((struct tcp_pcb *)lpcb); tcp_timer_needed(); } while (0);
+  res = ERR_OK;
+done:
+  if (err != ((void *)0)) {
+    *err = res;
+  }
+  return (struct tcp_pcb *)lpcb;
+}
+
+
+
+
+
+
+
+u32_t
+tcp_update_rcv_ann_wnd(struct tcp_pcb *pcb)
+{
+  u32_t new_right_edge;
+
+  do { if (!(pcb != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_update_rcv_ann_wnd: invalid pcb", 938, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+  new_right_edge = pcb->rcv_nxt + pcb->rcv_wnd;
+
+  if ((!((((u32_t)((u32_t)(new_right_edge) - (u32_t)(pcb->rcv_ann_right_edge + (((((20 * 1024) / 2)) < (pcb->mss)) ? (((20 * 1024) / 2)) : (pcb->mss)))) & 0x80000000u) != 0)))) {
+
+    pcb->rcv_ann_wnd = pcb->rcv_wnd;
+    return new_right_edge - pcb->rcv_ann_right_edge;
+  } else {
+    if ((((u32_t)((u32_t)(pcb->rcv_ann_right_edge) - (u32_t)(pcb->rcv_nxt)) & 0x80000000u) != 0)) {
+
+
+      pcb->rcv_ann_wnd = 0;
+    } else {
+
+      u32_t new_rcv_ann_wnd = pcb->rcv_ann_right_edge - pcb->rcv_nxt;
+
+      do { if (!(new_rcv_ann_wnd <= 0xffff)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "new_rcv_ann_wnd <= 0xffff", 954, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+      pcb->rcv_ann_wnd = (tcpwnd_size_t)new_rcv_ann_wnd;
+    }
+    return 0;
+  }
+}
+# 971 "src/core/tcp.c"
+void
+tcp_recved(struct tcp_pcb *pcb, u16_t len)
+{
+  u32_t wnd_inflation;
+  tcpwnd_size_t rcv_wnd;
+
+                           ;
+
+  do { if (!(pcb != ((void *)0))) { ; return;}} while(0);
+
+
+  do { if (!(pcb->state != LISTEN)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "don't call tcp_recved for listen-pcbs", 983, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+
+  rcv_wnd = (tcpwnd_size_t)(pcb->rcv_wnd + len);
+  if ((rcv_wnd > (20 * 1024)) || (rcv_wnd < pcb->rcv_wnd)) {
+
+                                                                                          ;
+    pcb->rcv_wnd = (20 * 1024);
+  } else {
+    pcb->rcv_wnd = rcv_wnd;
+  }
+
+  wnd_inflation = tcp_update_rcv_ann_wnd(pcb);
+
+
+
+
+
+  if (wnd_inflation >= (((((20 * 1024) / 4)) < ((1024 * 4))) ? (((20 * 1024) / 4)) : ((1024 * 4)))) {
+    do { (pcb)->flags = (tcpflags_t)((pcb)->flags | (0x02U)); } while(0);
+    tcp_output(pcb);
+  }
+
+
+                                                                                       ;
+}
+
+
+
+
+
+
+static u16_t
+tcp_new_port(void)
+{
+  u8_t i;
+  u16_t n = 0;
+  struct tcp_pcb *pcb;
+
+again:
+  tcp_port++;
+  if (tcp_port == 0xffff) {
+    tcp_port = 0xc000;
+  }
+
+  for (i = 0; i < 4; i++) {
+    for (pcb = *tcp_pcb_lists[i]; pcb != ((void *)0); pcb = pcb->next) {
+      if (pcb->local_port == tcp_port) {
+        n++;
+        if (n > (0xffff - 0xc000)) {
+          return 0;
+        }
+        goto again;
+      }
+    }
+  }
+  return tcp_port;
+}
+# 1070 "src/core/tcp.c"
+err_t
+tcp_connect(struct tcp_pcb *pcb, const ip_addr_t *ipaddr, u16_t port,
+            tcp_connected_fn connected)
+{
+  struct netif *netif = ((void *)0);
+  err_t ret;
+  u32_t iss;
+  u16_t old_local_port;
+
+                           ;
+
+  do { if (!(pcb != ((void *)0))) { ; return ERR_ARG;}} while(0);
+  do { if (!(ipaddr != ((void *)0))) { ; return ERR_ARG;}} while(0);
+
+  do { if (!(pcb->state == CLOSED)) { ; return ERR_ISCONN;}} while(0);
+
+                                                                  ;
+  do{ do { if((&pcb->remote_ip) != ((void *)0)) { do { (*(&pcb->remote_ip)).type = (((ipaddr)->type)); }while(0); }}while(0); if((((ipaddr) != ((void *)0)) && (((&*(ipaddr))->type) == IPADDR_TYPE_V6))){ do{((&((&pcb->remote_ip)->u_addr.ip6)))->addr[0] = ((&((ipaddr)->u_addr.ip6))) == ((void *)0) ? 0 : ((&((ipaddr)->u_addr.ip6)))->addr[0]; ((&((&pcb->remote_ip)->u_addr.ip6)))->addr[1] = ((&((ipaddr)->u_addr.ip6))) == ((void *)0) ? 0 : ((&((ipaddr)->u_addr.ip6)))->addr[1]; ((&((&pcb->remote_ip)->u_addr.ip6)))->addr[2] = ((&((ipaddr)->u_addr.ip6))) == ((void *)0) ? 0 : ((&((ipaddr)->u_addr.ip6)))->addr[2]; ((&((&pcb->remote_ip)->u_addr.ip6)))->addr[3] = ((&((ipaddr)->u_addr.ip6))) == ((void *)0) ? 0 : ((&((ipaddr)->u_addr.ip6)))->addr[3]; ((((&((&pcb->remote_ip)->u_addr.ip6))))->zone = (((&((ipaddr)->u_addr.ip6))) == ((void *)0) ? 0 : (((&((ipaddr)->u_addr.ip6)))->zone))); }while(0); }else{ (((&((&pcb->remote_ip)->u_addr.ip4)))->addr = (((&((ipaddr)->u_addr.ip4))) == ((void *)0) ? 0 : ((&((ipaddr)->u_addr.ip4)))->addr)); do { (&((&pcb->remote_ip)->u_addr.ip6))->addr[1] = (&((&pcb->remote_ip)->u_addr.ip6))->addr[2] = (&((&pcb->remote_ip)->u_addr.ip6))->addr[3] = 0; (((&((&pcb->remote_ip)->u_addr.ip6)))->zone = 0); }while(0); }}while(0);
+  pcb->remote_port = port;
+
+  if (pcb->netif_idx != (0)) {
+    netif = netif_get_by_index(pcb->netif_idx);
+  } else {
+
+    netif = ((((&pcb->remote_ip) != ((void *)0)) && (((&*(&pcb->remote_ip))->type) == IPADDR_TYPE_V6)) ? ip6_route((&((&pcb->local_ip)->u_addr.ip6)), (&((&pcb->remote_ip)->u_addr.ip6))) : ip4_route((&((&pcb->remote_ip)->u_addr.ip4))));
+  }
+  if (netif == ((void *)0)) {
+
+    return ERR_RTE;
+  }
+
+
+  if ((((&pcb->local_ip) == ((void *)0)) ? 1 : (((((&pcb->local_ip) != ((void *)0)) && (((&*(&pcb->local_ip))->type) == IPADDR_TYPE_V6))) ? ((((&((&pcb->local_ip)->u_addr.ip6))) == ((void *)0)) || (((*((&((&pcb->local_ip)->u_addr.ip6)))).addr[0] == 0) && ((*((&((&pcb->local_ip)->u_addr.ip6)))).addr[1] == 0) && ((*((&((&pcb->local_ip)->u_addr.ip6)))).addr[2] == 0) && ((*((&((&pcb->local_ip)->u_addr.ip6)))).addr[3] == 0))) : (((&((&pcb->local_ip)->u_addr.ip4))) == ((void *)0) || ((*((&((&pcb->local_ip)->u_addr.ip4)))).addr == ((u32_t)0x00000000UL)))))) {
+    const ip_addr_t *local_ip = ((((ipaddr) != ((void *)0)) && (((&*(ipaddr))->type) == IPADDR_TYPE_V6)) ? (((netif) != ((void *)0)) ? ip6_select_source_address(netif, (&((ipaddr)->u_addr.ip6))) : ((void *)0)) : (((netif) != ((void *)0)) ? ((const ip_addr_t*)&((netif)->ip_addr)) : ((void *)0)));
+    if (local_ip == ((void *)0)) {
+      return ERR_RTE;
+    }
+    do{ do { (pcb->local_ip).type = (((&*local_ip)->type)); }while(0); if((((&*local_ip)->type) == IPADDR_TYPE_V6)){ do{(*(&((&(pcb->local_ip))->u_addr.ip6))).addr[0] = (*(&((&(*local_ip))->u_addr.ip6))).addr[0]; (*(&((&(pcb->local_ip))->u_addr.ip6))).addr[1] = (*(&((&(*local_ip))->u_addr.ip6))).addr[1]; (*(&((&(pcb->local_ip))->u_addr.ip6))).addr[2] = (*(&((&(*local_ip))->u_addr.ip6))).addr[2]; (*(&((&(pcb->local_ip))->u_addr.ip6))).addr[3] = (*(&((&(*local_ip))->u_addr.ip6))).addr[3]; (((*(&((&(pcb->local_ip))->u_addr.ip6)))).zone = ((*(&((&(*local_ip))->u_addr.ip6)))).zone); }while(0); }else{ ((*(&((&(pcb->local_ip))->u_addr.ip4))).addr = (*(&((&(*local_ip))->u_addr.ip4))).addr); do { (&((&pcb->local_ip)->u_addr.ip6))->addr[1] = (&((&pcb->local_ip)->u_addr.ip6))->addr[2] = (&((&pcb->local_ip)->u_addr.ip6))->addr[3] = 0; (((&((&pcb->local_ip)->u_addr.ip6)))->zone = 0); }while(0); }}while(0);
+  }
+
+
+
+
+  if ((((&pcb->remote_ip) != ((void *)0)) && (((&*(&pcb->remote_ip))->type) == IPADDR_TYPE_V6)) &&
+      (!((((&((&pcb->remote_ip)->u_addr.ip6)))->zone) != 0) && ((((((&((&pcb->remote_ip)->u_addr.ip6))))->addr[0] & ((((0xffc00000UL) & (u32_t)0x000000ffUL) << 24) | (((0xffc00000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xffc00000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xffc00000UL) & (u32_t)0xff000000UL) >> 24))) == ((((0xfe800000UL) & (u32_t)0x000000ffUL) << 24) | (((0xfe800000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xfe800000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xfe800000UL) & (u32_t)0xff000000UL) >> 24))) || ((((IP6_UNICAST)) != IP6_UNICAST) && ((((((&((&pcb->remote_ip)->u_addr.ip6))))->addr[0] & ((((0xff8f0000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff8f0000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff8f0000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff8f0000UL) & (u32_t)0xff000000UL) >> 24))) == ((((0xff010000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff010000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff010000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff010000UL) & (u32_t)0xff000000UL) >> 24))) || (((((&((&pcb->remote_ip)->u_addr.ip6))))->addr[0] & ((((0xff8f0000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff8f0000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff8f0000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff8f0000UL) & (u32_t)0xff000000UL) >> 24))) == ((((0xff020000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff020000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff020000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff020000UL) & (u32_t)0xff000000UL) >> 24)))))))) {
+    (((((&((&pcb->remote_ip)->u_addr.ip6))))->zone = (((((((&((&pcb->remote_ip)->u_addr.ip6))))->addr[0] & ((((0xffc00000UL) & (u32_t)0x000000ffUL) << 24) | (((0xffc00000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xffc00000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xffc00000UL) & (u32_t)0xff000000UL) >> 24))) == ((((0xfe800000UL) & (u32_t)0x000000ffUL) << 24) | (((0xfe800000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xfe800000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xfe800000UL) & (u32_t)0xff000000UL) >> 24))) || ((((IP6_UNICAST)) != IP6_UNICAST) && ((((((&((&pcb->remote_ip)->u_addr.ip6))))->addr[0] & ((((0xff8f0000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff8f0000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff8f0000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff8f0000UL) & (u32_t)0xff000000UL) >> 24))) == ((((0xff010000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff010000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff010000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff010000UL) & (u32_t)0xff000000UL) >> 24))) || (((((&((&pcb->remote_ip)->u_addr.ip6))))->addr[0] & ((((0xff8f0000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff8f0000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff8f0000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff8f0000UL) & (u32_t)0xff000000UL) >> 24))) == ((((0xff020000UL) & (u32_t)0x000000ffUL) << 24) | (((0xff020000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xff020000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xff020000UL) & (u32_t)0xff000000UL) >> 24)))))) ? ((u8_t)((netif)->num + 1)) : 0)));
+  }
+
+
+  old_local_port = pcb->local_port;
+  if (pcb->local_port == 0) {
+    pcb->local_port = tcp_new_port();
+    if (pcb->local_port == 0) {
+      return ERR_BUF;
+    }
+  } else {
+# 1146 "src/core/tcp.c"
+  }
+
+  iss = tcp_next_iss(pcb);
+  pcb->rcv_nxt = 0;
+  pcb->snd_nxt = iss;
+  pcb->lastack = iss - 1;
+  pcb->snd_wl2 = iss - 1;
+  pcb->snd_lbb = iss - 1;
+
+
+  pcb->rcv_wnd = pcb->rcv_ann_wnd = (20 * 1024);
+  pcb->rcv_ann_right_edge = pcb->rcv_nxt;
+  pcb->snd_wnd = (20 * 1024);
+
+
+  pcb->mss = 536;
+
+  pcb->mss = tcp_eff_send_mss_netif(pcb->mss, netif, &pcb->remote_ip);
+
+  pcb->cwnd = 1;
+
+  pcb->connected = connected;
+
+
+
+
+
+  ret = tcp_enqueue_flags(pcb, 0x02U);
+  if (ret == ERR_OK) {
+
+    pcb->state = SYN_SENT;
+    if (old_local_port != 0) {
+      do { if(*(&tcp_bound_pcbs) == (pcb)) { (*(&tcp_bound_pcbs)) = (*&tcp_bound_pcbs)->next; } else { struct tcp_pcb *tcp_tmp_pcb; for (tcp_tmp_pcb = *&tcp_bound_pcbs; tcp_tmp_pcb != ((void *)0); tcp_tmp_pcb = tcp_tmp_pcb->next) { if(tcp_tmp_pcb->next == (pcb)) { tcp_tmp_pcb->next = (pcb)->next; break; } } } (pcb)->next = ((void *)0); } while(0);
+    }
+    do { do { (pcb)->next = *&tcp_active_pcbs; *(&tcp_active_pcbs) = (pcb); tcp_timer_needed(); } while (0); tcp_active_pcbs_changed = 1; } while (0);
+    ++lwip_stats.mib2.tcpactiveopens;
+
+    tcp_output(pcb);
+  }
+  return ret;
+}
+# 1195 "src/core/tcp.c"
+void
+tcp_slowtmr(void)
+{
+  struct tcp_pcb *pcb, *prev;
+  tcpwnd_size_t eff_wnd;
+  u8_t pcb_remove;
+  u8_t pcb_reset;
+  err_t err;
+
+  err = ERR_OK;
+
+  ++tcp_ticks;
+  ++tcp_timer_ctr;
+
+tcp_slowtmr_start:
+
+  prev = ((void *)0);
+  pcb = tcp_active_pcbs;
+  if (pcb == ((void *)0)) {
+                                                             ;
+  }
+  while (pcb != ((void *)0)) {
+                                                                    ;
+    do { if (!(pcb->state != CLOSED)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_slowtmr: active pcb->state != CLOSED", 1218, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+    do { if (!(pcb->state != LISTEN)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_slowtmr: active pcb->state != LISTEN", 1219, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+    do { if (!(pcb->state != TIME_WAIT)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_slowtmr: active pcb->state != TIME-WAIT", 1220, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+    if (pcb->last_timer == tcp_timer_ctr) {
+
+      prev = pcb;
+      pcb = pcb->next;
+      continue;
+    }
+    pcb->last_timer = tcp_timer_ctr;
+
+    pcb_remove = 0;
+    pcb_reset = 0;
+
+    if (pcb->state == SYN_SENT && pcb->nrtx >= 4) {
+      ++pcb_remove;
+                                                                        ;
+    } else if (pcb->nrtx >= 12) {
+      ++pcb_remove;
+                                                                         ;
+    } else {
+      if (pcb->persist_backoff > 0) {
+        do { if (!(pcb->unacked == ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_slowtimr: persist ticking with in-flight data", 1240, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+        do { if (!(pcb->unsent != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_slowtimr: persist ticking with empty send buffer", 1241, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+        if (pcb->persist_probe >= 12) {
+          ++pcb_remove;
+        } else {
+          u8_t backoff_cnt = tcp_persist_backoff[pcb->persist_backoff - 1];
+          if (pcb->persist_cnt < backoff_cnt) {
+            pcb->persist_cnt++;
+          }
+          if (pcb->persist_cnt >= backoff_cnt) {
+            int next_slot = 1;
+
+            if (pcb->snd_wnd == 0) {
+              if (tcp_zero_window_probe(pcb) != ERR_OK) {
+                next_slot = 0;
+              }
+
+            } else {
+              if (tcp_split_unsent_seg(pcb, (u16_t)pcb->snd_wnd) == ERR_OK) {
+                if (tcp_output(pcb) == ERR_OK) {
+
+                  next_slot = 0;
+                }
+              }
+            }
+            if (next_slot) {
+              pcb->persist_cnt = 0;
+              if (pcb->persist_backoff < sizeof(tcp_persist_backoff)) {
+                pcb->persist_backoff++;
+              }
+            }
+          }
+        }
+      } else {
+
+        if ((pcb->rtime >= 0) && (pcb->rtime < 0x7FFF)) {
+          ++pcb->rtime;
+        }
+
+        if (pcb->rtime >= pcb->rto) {
+
+
+
+                                                            ;
+
+
+
+          if ((tcp_rexmit_rto_prepare(pcb) == ERR_OK) || ((pcb->unacked == ((void *)0)) && (pcb->unsent != ((void *)0)))) {
+
+
+            if (pcb->state != SYN_SENT) {
+              u8_t backoff_idx = (((pcb->nrtx) < (sizeof(tcp_backoff) - 1)) ? (pcb->nrtx) : (sizeof(tcp_backoff) - 1));
+              int calc_rto = ((pcb->sa >> 3) + pcb->sv) << tcp_backoff[backoff_idx];
+              pcb->rto = (s16_t)(((calc_rto) < (0x7FFF)) ? (calc_rto) : (0x7FFF));
+            }
+
+
+            pcb->rtime = 0;
+
+
+            eff_wnd = (((pcb->cwnd) < (pcb->snd_wnd)) ? (pcb->cwnd) : (pcb->snd_wnd));
+            pcb->ssthresh = eff_wnd >> 1;
+            if (pcb->ssthresh < (tcpwnd_size_t)(pcb->mss << 1)) {
+              pcb->ssthresh = (tcpwnd_size_t)(pcb->mss << 1);
+            }
+            pcb->cwnd = pcb->mss;
+
+
+                                                                   ;
+            pcb->bytes_acked = 0;
+
+
+
+            tcp_rexmit_rto_commit(pcb);
+          }
+        }
+      }
+    }
+
+    if (pcb->state == FIN_WAIT_2) {
+
+      if (pcb->flags & 0x10U) {
+
+
+        if ((u32_t)(tcp_ticks - pcb->tmr) >
+            20000 / (2*250)) {
+          ++pcb_remove;
+                                                                                     ;
+        }
+      }
+    }
+
+
+    if (((pcb)->so_options & (0x08U)) &&
+        ((pcb->state == ESTABLISHED) ||
+         (pcb->state == CLOSE_WAIT))) {
+      if ((u32_t)(tcp_ticks - pcb->tmr) >
+          (pcb->keep_idle + 9U * 75000UL) / (2*250)) {
+                                                                                           ;
+        do { if((((&pcb->remote_ip)->type) == IPADDR_TYPE_V6)) { ; } else { ; }}while(0);
+                                      ;
+
+        ++pcb_remove;
+        ++pcb_reset;
+      } else if ((u32_t)(tcp_ticks - pcb->tmr) >
+                 (pcb->keep_idle + pcb->keep_cnt_sent * 75000UL)
+                 / (2*250)) {
+        err = tcp_keepalive(pcb);
+        if (err == ERR_OK) {
+          pcb->keep_cnt_sent++;
+        }
+      }
+    }
+
+
+
+
+
+    if (pcb->ooseq != ((void *)0) &&
+        (tcp_ticks - pcb->tmr >= (u32_t)pcb->rto * 6U)) {
+                                                                                ;
+      tcp_free_ooseq(pcb);
+    }
+
+
+
+    if (pcb->state == SYN_RCVD) {
+      if ((u32_t)(tcp_ticks - pcb->tmr) >
+          20000 / (2*250)) {
+        ++pcb_remove;
+                                                                                 ;
+      }
+    }
+
+
+    if (pcb->state == LAST_ACK) {
+      if ((u32_t)(tcp_ticks - pcb->tmr) > 2 * 60000UL / (2*250)) {
+        ++pcb_remove;
+                                                                                 ;
+      }
+    }
+
+
+    if (pcb_remove) {
+      struct tcp_pcb *pcb2;
+
+      tcp_err_fn err_fn = pcb->errf;
+
+      void *err_arg;
+      enum tcp_state last_state;
+      tcp_pcb_purge(pcb);
+
+      if (prev != ((void *)0)) {
+        do { if (!(pcb != tcp_active_pcbs)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_slowtmr: middle tcp != tcp_active_pcbs", 1393, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+        prev->next = pcb->next;
+      } else {
+
+        do { if (!(tcp_active_pcbs == pcb)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_slowtmr: first pcb == tcp_active_pcbs", 1397, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+        tcp_active_pcbs = pcb->next;
+      }
+
+      if (pcb_reset) {
+        tcp_rst(pcb, pcb->snd_nxt, pcb->rcv_nxt, &pcb->local_ip, &pcb->remote_ip,
+                pcb->local_port, pcb->remote_port);
+      }
+
+      err_arg = pcb->callback_arg;
+      last_state = pcb->state;
+      pcb2 = pcb;
+      pcb = pcb->next;
+      tcp_free(pcb2);
+
+      tcp_active_pcbs_changed = 0;
+      do { (void)last_state; if((err_fn) != ((void *)0)) (err_fn)((err_arg),(ERR_ABRT)); } while (0);
+      if (tcp_active_pcbs_changed) {
+        goto tcp_slowtmr_start;
+      }
+    } else {
+
+      prev = pcb;
+      pcb = pcb->next;
+
+
+      ++prev->polltmr;
+      if (prev->polltmr >= prev->pollinterval) {
+        prev->polltmr = 0;
+                                                                      ;
+        tcp_active_pcbs_changed = 0;
+        do { if((prev)->poll != ((void *)0)) (err) = (prev)->poll((prev)->callback_arg,(prev)); else (err) = ERR_OK; } while (0);
+        if (tcp_active_pcbs_changed) {
+          goto tcp_slowtmr_start;
+        }
+
+        if (err == ERR_OK) {
+          tcp_output(prev);
+        }
+      }
+    }
+  }
+
+
+
+  prev = ((void *)0);
+  pcb = tcp_tw_pcbs;
+  while (pcb != ((void *)0)) {
+    do { if (!(pcb->state == TIME_WAIT)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_slowtmr: TIME-WAIT pcb->state == TIME-WAIT", 1445, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+    pcb_remove = 0;
+
+
+    if ((u32_t)(tcp_ticks - pcb->tmr) > 2 * 60000UL / (2*250)) {
+      ++pcb_remove;
+    }
+
+
+    if (pcb_remove) {
+      struct tcp_pcb *pcb2;
+      tcp_pcb_purge(pcb);
+
+      if (prev != ((void *)0)) {
+        do { if (!(pcb != tcp_tw_pcbs)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_slowtmr: middle tcp != tcp_tw_pcbs", 1459, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+        prev->next = pcb->next;
+      } else {
+
+        do { if (!(tcp_tw_pcbs == pcb)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_slowtmr: first pcb == tcp_tw_pcbs", 1463, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+        tcp_tw_pcbs = pcb->next;
+      }
+      pcb2 = pcb;
+      pcb = pcb->next;
+      tcp_free(pcb2);
+    } else {
+      prev = pcb;
+      pcb = pcb->next;
+    }
+  }
+}
+
+
+
+
+
+
+
+void
+tcp_fasttmr(void)
+{
+  struct tcp_pcb *pcb;
+
+  ++tcp_timer_ctr;
+
+tcp_fasttmr_start:
+  pcb = tcp_active_pcbs;
+
+  while (pcb != ((void *)0)) {
+    if (pcb->last_timer != tcp_timer_ctr) {
+      struct tcp_pcb *next;
+      pcb->last_timer = tcp_timer_ctr;
+
+      if (pcb->flags & 0x01U) {
+                                                              ;
+        do { (pcb)->flags = (tcpflags_t)((pcb)->flags | (0x02U)); } while(0);
+        tcp_output(pcb);
+        do { (pcb)->flags = (tcpflags_t)((pcb)->flags & (tcpflags_t)(~(0x01U | 0x02U) & 0xffffU)); } while(0);
+      }
+
+      if (pcb->flags & 0x08U) {
+                                                              ;
+        do { (pcb)->flags = (tcpflags_t)((pcb)->flags & (tcpflags_t)(~(0x08U) & 0xffffU)); } while(0);
+        tcp_close_shutdown_fin(pcb);
+      }
+
+      next = pcb->next;
+
+
+      if (pcb->refused_data != ((void *)0)) {
+        tcp_active_pcbs_changed = 0;
+        tcp_process_refused_data(pcb);
+        if (tcp_active_pcbs_changed) {
+
+          goto tcp_fasttmr_start;
+        }
+      }
+      pcb = next;
+    } else {
+      pcb = pcb->next;
+    }
+  }
+}
+
+
+void
+tcp_txnow(void)
+{
+  struct tcp_pcb *pcb;
+
+  for (pcb = tcp_active_pcbs; pcb != ((void *)0); pcb = pcb->next) {
+    if (pcb->flags & 0x80U) {
+      tcp_output(pcb);
+    }
+  }
+}
+
+
+err_t
+tcp_process_refused_data(struct tcp_pcb *pcb)
+{
+
+
+
+
+  do { if (!(pcb != ((void *)0))) { ; return ERR_ARG;}} while(0);
+
+
+
+
+  {
+    err_t err;
+    u8_t refused_flags = pcb->refused_data->flags;
+
+
+    struct pbuf *refused_data = pcb->refused_data;
+
+
+
+
+    pcb->refused_data = ((void *)0);
+
+
+                                                                     ;
+    do { if((pcb)->recv != ((void *)0)) { (err) = (pcb)->recv((pcb)->callback_arg,(pcb),(refused_data),(ERR_OK)); } else { (err) = tcp_recv_null(((void *)0), (pcb), (refused_data), (ERR_OK)); } } while (0);
+    if (err == ERR_OK) {
+
+      if ((refused_flags & 0x20U)
+
+
+
+         ) {
+
+
+        if (pcb->rcv_wnd != (20 * 1024)) {
+          pcb->rcv_wnd++;
+        }
+        do { if(((pcb)->recv != ((void *)0))) { (err) = (pcb)->recv((pcb)->callback_arg,(pcb),((void *)0),ERR_OK); } else { (err) = ERR_OK; } } while (0);
+        if (err == ERR_ABRT) {
+          return ERR_ABRT;
+        }
+      }
+    } else if (err == ERR_ABRT) {
+
+
+
+                                                                                                   ;
+      return ERR_ABRT;
+    } else {
+
+
+
+
+
+
+      pcb->refused_data = refused_data;
+      return ERR_INPROGRESS;
+    }
+  }
+  return ERR_OK;
+}
+
+
+
+
+
+
+void
+tcp_segs_free(struct tcp_seg *seg)
+{
+  while (seg != ((void *)0)) {
+    struct tcp_seg *next = seg->next;
+    tcp_seg_free(seg);
+    seg = next;
+  }
+}
+
+
+
+
+
+
+void
+tcp_seg_free(struct tcp_seg *seg)
+{
+  if (seg != ((void *)0)) {
+    if (seg->p != ((void *)0)) {
+      pbuf_free(seg->p);
+
+
+
+    }
+    memp_free(MEMP_TCP_SEG, seg);
+  }
+}
+# 1647 "src/core/tcp.c"
+void
+tcp_setprio(struct tcp_pcb *pcb, u8_t prio)
+{
+                           ;
+
+  do { if (!(pcb != ((void *)0))) { ; return;}} while(0);
+
+  pcb->prio = prio;
+}
+# 1665 "src/core/tcp.c"
+struct tcp_seg *
+tcp_seg_copy(struct tcp_seg *seg)
+{
+  struct tcp_seg *cseg;
+
+  do { if (!(seg != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_seg_copy: invalid seg", 1670, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+  cseg = (struct tcp_seg *)memp_malloc(MEMP_TCP_SEG);
+  if (cseg == ((void *)0)) {
+    return ((void *)0);
+  }
+  memcpy((u8_t *)cseg,(const u8_t *)seg,sizeof(struct tcp_seg));
+  pbuf_ref(cseg->p);
+  return cseg;
+}
+
+
+
+
+
+
+
+err_t
+tcp_recv_null(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
+{
+  (void)arg;
+
+  do { if (!(pcb != ((void *)0))) { ; return ERR_ARG;}} while(0);
+
+  if (p != ((void *)0)) {
+    tcp_recved(pcb, p->tot_len);
+    pbuf_free(p);
+  } else if (err == ERR_OK) {
+    return tcp_close(pcb);
+  }
+  return ERR_OK;
+}
+
+
+
+
+
+
+
+static void
+tcp_kill_prio(u8_t prio)
+{
+  struct tcp_pcb *pcb, *inactive;
+  u32_t inactivity;
+  u8_t mprio;
+
+  mprio = (((127) < (prio)) ? (127) : (prio));
+
+
+
+
+  if (mprio == 0) {
+    return;
+  }
+
+
+
+
+
+
+  mprio--;
+
+  inactivity = 0;
+  inactive = ((void *)0);
+  for (pcb = tcp_active_pcbs; pcb != ((void *)0); pcb = pcb->next) {
+
+    if ((pcb->prio < mprio) ||
+
+        ((pcb->prio == mprio) && ((u32_t)(tcp_ticks - pcb->tmr) >= inactivity))) {
+      inactivity = tcp_ticks - pcb->tmr;
+      inactive = pcb;
+      mprio = pcb->prio;
+    }
+  }
+  if (inactive != ((void *)0)) {
+
+                                                          ;
+    tcp_abort(inactive);
+  }
+}
+
+
+
+
+
+static void
+tcp_kill_state(enum tcp_state state)
+{
+  struct tcp_pcb *pcb, *inactive;
+  u32_t inactivity;
+
+  do { if (!((state == CLOSING) || (state == LAST_ACK))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "invalid state", 1761, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+  inactivity = 0;
+  inactive = ((void *)0);
+
+
+  for (pcb = tcp_active_pcbs; pcb != ((void *)0); pcb = pcb->next) {
+    if (pcb->state == state) {
+      if ((u32_t)(tcp_ticks - pcb->tmr) >= inactivity) {
+        inactivity = tcp_ticks - pcb->tmr;
+        inactive = pcb;
+      }
+    }
+  }
+  if (inactive != ((void *)0)) {
+
+                                                                                ;
+
+    tcp_abandon(inactive, 0);
+  }
+}
+
+
+
+
+
+static void
+tcp_kill_timewait(void)
+{
+  struct tcp_pcb *pcb, *inactive;
+  u32_t inactivity;
+
+  inactivity = 0;
+  inactive = ((void *)0);
+
+  for (pcb = tcp_tw_pcbs; pcb != ((void *)0); pcb = pcb->next) {
+    if ((u32_t)(tcp_ticks - pcb->tmr) >= inactivity) {
+      inactivity = tcp_ticks - pcb->tmr;
+      inactive = pcb;
+    }
+  }
+  if (inactive != ((void *)0)) {
+
+                                                          ;
+    tcp_abort(inactive);
+  }
+}
+
+
+
+
+
+
+static void
+tcp_handle_closepend(void)
+{
+  struct tcp_pcb *pcb = tcp_active_pcbs;
+
+  while (pcb != ((void *)0)) {
+    struct tcp_pcb *next = pcb->next;
+
+    if (pcb->flags & 0x08U) {
+                                                                     ;
+      do { (pcb)->flags = (tcpflags_t)((pcb)->flags & (tcpflags_t)(~(0x08U) & 0xffffU)); } while(0);
+      tcp_close_shutdown_fin(pcb);
+    }
+    pcb = next;
+  }
+}
+
+
+
+
+
+
+
+struct tcp_pcb *
+tcp_alloc(u8_t prio)
+{
+  struct tcp_pcb *pcb;
+
+                           ;
+
+  pcb = (struct tcp_pcb *)memp_malloc(MEMP_TCP_PCB);
+  if (pcb == ((void *)0)) {
+
+    tcp_handle_closepend();
+
+
+                                                                                    ;
+    tcp_kill_timewait();
+
+    pcb = (struct tcp_pcb *)memp_malloc(MEMP_TCP_PCB);
+    if (pcb == ((void *)0)) {
+
+                                                                                     ;
+      tcp_kill_state(LAST_ACK);
+
+      pcb = (struct tcp_pcb *)memp_malloc(MEMP_TCP_PCB);
+      if (pcb == ((void *)0)) {
+
+                                                                                      ;
+        tcp_kill_state(CLOSING);
+
+        pcb = (struct tcp_pcb *)memp_malloc(MEMP_TCP_PCB);
+        if (pcb == ((void *)0)) {
+
+                                                                                                          ;
+          tcp_kill_prio(prio);
+
+          pcb = (struct tcp_pcb *)memp_malloc(MEMP_TCP_PCB);
+          if (pcb != ((void *)0)) {
+
+            --lwip_stats.memp[MEMP_TCP_PCB]->err;
+          }
+        }
+        if (pcb != ((void *)0)) {
+
+          --lwip_stats.memp[MEMP_TCP_PCB]->err;
+        }
+      }
+      if (pcb != ((void *)0)) {
+
+        --lwip_stats.memp[MEMP_TCP_PCB]->err;
+      }
+    }
+    if (pcb != ((void *)0)) {
+
+      --lwip_stats.memp[MEMP_TCP_PCB]->err;
+    }
+  }
+  if (pcb != ((void *)0)) {
+
+    memset(pcb, 0, sizeof(struct tcp_pcb));
+    pcb->prio = prio;
+    pcb->snd_buf = 2048;
+
+
+    pcb->rcv_wnd = pcb->rcv_ann_wnd = (20 * 1024);
+    pcb->ttl = 255;
+
+
+    pcb->mss = 536;
+
+
+    pcb->rto = 3000 / (2*250);
+    pcb->sv = 3000 / (2*250);
+    pcb->rtime = -1;
+    pcb->cwnd = 1;
+    pcb->tmr = tcp_ticks;
+    pcb->last_timer = tcp_timer_ctr;
+
+
+
+
+
+
+
+    pcb->ssthresh = 2048;
+
+
+    pcb->recv = tcp_recv_null;
+
+
+
+    pcb->keep_idle = 7200000UL;
+
+
+
+
+
+  }
+  return pcb;
+}
+# 1951 "src/core/tcp.c"
+struct tcp_pcb *
+tcp_new(void)
+{
+  return tcp_alloc(64);
+}
+# 1969 "src/core/tcp.c"
+struct tcp_pcb *
+tcp_new_ip_type(u8_t type)
+{
+  struct tcp_pcb *pcb;
+  pcb = tcp_alloc(64);
+
+  if (pcb != ((void *)0)) {
+    do { (pcb->local_ip).type = (type); }while(0);
+    do { (pcb->remote_ip).type = (type); }while(0);
+  }
+
+
+
+  return pcb;
+}
+# 1995 "src/core/tcp.c"
+void
+tcp_arg(struct tcp_pcb *pcb, void *arg)
+{
+                           ;
+
+
+  if (pcb != ((void *)0)) {
+    pcb->callback_arg = arg;
+  }
+}
+# 2018 "src/core/tcp.c"
+void
+tcp_recv(struct tcp_pcb *pcb, tcp_recv_fn recv)
+{
+                           ;
+  if (pcb != ((void *)0)) {
+    do { if (!(pcb->state != LISTEN)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "invalid socket state for recv callback", 2023, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+    pcb->recv = recv;
+  }
+}
+# 2038 "src/core/tcp.c"
+void
+tcp_sent(struct tcp_pcb *pcb, tcp_sent_fn sent)
+{
+                           ;
+  if (pcb != ((void *)0)) {
+    do { if (!(pcb->state != LISTEN)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "invalid socket state for sent callback", 2043, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+    pcb->sent = sent;
+  }
+}
+# 2064 "src/core/tcp.c"
+void
+tcp_err(struct tcp_pcb *pcb, tcp_err_fn err)
+{
+                           ;
+  if (pcb != ((void *)0)) {
+    do { if (!(pcb->state != LISTEN)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "invalid socket state for err callback", 2069, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+    pcb->errf = err;
+  }
+}
+# 2084 "src/core/tcp.c"
+void
+tcp_accept(struct tcp_pcb *pcb, tcp_accept_fn accept)
+{
+                           ;
+  if ((pcb != ((void *)0)) && (pcb->state == LISTEN)) {
+    struct tcp_pcb_listen *lpcb = (struct tcp_pcb_listen *)pcb;
+    lpcb->accept = accept;
+  }
+}
+# 2113 "src/core/tcp.c"
+void
+tcp_poll(struct tcp_pcb *pcb, tcp_poll_fn poll, u8_t interval)
+{
+                           ;
+
+  do { if (!(pcb != ((void *)0))) { ; return;}} while(0);
+  do { if (!(pcb->state != LISTEN)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "invalid socket state for poll", 2119, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+
+  pcb->poll = poll;
+
+
+
+  pcb->pollinterval = interval;
+}
+
+
+
+
+
+
+
+void
+tcp_pcb_purge(struct tcp_pcb *pcb)
+{
+  do { if (!(pcb != ((void *)0))) { ; return;}} while(0);
+
+  if (pcb->state != CLOSED &&
+      pcb->state != TIME_WAIT &&
+      pcb->state != LISTEN) {
+
+                                               ;
+
+    tcp_backlog_accepted(pcb);
+
+    if (pcb->refused_data != ((void *)0)) {
+                                                                              ;
+      pbuf_free(pcb->refused_data);
+      pcb->refused_data = ((void *)0);
+    }
+    if (pcb->unsent != ((void *)0)) {
+                                                                    ;
+    }
+    if (pcb->unacked != ((void *)0)) {
+                                                                         ;
+    }
+
+    if (pcb->ooseq != ((void *)0)) {
+                                                                       ;
+      tcp_free_ooseq(pcb);
+    }
+
+
+
+
+    pcb->rtime = -1;
+
+    tcp_segs_free(pcb->unsent);
+    tcp_segs_free(pcb->unacked);
+    pcb->unacked = pcb->unsent = ((void *)0);
+
+    pcb->unsent_oversize = 0;
+
+  }
+}
+
+
+
+
+
+
+
+void
+tcp_pcb_remove(struct tcp_pcb **pcblist, struct tcp_pcb *pcb)
+{
+  do { if (!(pcb != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_pcb_remove: invalid pcb", 2188, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+  do { if (!(pcblist != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_pcb_remove: invalid pcblist", 2189, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+  do { if(*(pcblist) == (pcb)) { (*(pcblist)) = (*pcblist)->next; } else { struct tcp_pcb *tcp_tmp_pcb; for (tcp_tmp_pcb = *pcblist; tcp_tmp_pcb != ((void *)0); tcp_tmp_pcb = tcp_tmp_pcb->next) { if(tcp_tmp_pcb->next == (pcb)) { tcp_tmp_pcb->next = (pcb)->next; break; } } } (pcb)->next = ((void *)0); } while(0);
+
+  tcp_pcb_purge(pcb);
+
+
+  if ((pcb->state != TIME_WAIT) &&
+      (pcb->state != LISTEN) &&
+      (pcb->flags & 0x01U)) {
+    do { (pcb)->flags = (tcpflags_t)((pcb)->flags | (0x02U)); } while(0);
+    tcp_output(pcb);
+  }
+
+  if (pcb->state != LISTEN) {
+    do { if (!(pcb->unsent == ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "unsent segments leaking", 2204, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+    do { if (!(pcb->unacked == ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "unacked segments leaking", 2205, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+    do { if (!(pcb->ooseq == ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "ooseq segments leaking", 2207, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+  }
+
+  pcb->state = CLOSED;
+
+  pcb->local_port = 0;
+
+  do { if (!(1)) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_pcb_remove: tcp_pcbs_sane()", 2215, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+}
+
+
+
+
+
+
+u32_t
+tcp_next_iss(struct tcp_pcb *pcb)
+{
+
+
+
+
+  static u32_t iss = 6510;
+
+  do { if (!(pcb != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_next_iss: invalid pcb", 2232, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+  (void)pcb;
+
+  iss += tcp_ticks;
+  return iss;
+
+}
+
+
+
+
+
+
+
+u16_t
+tcp_eff_send_mss_netif(u16_t sendmss, struct netif *outif, const ip_addr_t *dest)
+{
+  u16_t mss_s;
+  u16_t mtu;
+
+  (void)dest;
+
+  do { if (!(dest != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_eff_send_mss_netif: invalid dst_ip", 2254, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+
+
+  if ((((dest) != ((void *)0)) && (((&*(dest))->type) == IPADDR_TYPE_V6)))
+
+  {
+
+    mtu = nd6_get_destination_mtu((&((dest)->u_addr.ip6)), outif);
+  }
+
+  else
+
+
+
+  {
+    if (outif == ((void *)0)) {
+      return sendmss;
+    }
+    mtu = outif->mtu;
+  }
+
+
+  if (mtu != 0) {
+    u16_t offset;
+
+
+    if ((((dest) != ((void *)0)) && (((&*(dest))->type) == IPADDR_TYPE_V6)))
+
+    {
+      offset = 40 + 20;
+    }
+
+    else
+
+
+
+    {
+      offset = 20 + 20;
+    }
+
+    mss_s = (mtu > offset) ? (u16_t)(mtu - offset) : 0;
+
+
+
+
+    sendmss = (((sendmss) < (mss_s)) ? (sendmss) : (mss_s));
+  }
+  return sendmss;
+}
+
+
+
+static void
+tcp_netif_ip_addr_changed_pcblist(const ip_addr_t *old_addr, struct tcp_pcb *pcb_list)
+{
+  struct tcp_pcb *pcb;
+  pcb = pcb_list;
+
+  do { if (!(old_addr != ((void *)0))) { do {printf("Assertion \"%s\" failed at line %d in %s\n", "tcp_netif_ip_addr_changed_pcblist: invalid old_addr", 2313, "src/core/tcp.c"); fflush(((void *)0)); abort();} while(0); }} while(0);
+
+  while (pcb != ((void *)0)) {
+
+    if (((((&pcb->local_ip)->type) != ((old_addr)->type)) ? 0 : ((((&*(&pcb->local_ip))->type) == IPADDR_TYPE_V6) ? ((((((&((&pcb->local_ip)->u_addr.ip6))))->addr[0] == (((&((old_addr)->u_addr.ip6))))->addr[0]) && ((((&((&pcb->local_ip)->u_addr.ip6))))->addr[1] == (((&((old_addr)->u_addr.ip6))))->addr[1]) && ((((&((&pcb->local_ip)->u_addr.ip6))))->addr[2] == (((&((old_addr)->u_addr.ip6))))->addr[2]) && ((((&((&pcb->local_ip)->u_addr.ip6))))->addr[3] == (((&((old_addr)->u_addr.ip6))))->addr[3])) && ((((&((&pcb->local_ip)->u_addr.ip6))))->zone == (((&((old_addr)->u_addr.ip6))))->zone)) : (((&((&pcb->local_ip)->u_addr.ip4)))->addr == ((&((old_addr)->u_addr.ip4)))->addr)))
+
+
+        && (!(((&pcb->local_ip)->type) == IPADDR_TYPE_V4) || !((((&((&pcb->local_ip)->u_addr.ip4)))->addr & ((((0xffff0000UL) & (u32_t)0x000000ffUL) << 24) | (((0xffff0000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xffff0000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xffff0000UL) & (u32_t)0xff000000UL) >> 24))) == ((((0xa9fe0000UL) & (u32_t)0x000000ffUL) << 24) | (((0xa9fe0000UL) & (u32_t)0x0000ff00UL) << 8) | (((0xa9fe0000UL) & (u32_t)0x00ff0000UL) >> 8) | (((0xa9fe0000UL) & (u32_t)0xff000000UL) >> 24))))
+
+       ) {
+
+      struct tcp_pcb *next = pcb->next;
+                                                                                                         ;
+      tcp_abort(pcb);
+      pcb = next;
+    } else {
+      pcb = pcb->next;
+    }
+  }
+}
+
+
+
+
+
+
+void
+tcp_netif_ip_addr_changed(const ip_addr_t *old_addr, const ip_addr_t *new_addr)
+{
+  struct tcp_pcb_listen *lpcb;
+
+  if (!(((old_addr) == ((void *)0)) ? 1 : (((((old_addr) != ((void *)0)) && (((&*(old_addr))->type) == IPADDR_TYPE_V6))) ? ((((&((old_addr)->u_addr.ip6))) == ((void *)0)) || (((*((&((old_addr)->u_addr.ip6)))).addr[0] == 0) && ((*((&((old_addr)->u_addr.ip6)))).addr[1] == 0) && ((*((&((old_addr)->u_addr.ip6)))).addr[2] == 0) && ((*((&((old_addr)->u_addr.ip6)))).addr[3] == 0))) : (((&((old_addr)->u_addr.ip4))) == ((void *)0) || ((*((&((old_addr)->u_addr.ip4)))).addr == ((u32_t)0x00000000UL)))))) {
+    tcp_netif_ip_addr_changed_pcblist(old_addr, tcp_active_pcbs);
+    tcp_netif_ip_addr_changed_pcblist(old_addr, tcp_bound_pcbs);
+
+    if (!(((new_addr) == ((void *)0)) ? 1 : (((((new_addr) != ((void *)0)) && (((&*(new_addr))->type) == IPADDR_TYPE_V6))) ? ((((&((new_addr)->u_addr.ip6))) == ((void *)0)) || (((*((&((new_addr)->u_addr.ip6)))).addr[0] == 0) && ((*((&((new_addr)->u_addr.ip6)))).addr[1] == 0) && ((*((&((new_addr)->u_addr.ip6)))).addr[2] == 0) && ((*((&((new_addr)->u_addr.ip6)))).addr[3] == 0))) : (((&((new_addr)->u_addr.ip4))) == ((void *)0) || ((*((&((new_addr)->u_addr.ip4)))).addr == ((u32_t)0x00000000UL)))))) {
+
+      for (lpcb = tcp_listen_pcbs.listen_pcbs; lpcb != ((void *)0); lpcb = lpcb->next) {
+
+        if (((((&lpcb->local_ip)->type) != ((old_addr)->type)) ? 0 : ((((&*(&lpcb->local_ip))->type) == IPADDR_TYPE_V6) ? ((((((&((&lpcb->local_ip)->u_addr.ip6))))->addr[0] == (((&((old_addr)->u_addr.ip6))))->addr[0]) && ((((&((&lpcb->local_ip)->u_addr.ip6))))->addr[1] == (((&((old_addr)->u_addr.ip6))))->addr[1]) && ((((&((&lpcb->local_ip)->u_addr.ip6))))->addr[2] == (((&((old_addr)->u_addr.ip6))))->addr[2]) && ((((&((&lpcb->local_ip)->u_addr.ip6))))->addr[3] == (((&((old_addr)->u_addr.ip6))))->addr[3])) && ((((&((&lpcb->local_ip)->u_addr.ip6))))->zone == (((&((old_addr)->u_addr.ip6))))->zone)) : (((&((&lpcb->local_ip)->u_addr.ip4)))->addr == ((&((old_addr)->u_addr.ip4)))->addr)))) {
+
+
+          do{ do { (lpcb->local_ip).type = (((&*new_addr)->type)); }while(0); if((((&*new_addr)->type) == IPADDR_TYPE_V6)){ do{(*(&((&(lpcb->local_ip))->u_addr.ip6))).addr[0] = (*(&((&(*new_addr))->u_addr.ip6))).addr[0]; (*(&((&(lpcb->local_ip))->u_addr.ip6))).addr[1] = (*(&((&(*new_addr))->u_addr.ip6))).addr[1]; (*(&((&(lpcb->local_ip))->u_addr.ip6))).addr[2] = (*(&((&(*new_addr))->u_addr.ip6))).addr[2]; (*(&((&(lpcb->local_ip))->u_addr.ip6))).addr[3] = (*(&((&(*new_addr))->u_addr.ip6))).addr[3]; (((*(&((&(lpcb->local_ip))->u_addr.ip6)))).zone = ((*(&((&(*new_addr))->u_addr.ip6)))).zone); }while(0); }else{ ((*(&((&(lpcb->local_ip))->u_addr.ip4))).addr = (*(&((&(*new_addr))->u_addr.ip4))).addr); do { (&((&lpcb->local_ip)->u_addr.ip6))->addr[1] = (&((&lpcb->local_ip)->u_addr.ip6))->addr[2] = (&((&lpcb->local_ip)->u_addr.ip6))->addr[3] = 0; (((&((&lpcb->local_ip)->u_addr.ip6)))->zone = 0); }while(0); }}while(0);
+        }
+      }
+    }
+  }
+}
+
+const char *
+tcp_debug_state_str(enum tcp_state s)
+{
+  return tcp_state_str[s];
+}
+
+err_t
+tcp_tcp_get_tcp_addrinfo(struct tcp_pcb *pcb, int local, ip_addr_t *addr, u16_t *port)
+{
+  if (pcb) {
+    if (local) {
+      if (addr) {
+        *addr = pcb->local_ip;
+      }
+      if (port) {
+        *port = pcb->local_port;
+      }
+    } else {
+      if (addr) {
+        *addr = pcb->remote_ip;
+      }
+      if (port) {
+        *port = pcb->remote_port;
+      }
+    }
+    return ERR_OK;
+  }
+  return ERR_VAL;
+}
+
+
+
+void
+tcp_free_ooseq(struct tcp_pcb *pcb)
+{
+  if (pcb->ooseq) {
+    tcp_segs_free(pcb->ooseq);
+    pcb->ooseq = ((void *)0);
+
+
+
+  }
+}
