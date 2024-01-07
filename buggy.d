@@ -1,1 +1,0 @@
-buggy.o: buggy.c
