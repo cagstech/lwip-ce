@@ -19,16 +19,19 @@ typedef enum
 {
   ECM_OK,
   ECM_USB_INIT_FAIL,
+  ECM_DEVICE_UNSUPPORTED,
+  ECM_MEMORY_OVERFLOW,
+  ECM_DEVICE_CONFIG_ERROR,
 
 } ecm_error_t;
 
 struct ecm_state
 {
   usb_device_t usb_device;
+  usb_interface_descriptor_t if_control, if_data;
   usb_endpoint_t ecm_in, ecm_out;
 };
 extern struct ecm_state ecm_state;
-extern usb_device_t usb_device;
 
 bool ecm_init(void);
 struct pbuf *ecm_receive(void);

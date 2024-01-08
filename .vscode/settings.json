@@ -5,7 +5,10 @@
     "files.trimFinalNewlines": true,
     "files.trimTrailingWhitespace": true,
     "files.associations": {
-        "*.h": "c"
+        "*.h": "c",
+        "__mutex_base": "c",
+        "atomic": "c",
+        "__locale": "c"
     },
     "GitHooks.hooksDirectory": "/Users/acagliano/CEdev/source/lwip-ce/.git/hooks"
 }
