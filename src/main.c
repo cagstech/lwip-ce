@@ -48,11 +48,20 @@ ecm_error_t main(void)
         return ECM_USB_INIT_FAIL;
 
     kb_SetMode(MODE_3_CONTINUOUS);
+    bool init_done = false;
     do
     {
+        if (init_done == false && ecm_device.ready)
+        {
+            printf("Device ready!\n");
+            init_done = true;
+        }
         usb_HandleEvents();
-    } while (!kb_isDown(kb_KeyClear));
+    } while ((!kb_isDown(kb_KeyClear)) || ecm_device.ready);
 
+    ecm_transmit(/* test sending a packet */);
+
+    printf("%s", buf);
     /* Start DHCP and HTTPD */
     //    dhcp_start(&netif);
     // httpd_init();

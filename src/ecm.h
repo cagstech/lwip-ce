@@ -30,6 +30,7 @@ typedef enum
 
 typedef struct _ecm_device_t
 {
+  bool ready;
   usb_device_t usb_device;
   usb_interface_descriptor_t *if_control, *if_data;
   // usb_descriptor_t *conf_active;
