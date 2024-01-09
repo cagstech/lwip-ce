@@ -95,9 +95,9 @@ bool ecm_init(void)
     // test for composite device, which is what an ECM device usually is
     if (d->bDeviceClass != 0x00)
         return false;
-
+    uint8_t num_configs = descriptor.device.bNumConfigurations;
     // foreach configuration of device
-    for (int c_idx = 0; c_idx < descriptor.device.bNumConfigurations; c_idx++)
+    for (int c_idx = 0; c_idx < num_configs; c_idx++)
     {
         // get total length of configuration descriptor, error if too large
         uint8_t ifnum = 0;
