@@ -90,7 +90,8 @@ bool ecm_init(void)
     size_t len, xferd;
 
     // wait for device to be enabled, request device descriptor
-    usb_GetDeviceDescriptor(usb_device, &descriptor, &len, &xferd);
+    if (usb_GetDeviceDescriptor(usb_device, &descriptor, &len, &xferd))
+        return false;
     // test for composite device, which is what an ECM device usually is
     if (d->bDeviceClass != 0x00)
         return false;
@@ -107,7 +108,8 @@ bool ecm_init(void)
             return ECM_MEMORY_OVERFLOW;
 
         // request configuration descriptor(s)
-        usb_GetConfigurationDescriptor(usb_device, c_idx, &descriptor, &len, &xferd);
+        if (usb_GetConfigurationDescriptor(usb_device, c_idx, &descriptor, &len, &xferd))
+            continue;
         usb_descriptor_t *desc = (usb_descriptor_t *)descriptor; // current working descriptor
         while (parsed_len < desc_len)
         {
@@ -190,8 +192,10 @@ bool ecm_init(void)
 
     return false;
 init_success:
-    usb_SetConfiguration(ecm_state.usb_device, descriptor, desc_len);
-    usb_SetInterface(ecm_state.usb_device, ecm_state.if_data, desc_len - parsed_len);
+    if (usb_SetConfiguration(ecm_state.usb_device, descriptor, desc_len))
+        return false;
+    if (usb_SetInterface(ecm_state.usb_device, ecm_state.if_data, desc_len - parsed_len))
+        return false;
     return true;
 }
 // setup netif in lwip
