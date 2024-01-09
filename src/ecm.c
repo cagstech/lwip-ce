@@ -16,14 +16,9 @@ typedef struct
     uint8_t bInterface;
 } usb_union_functional_descriptor_t;
 
-static u8_t buf[1518];
-usb_device_t usb_device = NULL;
-struct ecm_state ecm_state = {0};
-
-#define ECM_ENDPOINT_IN 0x81
-#define ECM_ENDPOINT_OUT 0x02
-#define USB_CS_INTERFACE_DESCRIPTOR 0x24
-#define ECM_UNION_DESCRIPTOR 0x06
+#define ECM_MTU 1518
+static u8_t buf[ECM_MTU];
+struct ecm_device_t ecm_device = {0};
 
 enum _descriptor_parser_await_states
 {
@@ -53,7 +48,7 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
     {
         usb_device_t host = usb_FindDevice(NULL, NULL, USB_SKIP_HUBS);
         if (host)
-            usb_device = host;
+            ecm_device.usb_device = host;
         if (ecm_init())
             return USB_SUCCESS;
         break;
@@ -61,7 +56,7 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
         // break;
     case USB_DEVICE_RESUMED_EVENT:
     case USB_DEVICE_ENABLED_EVENT:
-        usb_device = event_data;
+        ecm_device.usb_device = event_data;
         if (ecm_init())
             return USB_SUCCESS;
         break;
@@ -74,41 +69,42 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
     return USB_SUCCESS;
 }
 
-#define CDC_CONTROL_CLASS 0x02
-#define CDC_DATA_CLASS 0x0A
-#define ECM_CLASS 0x06
-#define ECM_PROTOCOL 0
-bool ecm_init(void)
+// Defines ECM-specific classes/subclasses not defined in <usbdrvce.h>
+#define USB_ECM_SUBCLASS 0x06
+#define USB_CS_INTERFACE_DESCRIPTOR 0x24
+#define USB_UNION_DESCRIPTOR 0x06
+ecm_error_t ecm_init(void)
 {
     // validate that the device is actually a CDC-ECM device
     union
     {
         uint8_t bytes[256];
-        usb_configuration_descriptor_t conf;
-        usb_device_descriptor_t device;
+        usb_descriptor_t d;
     } descriptor;
-    size_t len, xferd;
-
+    size_t xferd;
+    usb_error_t err;
     // wait for device to be enabled, request device descriptor
-    if (usb_GetDeviceDescriptor(usb_device, &descriptor, &len, &xferd))
-        return false;
+    err = usb_GetDeviceDescriptor(usb_device, &descriptor, sizeof usb_device_descriptor_t, &xferd);
+    if (err || xferd == NULL)
+        return ECM_ERROR_INVALID_DESCRIPTOR;
     // test for composite device, which is what an ECM device usually is
-    if (d->bDeviceClass != 0x00)
-        return false;
-    uint8_t num_configs = descriptor.device.bNumConfigurations;
+    if (d->bDeviceClass != USB_INTERFACE_SPECIFIC_CLASS)
+        return ECM_ERROR_INVALID_DEVICE;
+    uint8_t num_configs = ((usb_device_descriptor_t *)descriptor).bNumConfigurations;
     // foreach configuration of device
     for (int c_idx = 0; c_idx < num_configs; c_idx++)
     {
         // get total length of configuration descriptor, error if too large
         uint8_t ifnum = 0;
         uint8_t parse_state = PARSE_AWAIT_CONTROL_IF;
-        size_t desc_len = usb_GetConfigurationDescriptorTotalLength(usb_device, c_idx),
+        size_t desc_len = usb_GetConfigurationDescriptorTotalLength(ecm_device.usb_device, c_idx),
                parsed_len = 0;
         if (desc_len > 256)
-            return ECM_MEMORY_OVERFLOW;
+            return ECM_ERROR_MEMORY;
 
         // request configuration descriptor(s)
-        if (usb_GetConfigurationDescriptor(usb_device, c_idx, &descriptor, &len, &xferd))
+        err = usb_GetConfigurationDescriptor(usb_device, c_idx, &descriptor, desc_len, &xferd);
+        if (err || xferd == NULL)
             continue;
         usb_descriptor_t *desc = (usb_descriptor_t *)descriptor; // current working descriptor
         while (parsed_len < desc_len)
@@ -123,10 +119,10 @@ bool ecm_init(void)
                 {
                     usb_endpoint_descriptor_t *endpoint = (usb_endpoint_descriptor_t *)desc;
                     if (endpoint->bEndpointAddress & 0b10000000)
-                        ecm_state.ecm_out = endpoint->bEndpointAddress; // set out endpoint address
+                        ecm_device.out = endpoint->bEndpointAddress; // set out endpoint address
                     else
-                        ecm_state.ecm_in = endpoint->bEndpointAddress; // set in endpoint address
-                    if (ecm_state.ecm_in && ecm_state.ecm_out)
+                        ecm_device.in = endpoint->bEndpointAddress; // set in endpoint address
+                    if (ecm_device.in && ecm_device.out)
                         goto init_success; // if we have both, we are done -- hard exit
                 }
                 break;
@@ -142,9 +138,9 @@ bool ecm_init(void)
                     {
                         if ((iface->bInterfaceNumber == ifnum) &&
                             (iface->bNumEndpoints == 2) &&
-                            (iface->bInterfaceClass == CDC_DATA_CLASS))
+                            (iface->bInterfaceClass == USB_CDC_DATA_CLASS))
                         {
-                            ecm_state.if_data = iface;
+                            ecm_device.if_data = iface;
                             parse_state = PARSE_AWAIT_ENDPOINTS;
                         }
                     }
@@ -152,16 +148,16 @@ bool ecm_init(void)
                     {
                         // if we encounter another interface type after a control interface that isn't the CS_INTERFACE
                         // then we don't have the correct interface. This could be a malformed descriptor or something else
-                        ecm_state.if_control = NULL;          // reset control interface if ifnum is not set
+                        ecm_device.if_control = NULL;         // reset control interface if ifnum is not set
                         parse_state = PARSE_AWAIT_CONTROL_IF; // reset parser state
 
                         // If the interface is class CDC control and subtype ECM, this might be the correct interface union
                         // the next thing we should encounter is see case USB_CS_INTERFACE_DESCRIPTOR
-                        if ((iface->bInterfaceClass == CDC_CONTROL_CLASS) &&
-                            (iface->bInterfaceSubClass == ECM_CLASS))
+                        if ((iface->bInterfaceClass == USB_COMM_CLASS) &&
+                            (iface->bInterfaceSubClass == USB_ECM_SUBCLASS))
                         {
                             // this is our control interface. maybe.
-                            ecm_state.if_control = iface;
+                            ecm_device.if_control = iface;
                             parse_state = PARSE_AWAIT_CS_INTERFACE;
                         }
                     }
@@ -190,52 +186,30 @@ bool ecm_init(void)
         }
     }
 
-    return false;
+    return ECM_ERROR_NO_DEVICE;
 init_success:
-    if (usb_SetConfiguration(ecm_state.usb_device, descriptor, desc_len))
-        return false;
-    if (usb_SetInterface(ecm_state.usb_device, ecm_state.if_data, desc_len - parsed_len))
-        return false;
-    return true;
-}
-// setup netif in lwip
-
-// ip4_addr_t addr = IPADDR4_INIT_BYTES(192, 168, 25, 2);
-// ip4_addr_t netmask = IPADDR4_INIT_BYTES(255, 255, 255, 0);
-// ip4_addr_t gateway = IPADDR4_INIT_BYTES(192, 168, 25, 1);
-// netif_add(&netif, &addr, &netmask, &gateway, NULL, my_netif_init, netif_input);
-// netif.name[0] = 'e';
-// netif.name[1] = 'n';
-// netif.num = 0;
-// netif.state = usb_device;
-// netif_create_ip6_linklocal_address(&netif, 1);
-// netif.ip6_autoconfig_enabled = 1;
-// netif_set_status_callback(&netif, netif_status_callback);
-// netif_set_default(&netif);
-// netif_set_up(&netif);
+    if (usb_SetConfiguration(ecm_device.usb_device, descriptor, desc_len))
+        return ECM_CONFIGURATION_ERROR;
+    if (usb_SetInterface(ecm_device.usb_device, ecm_device.if_data, desc_len - parsed_len))
+        return ECM_INTERFACE_ERROR;
+    return ECM_OK;
 }
 
 struct pbuf *
-veth_receive(void)
+ecm_receive(void)
 {
-    ssize_t size = veth_rx();
-    if (size == -1)
-    {
-        return NULL;
-    }
-    struct pbuf *p = pbuf_alloc(PBUF_RAW, size, PBUF_POOL);
-    if (p != NULL)
-    {
-        pbuf_take(p, buf, size);
-    }
-    return p;
+    if (usb_ScheduleBulkTransfer(ecm_device.in, buf, ECM_MTU, NULL, NULL))
+        return ECM_ERROR_RX;
+    return ECM_OK;
 }
 
-err_t veth_transmit(struct netif *netif, struct pbuf *p)
+ecm_error_t ecm_transmit(struct netif *netif, struct pbuf *p)
 {
     // LINK_STATS_INC(link.xmit);
     /* Update SNMP stats (only if you use SNMP) */
     // MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
     // pbuf_copy_partial(p, buf, p->tot_len, 0);
-    usb_ScheduleBulkTransfer(ecm_state.ecm_out, buf, p->tot_len, NULL, NULL) return ERR_OK;
+    if (usb_ScheduleBulkTransfer(ecm_device.out, buf, p->tot_len, NULL, NULL))
+        return ECM_ERROR_TX;
+    return ECM_OK;
 }
