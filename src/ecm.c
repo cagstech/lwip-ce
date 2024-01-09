@@ -192,13 +192,22 @@ init_success:
         return ECM_CONFIGURATION_ERROR;
     if (usb_SetInterface(ecm_device.usb_device, ecm_device.if_data, desc_len - parsed_len))
         return ECM_INTERFACE_ERROR;
+    ecm_device.ready = true;
     return ECM_OK;
+}
+
+usb_error_t ecm_receive_callback(usb_endpoint_t endpoint,
+                                 usb_transfer_status_t status,
+                                 size_t transferred,
+                                 usb_transfer_data_t *data)
+{
+    return usb_ScheduleBulkTransfer(ecm_device.in, buf, ECM_MTU, ecm_receive, NULL))
 }
 
 struct pbuf *
 ecm_receive(void)
 {
-    if (usb_ScheduleBulkTransfer(ecm_device.in, buf, ECM_MTU, NULL, NULL))
+    if (usb_ScheduleBulkTransfer(ecm_device.in, buf, ECM_MTU, ecm_receive_callback, NULL))
         return ECM_ERROR_RX;
     return ECM_OK;
 }
