@@ -140,7 +140,7 @@ bool ecm_init(void)
                     // if we have a control interface and ifnum is non-zero (we have an interface num to look for)
                     if (parse_state == PARSE_AWAIT_BULK_IF)
                     {
-                        if ((iface->bInterfaceNumber == if_data) &&
+                        if ((iface->bInterfaceNumber == ifnum) &&
                             (iface->bNumEndpoints == 2) &&
                             (iface->bInterfaceClass == CDC_DATA_CLASS))
                         {
