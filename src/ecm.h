@@ -38,11 +38,11 @@ typedef struct _ecm_device_t
 } ecm_device_t;
 extern ecm_device_t ecm_device;
 
-bool ecm_init(void);
-struct pbuf *ecm_receive(void);
-ecm_erorr_t ecm_transmit(struct netif *netif, struct pbuf *p);
+ecm_error_t ecm_init(void);
+ecm_error_t ecm_receive(void);
+ecm_error_t ecm_transmit(void *buf, size_t len);
 
 usb_error_t ecm_handle_usb_event(usb_event_t event, void *event_data,
-                                 usb_callback_data_t *callback_data)
+                                 usb_callback_data_t *callback_data);
 
 #endif // LWIP_VETH_H
