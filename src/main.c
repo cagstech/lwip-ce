@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 #undef NDEBUG
 // #include <debug.h>
 #include <keypadc.h>
@@ -41,27 +42,36 @@ my_netif_init(struct netif *netif)
     return ERR_OK;
 }
 */
-ecm_error_t main(void)
+int main(void)
 {
     // lwip_init();
-    if (usb_Init(ecm_handle_usb_event, device, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
-        return ECM_USB_INIT_FAIL;
+    if (usb_Init(ecm_handle_usb_event, ecm_device.usb_device, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
+        return 1;
 
     kb_SetMode(MODE_3_CONTINUOUS);
     bool init_done = false;
     do
     {
+        kb_Scan();
         if (init_done == false && ecm_device.ready)
         {
             printf("Device ready!\n");
+            ecm_receive();
             init_done = true;
         }
+        if (kb_IsDown(kb_2nd))
+        {
+            const char *msg1 = "The fox jumped over the dog.";
+            ecm_transmit(msg1, strlen(msg1));
+        }
+        if (kb_IsDown(kb_Alpha))
+        {
+            const char *msg2 = "The fox jumped over the other fox.";
+            ecm_transmit(msg2, strlen(msg2));
+        }
         usb_HandleEvents();
-    } while ((!kb_isDown(kb_KeyClear)) || ecm_device.ready);
+    } while (!kb_IsDown(kb_Clear));
 
-    ecm_transmit(/* test sending a packet */);
-
-    printf("%s", buf);
     /* Start DHCP and HTTPD */
     //    dhcp_start(&netif);
     // httpd_init();
