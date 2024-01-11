@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <usbdrvce.h>
 // #include "lwip/netif.h"
 // #include "lwip/pbuf.h"
@@ -18,7 +19,8 @@ typedef struct
 } usb_union_functional_descriptor_t;
 
 #define ECM_MTU 1518
-static uint8_t buf[ECM_MTU];
+static uint8_t in_buf[ECM_MTU];
+static uint8_t out_buf[ECM_MTU];
 ecm_device_t ecm_device = {0};
 
 enum _descriptor_parser_await_states
@@ -30,8 +32,14 @@ enum _descriptor_parser_await_states
     PARSE_OK
 };
 
-void hexdump(void *hex, size_t len)
+void hexdump(uint8_t *hex, size_t len)
 {
+    for (int i = 0; i < len; i++)
+    {
+        printf("%02X", hex[i]);
+        if ((i % 8 == 0) && (i != 0))
+            printf("\n");
+    }
 }
 
 usb_error_t
@@ -122,9 +130,9 @@ ecm_error_t ecm_init(void)
                 {
                     usb_endpoint_descriptor_t *endpoint = (usb_endpoint_descriptor_t *)desc;
                     if (endpoint->bEndpointAddress & 0b10000000)
-                        ecm_device.out = endpoint->bEndpointAddress; // set out endpoint address
+                        ecm_device.out = usb_GetDeviceEndpoint(ecm_device.usb_device, endpoint->bEndpointAddress); // set out endpoint address
                     else
-                        ecm_device.in = endpoint->bEndpointAddress; // set in endpoint address
+                        ecm_device.in = usb_GetDeviceEndpoint(ecm_device.usb_device, endpoint->bEndpointAddress); // set in endpoint address
                     if (ecm_device.in && ecm_device.out)
                         goto init_success; // if we have both, we are done -- hard exit
                 }
@@ -143,7 +151,10 @@ ecm_error_t ecm_init(void)
                             (iface->bNumEndpoints == 2) &&
                             (iface->bInterfaceClass == USB_CDC_DATA_CLASS))
                         {
-                            ecm_device.if_data = iface;
+                            ecm_device.if_data.addr = iface;
+                            ecm_device.if_data.len = desc_len - parsed_len;
+                            if (usb_SetInterface(ecm_device.usb_device, ecm_device.if_data.addr, ecm_device.if_data.len))
+                                return ECM_INTERFACE_ERROR;
                             parse_state = PARSE_AWAIT_ENDPOINTS;
                         }
                     }
@@ -160,6 +171,8 @@ ecm_error_t ecm_init(void)
                             (iface->bInterfaceSubClass == USB_ECM_SUBCLASS))
                         {
                             // this is our control interface. maybe.
+                            if (usb_SetConfiguration(ecm_device.usb_device, &descriptor.conf, desc_len))
+                                return ECM_CONFIGURATION_ERROR;
                             ecm_device.if_control = iface;
                             parse_state = PARSE_AWAIT_CS_INTERFACE;
                         }
@@ -191,14 +204,6 @@ ecm_error_t ecm_init(void)
     printf("no device\n");
     return ECM_ERROR_NO_DEVICE;
 init_success:
-    printf("device found\n");
-    if (usb_SetConfiguration(ecm_device.usb_device, &descriptor.conf, desc_len))
-        return ECM_CONFIGURATION_ERROR;
-    printf("device configured\n");
-    printf("setting %u bytes to if\n", desc_len - parsed_len);
-    if (usb_SetInterface(ecm_device.usb_device, ecm_device.if_data, desc_len - parsed_len))
-        return ECM_INTERFACE_ERROR;
-    printf("if set\n");
     ecm_device.ready = true;
     return ECM_OK;
 }
@@ -208,15 +213,15 @@ usb_error_t ecm_receive_callback(usb_endpoint_t endpoint,
                                  size_t transferred,
                                  usb_transfer_data_t *data)
 {
-    printf("%u bytes received!\n", transferred);
-    buf[transferred] = 0;
-    printf("%s", buf);
-    return usb_ScheduleBulkTransfer(ecm_device.in, buf, ECM_MTU, ecm_receive, NULL);
+    // printf("%u bytes received!\n", transferred);
+    in_buf[transferred] = 0;
+    printf("%s", in_buf);
+    return usb_ScheduleBulkTransfer(ecm_device.in, in_buf, ECM_MTU, ecm_receive, NULL);
 }
 
 ecm_error_t ecm_receive(void)
 {
-    if (usb_ScheduleBulkTransfer(ecm_device.in, buf, ECM_MTU, ecm_receive_callback, NULL))
+    if (usb_ScheduleBulkTransfer(ecm_device.in, in_buf, ECM_MTU, ecm_receive_callback, NULL))
         return ECM_ERROR_RX;
     return ECM_OK;
 }
@@ -236,7 +241,8 @@ ecm_error_t ecm_transmit(void *buf, size_t len)
     /* Update SNMP stats (only if you use SNMP) */
     // MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
     // pbuf_copy_partial(p, buf, p->tot_len, 0);
-    if (usb_ScheduleBulkTransfer(ecm_device.out, buf, len, ecm_transmit_callback, NULL))
+    memcpy(out_buf, buf, len);
+    if (usb_ScheduleBulkTransfer(ecm_device.out, out_buf, len, ecm_transmit_callback, NULL))
         return ECM_ERROR_TX;
     return ECM_OK;
 }
