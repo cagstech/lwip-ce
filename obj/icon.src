@@ -5,5 +5,5 @@
 
 	public ___description
 ___description:
-	db	"lwIP", 0
+	db	"ECM driver test", 0
 ___prgm_init:
