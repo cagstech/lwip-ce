@@ -70,8 +70,11 @@ int main(void)
             ecm_transmit(msg2, strlen(msg2));
         }
         usb_HandleEvents();
-    } while (!kb_IsDown(kb_Clear));
+        if (kb_IsDown(kb_Clear))
+            break;
+    } while (1);
 
+    usb_Cleanup();
     /* Start DHCP and HTTPD */
     //    dhcp_start(&netif);
     // httpd_init();
