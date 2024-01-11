@@ -52,26 +52,38 @@ int main(void)
     bool init_done = false;
     do
     {
-        kb_Scan();
         if (init_done == false && ecm_device.ready)
         {
             printf("Device ready!\n");
-            ecm_receive();
+            if (ecm_receive())
+            {
+                printf("receive queue error");
+            }
             init_done = true;
         }
-        if (kb_IsDown(kb_2nd))
+        if (kb_IsDown(kb_Key2nd))
         {
+            while (kb_IsDown(kb_Key2nd))
+                ;
             const char *msg1 = "The fox jumped over the dog.";
-            ecm_transmit(msg1, strlen(msg1));
+            if (!ecm_transmit(msg1, strlen(msg1)))
+                printf("transfer queued\n");
+            else
+                printf("transfer error\n");
         }
-        if (kb_IsDown(kb_Alpha))
+        if (kb_IsDown(kb_KeyAlpha))
         {
+            while (kb_IsDown(kb_KeyAlpha))
+                ;
             const char *msg2 = "The fox jumped over the other fox.";
-            ecm_transmit(msg2, strlen(msg2));
+            if (!ecm_transmit(msg2, strlen(msg2)))
+                printf("transfer queued\n");
+            else
+                printf("transfer error\n");
         }
-        usb_HandleEvents();
-        if (kb_IsDown(kb_Clear))
+        if (kb_IsDown(kb_KeyClear))
             break;
+        usb_HandleEvents();
     } while (1);
 
     usb_Cleanup();
