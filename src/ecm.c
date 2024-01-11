@@ -39,24 +39,16 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
     switch (event)
     {
     case USB_DEVICE_CONNECTED_EVENT:
+        printf("device connected\n");
         if (!(usb_GetRole() & USB_ROLE_DEVICE))
         {
             usb_device_t usb_device = event_data;
             usb_ResetDevice(usb_device);
         }
         break;
-    case USB_HOST_CONFIGURE_EVENT:
-    {
-        usb_device_t host = usb_FindDevice(NULL, NULL, USB_SKIP_HUBS);
-        if (host)
-            ecm_device.usb_device = host;
-        if (ecm_init())
-            return USB_SUCCESS;
-        break;
-    }
-        // break;
     case USB_DEVICE_RESUMED_EVENT:
     case USB_DEVICE_ENABLED_EVENT:
+        printf("device enabled\n");
         ecm_device.usb_device = event_data;
         if (ecm_init())
             return USB_SUCCESS;
