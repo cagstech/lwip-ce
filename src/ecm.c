@@ -30,6 +30,10 @@ enum _descriptor_parser_await_states
     PARSE_OK
 };
 
+void hexdump(void *hex, size_t len)
+{
+}
+
 usb_error_t
 ecm_handle_usb_event(usb_event_t event, void *event_data,
                      usb_callback_data_t *callback_data)
@@ -50,8 +54,7 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
     case USB_DEVICE_ENABLED_EVENT:
         printf("device enabled\n");
         ecm_device.usb_device = event_data;
-        if (ecm_init())
-            return USB_SUCCESS;
+        return ecm_init();
         break;
         // break;
     case USB_DEVICE_SUSPENDED_EVENT:
@@ -81,12 +84,14 @@ ecm_error_t ecm_init(void)
     usb_error_t err;
     // wait for device to be enabled, request device descriptor
     err = usb_GetDeviceDescriptor(ecm_device.usb_device, &descriptor.dev, sizeof(usb_device_descriptor_t), &xferd);
+    printf("device descriptor returned\n");
     if (err || xferd == NULL)
         return ECM_ERROR_INVALID_DESCRIPTOR;
     // test for composite device, which is what an ECM device usually is
     if (descriptor.dev.bDeviceClass != USB_INTERFACE_SPECIFIC_CLASS)
         return ECM_ERROR_INVALID_DEVICE;
     uint8_t num_configs = descriptor.dev.bNumConfigurations;
+    printf("parsing %u configs\n", num_configs);
     // foreach configuration of device
     for (int c_idx = 0; c_idx < num_configs; c_idx++)
     {
@@ -102,6 +107,8 @@ ecm_error_t ecm_init(void)
         err = usb_GetConfigurationDescriptor(ecm_device.usb_device, c_idx, &descriptor.conf, desc_len, &xferd);
         if (err || xferd == NULL)
             continue;
+
+        printf("config%u: ptr:%p, len:%u\n", c_idx, &descriptor.conf, xferd);
         usb_descriptor_t *desc = &descriptor.desc; // current working descriptor
         while (parsed_len < desc_len)
         {
@@ -181,13 +188,17 @@ ecm_error_t ecm_init(void)
             desc = (usb_descriptor_t *)(((uint8_t *)desc) + desc->bLength);
         }
     }
-
+    printf("no device\n");
     return ECM_ERROR_NO_DEVICE;
 init_success:
+    printf("device found\n");
     if (usb_SetConfiguration(ecm_device.usb_device, &descriptor.conf, desc_len))
         return ECM_CONFIGURATION_ERROR;
+    printf("device configured\n");
+    printf("setting %u bytes to if\n", desc_len - parsed_len);
     if (usb_SetInterface(ecm_device.usb_device, ecm_device.if_data, desc_len - parsed_len))
         return ECM_INTERFACE_ERROR;
+    printf("if set\n");
     ecm_device.ready = true;
     return ECM_OK;
 }
