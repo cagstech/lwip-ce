@@ -68,6 +68,7 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
     case USB_DEVICE_SUSPENDED_EVENT:
     case USB_DEVICE_DISABLED_EVENT:
     case USB_DEVICE_DISCONNECTED_EVENT:
+        memset(&ecm_device, 0, sizeof(ecm_device));
         return USB_SUCCESS;
     }
     return USB_SUCCESS;
@@ -130,9 +131,9 @@ ecm_error_t ecm_init(void)
                 {
                     usb_endpoint_descriptor_t *endpoint = (usb_endpoint_descriptor_t *)desc;
                     if (endpoint->bEndpointAddress & 0b10000000)
-                        ecm_device.out = usb_GetDeviceEndpoint(ecm_device.usb_device, endpoint->bEndpointAddress); // set out endpoint address
+                        ecm_device.in = usb_GetDeviceEndpoint(ecm_device.usb_device, endpoint->bEndpointAddress); // set out endpoint address
                     else
-                        ecm_device.in = usb_GetDeviceEndpoint(ecm_device.usb_device, endpoint->bEndpointAddress); // set in endpoint address
+                        ecm_device.out = usb_GetDeviceEndpoint(ecm_device.usb_device, endpoint->bEndpointAddress); // set in endpoint address
                     if (ecm_device.in && ecm_device.out)
                         goto init_success; // if we have both, we are done -- hard exit
                 }
