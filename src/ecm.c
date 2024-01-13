@@ -34,7 +34,7 @@ enum _descriptor_parser_await_states
 
 void hexdump(uint8_t *hex, size_t len)
 {
-    for (int i = 0; i < len; i++)
+    for (size_t i = 0; i < len; i++)
     {
         printf("%02X", hex[i]);
         if ((i % 8 == 0) && (i != 0))
@@ -68,6 +68,7 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
     case USB_DEVICE_SUSPENDED_EVENT:
     case USB_DEVICE_DISABLED_EVENT:
     case USB_DEVICE_DISCONNECTED_EVENT:
+        printf("device lost\n");
         memset(&ecm_device, 0, sizeof(ecm_device));
         return USB_SUCCESS;
     }
@@ -80,7 +81,6 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
 #define USB_UNION_DESCRIPTOR 0x06
 ecm_error_t ecm_init(void)
 {
-    // validate that the device is actually a CDC-ECM device
     union
     {
         uint8_t bytes[256];
@@ -93,14 +93,12 @@ ecm_error_t ecm_init(void)
     usb_error_t err;
     // wait for device to be enabled, request device descriptor
     err = usb_GetDeviceDescriptor(ecm_device.usb_device, &descriptor.dev, sizeof(usb_device_descriptor_t), &xferd);
-    printf("device descriptor returned\n");
-    if (err || xferd == NULL)
+    if (err || xferd == 0)
         return ECM_ERROR_INVALID_DESCRIPTOR;
     // test for composite device, which is what an ECM device usually is
     if (descriptor.dev.bDeviceClass != USB_INTERFACE_SPECIFIC_CLASS)
         return ECM_ERROR_INVALID_DEVICE;
     uint8_t num_configs = descriptor.dev.bNumConfigurations;
-    printf("parsing %u configs\n", num_configs);
     // foreach configuration of device
     for (int c_idx = 0; c_idx < num_configs; c_idx++)
     {
@@ -114,10 +112,9 @@ ecm_error_t ecm_init(void)
 
         // request configuration descriptor(s)
         err = usb_GetConfigurationDescriptor(ecm_device.usb_device, c_idx, &descriptor.conf, desc_len, &xferd);
-        if (err || xferd == NULL)
+        if (err || xferd == 0)
             continue;
 
-        printf("config%u: ptr:%p, len:%u\n", c_idx, &descriptor.conf, xferd);
         usb_descriptor_t *desc = &descriptor.desc; // current working descriptor
         while (parsed_len < desc_len)
         {
@@ -202,29 +199,31 @@ ecm_error_t ecm_init(void)
             desc = (usb_descriptor_t *)(((uint8_t *)desc) + desc->bLength);
         }
     }
-    printf("no device\n");
     return ECM_ERROR_NO_DEVICE;
 init_success:
     ecm_device.ready = true;
     return ECM_OK;
 }
-
+bool transfer_fail = 0;
 usb_error_t ecm_receive_callback(usb_endpoint_t endpoint,
                                  usb_transfer_status_t status,
                                  size_t transferred,
                                  usb_transfer_data_t *data)
 {
-    // printf("%u bytes received!\n", transferred);
-    in_buf[transferred] = 0;
-    printf("%s", in_buf);
-    return usb_ScheduleBulkTransfer(ecm_device.in, in_buf, ECM_MTU, ecm_receive, NULL);
+    if (transferred != 0)
+        printf("%u bytes received!\n", transferred);
+    if (status & USB_TRANSFER_NO_DEVICE)
+    {
+        printf("transfer error");
+        transfer_fail = 1;
+        return USB_ERROR_NO_DEVICE;
+    }
+    return usb_ScheduleBulkTransfer(ecm_device.in, in_buf, ECM_MTU, ecm_receive_callback, NULL);
 }
 
 ecm_error_t ecm_receive(void)
 {
-    if (usb_ScheduleBulkTransfer(ecm_device.in, in_buf, ECM_MTU, ecm_receive_callback, NULL))
-        return ECM_ERROR_RX;
-    return ECM_OK;
+    return usb_ScheduleBulkTransfer(ecm_device.in, in_buf, ECM_MTU, ecm_receive_callback, NULL);
 }
 
 usb_error_t ecm_transmit_callback(usb_endpoint_t endpoint,
@@ -243,7 +242,7 @@ ecm_error_t ecm_transmit(void *buf, size_t len)
     // MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
     // pbuf_copy_partial(p, buf, p->tot_len, 0);
     memcpy(out_buf, buf, len);
-    if (usb_ScheduleBulkTransfer(ecm_device.out, out_buf, len, ecm_transmit_callback, NULL))
-        return ECM_ERROR_TX;
-    return ECM_OK;
+    if (ecm_device.usb_device)
+        return usb_ScheduleBulkTransfer(ecm_device.out, out_buf, len, ecm_transmit_callback, NULL);
+    return USB_ERROR_NO_DEVICE;
 }

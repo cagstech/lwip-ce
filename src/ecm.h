@@ -50,4 +50,7 @@ ecm_error_t ecm_transmit(void *buf, size_t len);
 usb_error_t ecm_handle_usb_event(usb_event_t event, void *event_data,
                                  usb_callback_data_t *callback_data);
 
+// debug stuff
+extern bool transfer_fail;
+
 #endif // LWIP_VETH_H
