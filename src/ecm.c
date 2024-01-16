@@ -63,13 +63,14 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
         printf("device enabled\n");
         ecm_device.usb_device = event_data;
         return ecm_init();
+        break;
         // break;
-    case USB_DEVICE_DISCONNECTED_EVENT:
-    case USB_HOST_PORT_CONNECT_STATUS_CHANGE_INTERRUPT:
     case USB_DEVICE_SUSPENDED_EVENT:
     case USB_DEVICE_DISABLED_EVENT:
+    case USB_DEVICE_DISCONNECTED_EVENT:
         printf("device lost\n");
-        return USB_ERROR_NO_DEVICE;
+        memset(&ecm_device, 0, sizeof(ecm_device));
+        return USB_SUCCESS;
     }
     return USB_SUCCESS;
 }
@@ -213,7 +214,7 @@ usb_error_t ecm_receive_callback(usb_endpoint_t endpoint,
         printf("%u bytes received!\n", transferred);
     if (status & USB_TRANSFER_NO_DEVICE)
     {
-        printf("transfer error\n");
+        printf("transfer error");
         transfer_fail = 1;
         return USB_ERROR_NO_DEVICE;
     }
