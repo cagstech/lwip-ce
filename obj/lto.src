@@ -1,0 +1,807 @@
+	section	.text,"ax",@progbits
+	assume	adl = 1
+	section	.text,"ax",@progbits
+	public	_ecm_handle_usb_event
+_ecm_handle_usb_event:
+	call	__frameset0
+	ld	iy, (ix + 6)
+	ld	de, 0
+	ld	bc, 2
+	lea	hl, iy
+	or	a, a
+	sbc	hl, bc
+	jr	nz, BB0_2
+	call	_usb_GetRole
+	ld	a, l
+	bit	4, a
+	ld	hl, (ix + 9)
+	push	hl
+	call	z, _usb_ResetDevice
+	pop	hl
+	jr	BB0_7
+BB0_2:
+	ld	bc, 4
+	lea	hl, iy
+	or	a, a
+	sbc	hl, bc
+	jr	z, BB0_4
+	ld	bc, 7
+	lea	hl, iy
+	or	a, a
+	sbc	hl, bc
+	jr	nz, BB0_9
+BB0_4:
+	ld	hl, (ix + 9)
+BB0_5:
+	ld	(_ecm_device+1), hl
+BB0_6:
+	call	_ecm_init
+BB0_7:
+	ld	de, 0
+BB0_8:
+	ex	de, hl
+	pop	ix
+	ret
+BB0_9:
+	ld	bc, 12
+	lea	hl, iy
+	or	a, a
+	sbc	hl, bc
+	jr	nz, BB0_8
+	ld	hl, 0
+	ld	de, 8
+	push	de
+	push	hl
+	push	hl
+	call	_usb_FindDevice
+	pop	de
+	pop	de
+	pop	de
+	add	hl, bc
+	or	a, a
+	sbc	hl, bc
+	jr	nz, BB0_5
+	jr	BB0_6
+	section	.text,"ax",@progbits
+
+	section	.text,"ax",@progbits
+	public	_ecm_init
+_ecm_init:
+	ld	hl, -296
+	call	__frameset
+	ld	bc, -265
+	lea	iy, ix
+	add	iy, bc
+	lea	de, iy + 3
+	ld	bc, -268
+	lea	hl, ix
+	add	hl, bc
+	ld	(hl), iy
+	lea	hl, iy
+	ld	bc, (_ecm_device+1)
+	ld	(ix - 3), bc
+	ld	bc, -274
+	lea	iy, ix
+	add	iy, bc
+	ld	(iy), hl
+	push	hl
+	ld	hl, 18
+	push	hl
+	ld	bc, -271
+	lea	hl, ix
+	add	hl, bc
+	ld	(hl), de
+	push	de
+	ld	de, 0
+	push	de
+	ld	hl, 1
+	push	hl
+	ld	bc, (ix - 3)
+	push	bc
+	call	_usb_GetDescriptor
+	pop	de
+	pop	de
+	pop	de
+	pop	de
+	pop	de
+	pop	de
+	add	hl, bc
+	or	a, a
+	sbc	hl, bc
+	jr	z, BB1_2
+	ld	hl, -4
+	jp	BB1_47
+BB1_2:
+	ld	bc, -268
+	lea	hl, ix
+	add	hl, bc
+	ld	iy, (hl)
+	ld	hl, (iy)
+	add	hl, bc
+	or	a, a
+	sbc	hl, bc
+	ld	hl, -4
+	jp	z, BB1_47
+	ld	a, (iy + 7)
+	or	a, a
+	jp	nz, BB1_43
+	or	a, a
+	sbc	hl, hl
+	ex	de, hl
+	ld	e, (iy + 20)
+	ld	bc, 0
+BB1_5:
+	push	bc
+	pop	hl
+	or	a, a
+	sbc	hl, de
+	jp	z, BB1_44
+	ld	(ix - 3), bc
+	ld	bc, -280
+	lea	hl, ix
+	add	hl, bc
+	ld	(hl), de
+	ld	hl, (_ecm_device+1)
+	ld	bc, (ix - 3)
+	push	bc
+	push	hl
+	ld	de, -277
+	lea	hl, ix
+	add	hl, de
+	ld	(hl), bc
+	call	_usb_GetConfigurationDescriptorTotalLength
+	push	hl
+	pop	bc
+	pop	hl
+	pop	hl
+	push	bc
+	pop	hl
+	ld	de, 257
+	or	a, a
+	sbc	hl, de
+	jp	nc, BB1_46
+	ld	hl, (_ecm_device+1)
+	ld	(ix - 3), bc
+	ld	bc, -274
+	lea	iy, ix
+	add	iy, bc
+	ld	de, (iy)
+	push	de
+	ld	bc, (ix - 3)
+	push	ix
+	ld	de, -283
+	add	ix, de
+	ld	(ix), bc
+	pop	ix
+	push	bc
+	push	ix
+	ld	bc, -271
+	add	ix, bc
+	ld	de, (ix)
+	pop	ix
+	push	de
+	push	ix
+	ld	bc, -277
+	add	ix, bc
+	ld	de, (ix)
+	pop	ix
+	push	de
+	ld	de, 2
+	push	de
+	push	hl
+	call	_usb_GetDescriptor
+	pop	de
+	pop	de
+	pop	de
+	pop	de
+	pop	de
+	pop	de
+	add	hl, bc
+	or	a, a
+	sbc	hl, bc
+	ld	b, 2
+	jr	nz, BB1_9
+	ld	de, -268
+	lea	hl, ix
+	add	hl, de
+	ld	iy, (hl)
+	ld	hl, (iy)
+	add	hl, bc
+	or	a, a
+	sbc	hl, bc
+	jr	nz, BB1_10
+BB1_9:
+	ld	de, -277
+	lea	hl, ix
+	add	hl, de
+	ld	bc, (hl)
+	inc	bc
+	ld	de, -268
+	lea	iy, ix
+	add	iy, de
+	ld	iy, (iy)
+	ld	(ix - 3), bc
+	ld	bc, -280
+	lea	iy, ix
+	add	iy, bc
+	ld	de, (iy)
+	ld	bc, (ix - 3)
+	jp	BB1_5
+BB1_10:
+	ld	hl, (_ecm_device+13)
+	ld	de, -293
+	lea	iy, ix
+	add	iy, de
+	ld	(iy), hl
+	ld	hl, (_ecm_device+10)
+	push	ix
+	ld	de, -290
+	add	ix, de
+	ld	(ix), hl
+	pop	ix
+	ld	c, 0
+	ld	de, -287
+	lea	hl, ix
+	add	hl, de
+	ld	(hl), c
+	push	ix
+	ld	de, -271
+	add	ix, de
+	ld	iy, (ix)
+	pop	ix
+	or	a, a
+	sbc	hl, hl
+BB1_11:
+	push	ix
+	ld	de, -286
+	add	ix, de
+	ld	(ix), hl
+	pop	ix
+	ld	(ix - 3), bc
+	push	ix
+	ld	bc, -283
+	add	ix, bc
+	ld	de, (ix)
+	pop	ix
+	or	a, a
+	sbc	hl, de
+	ld	bc, (ix - 3)
+	jp	nc, BB1_9
+	ld	a, (iy + 1)
+	cp	a, 4
+	jr	nz, BB1_18
+	ld	a, c
+	cp	a, 2
+	jp	nz, BB1_30
+	ld	a, (iy + 2)
+	ld	de, -287
+	lea	hl, ix
+	add	hl, de
+	ld	l, (hl)
+	cp	a, l
+	push	ix
+	inc	de
+	push	af
+	add	ix, de
+	pop	af
+	ld	hl, (ix)
+	pop	ix
+	jp	nz, BB1_37
+	ld	a, (iy + 4)
+	cp	a, 2
+	jp	nz, BB1_37
+	ld	a, (iy + 5)
+	cp	a, 10
+	jp	nz, BB1_37
+	ld	(_ecm_device+7), iy
+	ld	c, 3
+	jp	BB1_42
+BB1_18:
+	cp	a, 5
+	ld	de, -286
+	lea	hl, ix
+	push	af
+	add	hl, de
+	pop	af
+	ld	hl, (hl)
+	jp	nz, BB1_33
+	ld	a, c
+	cp	a, 3
+	jp	nz, BB1_42
+	ld	l, (iy + 2)
+	bit	7, l
+	ld	a, -1
+	jr	z, BB1_22
+	ld	a, 0
+BB1_22:
+	bit	0, a
+	ld	de, 10
+	jr	nz, BB1_24
+	ld	de, 13
+BB1_24:
+	push	ix
+	ld	bc, -296
+	add	ix, bc
+	ld	(ix), de
+	pop	ix
+	ld	bc, 0
+	ld	c, l
+	bit	0, a
+	push	bc
+	pop	hl
+	jr	nz, BB1_26
+	ld	de, -290
+	lea	hl, ix
+	add	hl, de
+	ld	hl, (hl)
+BB1_26:
+	push	ix
+	ld	de, -290
+	add	ix, de
+	ld	(ix), hl
+	pop	ix
+	bit	0, a
+	jr	nz, BB1_28
+	ld	de, -293
+	lea	hl, ix
+	add	hl, de
+	ld	(hl), bc
+BB1_28:
+	ld	hl, _ecm_device
+	ld	(ix - 3), bc
+	push	ix
+	ld	bc, -296
+	add	ix, bc
+	ld	de, (ix)
+	pop	ix
+	add	hl, de
+	ld	bc, (ix - 3)
+	ld	(hl), bc
+	ld	bc, -290
+	lea	hl, ix
+	add	hl, bc
+	ld	de, (hl)
+	push	de
+	pop	hl
+	add	hl, bc
+	or	a, a
+	sbc	hl, bc
+	jp	z, BB1_40
+	ld	bc, -293
+	lea	hl, ix
+	add	hl, bc
+	ld	hl, (hl)
+	add	hl, bc
+	or	a, a
+	sbc	hl, bc
+	push	ix
+	ld	bc, -290
+	push	af
+	add	ix, bc
+	pop	af
+	ld	(ix), de
+	pop	ix
+	ld	c, 3
+	ld	b, 2
+	push	ix
+	ld	de, -286
+	push	af
+	add	ix, de
+	pop	af
+	ld	hl, (ix)
+	pop	ix
+	jp	z, BB1_42
+	jp	BB1_48
+BB1_30:
+	ld	hl, 0
+	ld	(_ecm_device+4), hl
+	ld	a, (iy + 5)
+	cp	a, 2
+	jr	nz, BB1_38
+	ld	a, (iy + 6)
+	cp	a, 6
+	ld	de, -286
+	lea	hl, ix
+	push	af
+	add	hl, de
+	pop	af
+	ld	hl, (hl)
+	jr	nz, BB1_41
+	ld	(_ecm_device+4), iy
+	jr	BB1_39
+BB1_33:
+	cp	a, 36
+	jr	nz, BB1_42
+	ld	a, c
+	cp	a, 1
+	jr	nz, BB1_42
+	ld	a, (iy + 2)
+	cp	a, 6
+	jr	nz, BB1_39
+	ld	a, (iy + 4)
+	push	ix
+	ld	de, -287
+	add	ix, de
+	ld	(ix), a
+	pop	ix
+BB1_37:
+	ld	c, b
+	jr	BB1_42
+BB1_38:
+	ld	c, 0
+	ld	de, -286
+	lea	hl, ix
+	add	hl, de
+	ld	hl, (hl)
+	jr	BB1_42
+BB1_39:
+	ld	c, 1
+	jr	BB1_42
+BB1_40:
+	ld	bc, -290
+	lea	hl, ix
+	add	hl, bc
+	ld	(hl), de
+	ld	c, 3
+	ld	b, 2
+	push	ix
+	ld	de, -286
+	add	ix, de
+	ld	hl, (ix)
+	pop	ix
+	jr	BB1_42
+BB1_41:
+	ld	c, 0
+BB1_42:
+	ld	de, 0
+	ld	e, (iy)
+	add	hl, de
+	add	iy, de
+	jp	BB1_11
+BB1_43:
+	ld	hl, -2
+	jr	BB1_47
+BB1_44:
+	scf
+BB1_45:
+	sbc	hl, hl
+	jr	BB1_47
+BB1_46:
+	ld	hl, -3
+BB1_47:
+	ld	sp, ix
+	pop	ix
+	ret
+BB1_48:
+	ld	hl, (_ecm_device+1)
+	ld	bc, -283
+	lea	iy, ix
+	add	iy, bc
+	ld	de, (iy)
+	push	de
+	push	ix
+	ld	bc, -271
+	add	ix, bc
+	ld	de, (ix)
+	pop	ix
+	push	de
+	push	hl
+	call	_usb_SetConfiguration
+	pop	de
+	pop	de
+	pop	de
+	add	hl, bc
+	or	a, a
+	sbc	hl, bc
+	ld	hl, -5
+	jr	nz, BB1_47
+	ld	iy, (_ecm_device+1)
+	ld	bc, (_ecm_device+7)
+	ld	de, -283
+	lea	hl, ix
+	add	hl, de
+	ld	hl, (hl)
+	ld	(ix - 3), bc
+	push	ix
+	ld	bc, -286
+	add	ix, bc
+	ld	de, (ix)
+	pop	ix
+	or	a, a
+	sbc	hl, de
+	push	hl
+	ld	bc, (ix - 3)
+	push	bc
+	push	iy
+	call	_usb_SetInterface
+	pop	de
+	pop	de
+	pop	de
+	add	hl, bc
+	or	a, a
+	sbc	hl, bc
+	ld	hl, -6
+	jr	nz, BB1_47
+	ld	a, 1
+	ld	(_ecm_device), a
+	or	a, a
+	jp	BB1_45
+	section	.text,"ax",@progbits
+
+	section	.text,"ax",@progbits
+	public	_ecm_receive_callback
+_ecm_receive_callback:
+	call	__frameset0
+	ld	de, (ix + 12)
+	ld	hl, _.str
+	push	de
+	push	hl
+	call	_printf
+	pop	hl
+	pop	hl
+	ld	de, _buf
+	push	de
+	pop	hl
+	ld	bc, (ix + 12)
+	add	hl, bc
+	ld	(hl), 0
+	push	de
+	ld	hl, _.str.1
+	push	hl
+	call	_printf
+	pop	hl
+	pop	hl
+	ld	hl, (_ecm_device+10)
+	ld	de, 0
+	push	de
+	ld	de, _ecm_receive
+	push	de
+	ld	de, 1518
+	push	de
+	ld	de, _buf
+	push	de
+	push	hl
+	call	_usb_ScheduleTransfer
+	ld	sp, ix
+	pop	ix
+	ret
+	section	.text,"ax",@progbits
+
+	section	.text,"ax",@progbits
+	public	_ecm_receive
+_ecm_receive:
+	ld	iy, 1518
+	ld	bc, _ecm_receive_callback
+	ld	de, 0
+	ld	hl, (_ecm_device+10)
+	push	de
+	push	bc
+	push	iy
+	ld	de, _buf
+	push	de
+	push	hl
+	call	_usb_ScheduleTransfer
+	pop	de
+	pop	de
+	pop	de
+	pop	de
+	pop	de
+	add	hl, bc
+	or	a, a
+	sbc	hl, bc
+	ld	hl, 0
+	jr	z, BB3_2
+	ld	hl, -8
+BB3_2:
+	ret
+	section	.text,"ax",@progbits
+
+	section	.text,"ax",@progbits
+	public	_ecm_transmit_callback
+_ecm_transmit_callback:
+	call	__frameset0
+	ld	hl, (ix + 12)
+	ld	de, _.str.2
+	push	hl
+	push	de
+	call	_printf
+	pop	hl
+	pop	hl
+	or	a, a
+	sbc	hl, hl
+	pop	ix
+	ret
+	section	.text,"ax",@progbits
+
+	section	.text,"ax",@progbits
+	public	_ecm_transmit
+_ecm_transmit:
+	call	__frameset0
+	ld	iy, (ix + 9)
+	ld	bc, _ecm_transmit_callback
+	ld	de, 0
+	ld	hl, (_ecm_device+13)
+	push	de
+	push	bc
+	push	iy
+	ld	de, (ix + 6)
+	push	de
+	push	hl
+	call	_usb_ScheduleTransfer
+	pop	de
+	pop	de
+	pop	de
+	pop	de
+	pop	de
+	add	hl, bc
+	or	a, a
+	sbc	hl, bc
+	ld	hl, 0
+	jr	z, BB5_2
+	ld	hl, -7
+BB5_2:
+	pop	ix
+	ret
+	section	.text,"ax",@progbits
+
+	section	.text,"ax",@progbits
+	public	_main
+_main:
+	ld	hl, -1
+	call	__frameset
+	ld	iy, _ecm_handle_usb_event
+	ld	de, 0
+	ld	bc, 36106
+	xor	a, a
+	ld	(ix - 1), a
+	ld	hl, (_ecm_device+1)
+	push	bc
+	push	de
+	push	hl
+	push	iy
+	call	_usb_Init
+	pop	de
+	pop	de
+	pop	de
+	pop	de
+	add	hl, bc
+	or	a, a
+	sbc	hl, bc
+	jp	nz, BB6_7
+	ld	a, (-720896)
+	or	a, 3
+	ld	(-720896), a
+BB6_2:
+	call	_kb_Scan
+	ld	a, (ix - 1)
+	and	a, 1
+	ld	l, a
+	ld	a, (_ecm_device)
+	bit	0, l
+	jr	nz, BB6_5
+	or	a, a
+	jr	z, BB6_5
+	ld	hl, _str
+	push	hl
+	call	_puts
+	pop	hl
+	call	_ecm_receive
+	ld	a, 1
+	ld	(ix - 1), a
+BB6_5:
+	ld	hl, -720880
+	push	de
+	ld	e, (hl)
+	inc	hl
+	ld	d, (hl)
+	ld	l, e
+	ld	h, d
+	pop	de
+	ld	a, l
+	bit	5, a
+	ld	hl, 28
+	push	hl
+	ld	hl, _.str.1.1
+	push	hl
+	call	nz, _ecm_transmit
+	pop	hl
+	pop	hl
+	ld	hl, -720880
+	push	de
+	ld	e, (hl)
+	inc	hl
+	ld	d, (hl)
+	ld	l, e
+	ld	h, d
+	pop	de
+	ld	a, l
+	bit	7, a
+	ld	hl, 34
+	push	hl
+	ld	hl, _.str.2.2
+	push	hl
+	call	nz, _ecm_transmit
+	pop	hl
+	pop	hl
+	call	_usb_HandleEvents
+	ld	hl, -720880
+	push	de
+	ld	e, (hl)
+	inc	hl
+	ld	d, (hl)
+	ld	l, e
+	ld	h, d
+	pop	de
+	ld	a, l
+	bit	6, a
+	jr	z, BB6_2
+	or	a, a
+	sbc	hl, hl
+	jr	BB6_8
+BB6_7:
+	ld	hl, 1
+BB6_8:
+	inc	sp
+	pop	ix
+	ret
+	section	.text,"ax",@progbits
+
+	section	.rodata,"a",@progbits
+	private	_.str
+_.str:
+	db	"%u bytes received!", 10, 0
+
+	section	.bss,"aw",@nobits
+	private	_buf
+_buf:
+	rb	1518
+
+	section	.rodata,"a",@progbits
+	private	_.str.1
+_.str.1:
+	db	"%s", 0
+
+	section	.rodata,"a",@progbits
+	private	_.str.2
+_.str.2:
+	db	"%u bytes sent", 10, 0
+
+	section	.bss,"aw",@nobits
+	public	_ecm_device
+_ecm_device:
+	rb	16
+
+	section	.rodata,"a",@progbits
+	private	_.str.1.1
+_.str.1.1:
+	db	"The fox jumped over the dog.", 0
+
+	section	.rodata,"a",@progbits
+	private	_.str.2.2
+_.str.2.2:
+	db	"The fox jumped over the other fox.", 0
+
+	section	.rodata,"a",@progbits
+	private	_str
+_str:
+	db	"Device ready!", 0
+
+	ident	"clang version 15.0.0 (https://github.com/jacobly0/llvm-project 6c61664110f888c0285ae4c48b150c9a7a4361bb)"
+	ident	"clang version 15.0.0 (https://github.com/jacobly0/llvm-project 6c61664110f888c0285ae4c48b150c9a7a4361bb)"
+	extern	_usb_GetDescriptor
+	extern	__Unwind_SjLj_Register
+	extern	__frameset
+	extern	_usb_FindDevice
+	extern	_usb_ResetDevice
+	extern	_kb_Scan
+	extern	_usb_GetConfigurationDescriptorTotalLength
+	extern	_usb_SetInterface
+	extern	_usb_ScheduleTransfer
+	extern	_usb_HandleEvents
+	extern	_usb_SetConfiguration
+	extern	_usb_GetRole
+	extern	_puts
+	extern	__Unwind_SjLj_Unregister
+	extern	_printf
+	extern	__frameset0
+	extern	_usb_Init

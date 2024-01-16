@@ -83,11 +83,7 @@ int main(void)
         }
         if (kb_IsDown(kb_KeyClear))
             break;
-        if (transfer_fail)
-            printf("running handleevents\n");
         usb_HandleEvents();
-        if (transfer_fail)
-            printf("handleevents done\n");
     } while (1);
 
     usb_Cleanup();
