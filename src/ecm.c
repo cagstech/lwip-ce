@@ -78,7 +78,7 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
 #define USB_ECM_SUBCLASS 0x06
 #define USB_CS_INTERFACE_DESCRIPTOR 0x24
 #define USB_UNION_DESCRIPTOR 0x06
-ecm_error_t ecm_init(void)
+ecm_error_t usb_init_ecm(void)
 {
     // validate that the device is actually a CDC-ECM device
     union
