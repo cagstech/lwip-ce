@@ -12,7 +12,7 @@
 #include <usbdrvce.h>
 // #include "lwip/arch.h"
 // #include "lwip/err.h"
-// #include "lwip/netif.h"
+#include "lwip/netif.h"
 // #include "lwip/pbuf.h"
 
 enum _ecm_device_status
@@ -24,6 +24,7 @@ enum _ecm_device_status
 typedef struct _ecm_device_t
 {
   uint8_t status;
+  struct netif netif;
   struct
   {
     usb_device_t device;
@@ -59,7 +60,7 @@ extern uint8_t in_buf[ECM_MTU];
 
 usb_error_t ecm_init(void);
 usb_error_t ecm_receive(void);
-usb_error_t ecm_transmit(void *buf, size_t len);
+usb_error_t ecm_transmit(struct netif *netif, struct pbuf *p);
 
 usb_error_t ecm_handle_usb_event(usb_event_t event, void *event_data,
                                  usb_callback_data_t *callback_data);
