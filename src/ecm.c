@@ -7,8 +7,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <usbdrvce.h>
-// #include "lwip/netif.h"
-// #include "lwip/pbuf.h"
+#include "lwip/netif.h"
+#include "lwip/pbuf.h"
 // #include "lwip/stats.h"
 // #include "lwip/snmp.h"
 
@@ -277,13 +277,21 @@ usb_error_t ecm_init(void)
                                      size_t transferred,
                                      usb_transfer_data_t * data)
     {
-        if (transferred != 0)
-            printf("%u bytes received!\n", transferred);
         if (status & USB_TRANSFER_NO_DEVICE)
         {
             printf("transfer error\n");
             transfer_fail = 1;
             return USB_ERROR_NO_DEVICE;
+        }
+        if (transferred)
+        {
+            struct pbuf *p = pbuf_alloc(PBUF_RAW, size, PBUF_POOL);
+            if (p != NULL)
+            {
+                pbuf_take(p, buf, transferred);
+                if (ecm_device.netif.input(p, &ecm_device.netif) != ERR_OK)
+                    pbuf_free(p);
+            }
         }
         return usb_ScheduleBulkTransfer(ecm_device.usb.if_data.endpoint.in, in_buf, ECM_MTU, ecm_receive_callback, NULL);
     }
@@ -302,7 +310,7 @@ usb_error_t ecm_init(void)
         return USB_SUCCESS;
     }
 
-    usb_error_t ecm_transmit(void *buf, size_t len)
+    usb_error_t ecm_transmit(struct netif * netif, struct pbuf * p)
     {
         // LINK_STATS_INC(link.xmit);
         /* Update SNMP stats (only if you use SNMP) */
