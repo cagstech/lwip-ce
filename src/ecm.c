@@ -7,8 +7,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <usbdrvce.h>
-#include "lwip/netif.h"
-#include "lwip/pbuf.h"
+#include "include/lwip/netif.h"
+#include "include/lwip/pbuf.h"
 // #include "lwip/stats.h"
 // #include "lwip/snmp.h"
 
@@ -285,6 +285,7 @@ usb_error_t ecm_init(void)
         }
         if (transferred)
         {
+            printf("packet received, %u bytes\n", transferred);
             struct pbuf *p = pbuf_alloc(PBUF_RAW, size, PBUF_POOL);
             if (p != NULL)
             {
