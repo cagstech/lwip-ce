@@ -10,10 +10,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <usbdrvce.h>
-// #include "lwip/arch.h"
-// #include "lwip/err.h"
+#include "lwip/arch.h"
+#include "lwip/err.h"
 #include "lwip/netif.h"
-// #include "lwip/pbuf.h"
+#include "lwip/pbuf.h"
 
 enum _ecm_device_status
 {
