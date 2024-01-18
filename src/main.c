@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <ti/screen.h>
 #undef NDEBUG
 // #include <debug.h>
 #include <keypadc.h>
@@ -39,6 +40,7 @@ my_netif_init(struct netif *netif)
 
 int main(void)
 {
+    os_ClrHomeFull();
     // initialize usb hardware
     if (usb_Init(ecm_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
         return 1;
@@ -52,6 +54,7 @@ int main(void)
         {
             // queue ecm_receive
             // configure ip addr info
+            printf("device ready\n");
             lwip_init();
             ip4_addr_t addr = IPADDR4_INIT_BYTES(192, 168, 25, 2);
             ip4_addr_t netmask = IPADDR4_INIT_BYTES(255, 255, 255, 0);
@@ -65,7 +68,6 @@ int main(void)
             netif_set_status_callback(&ecm_device.netif, netif_status_callback);
             netif_set_default(&ecm_device.netif);
             netif_set_up(&ecm_device.netif);
-            ecm_receive();
             netif_init = true;
         }
         if (kb_IsDown(kb_KeyClear))
