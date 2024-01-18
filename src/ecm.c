@@ -223,7 +223,7 @@ usb_error_t ecm_init(void)
                             // use this to set configuration
                             ecm_device.usb.config.addr = &descriptor.conf;
                             ecm_device.usb.config.len = desc_len;
-                            parse_state = PARSE_AWAIT_CS_INTERFACE;
+                            parse_state = PARSE_AWAIT_MAC_ADDR;
                         }
                     }
                 }
@@ -231,38 +231,38 @@ usb_error_t ecm_init(void)
             case USB_CS_INTERFACE_DESCRIPTOR:
                 // this is a class-specific descriptor that specifies the interfaces used by the control interface
                 {
-                    if ((parse_state == PARSE_AWAIT_CS_INTERFACE) || (parse_state == PARSE_AWAIT_MAC_ADDR))
+                    usb_cs_interface_descriptor_t *cs = (usb_cs_interface_descriptor_t *)desc;
+                    if ((parse_state == PARSE_AWAIT_MAC_ADDR) && (cs->bDescriptorSubType == USB_ETHERNET_FUNCTIONAL_DESCRIPTOR))
                     {
-                        usb_cs_interface_descriptor_t *cs = (usb_cs_interface_descriptor_t *)desc;
-                        if (cs->bDescriptorSubType == USB_ETHERNET_FUNCTIONAL_DESCRIPTOR)
-                        {
-                            // if ethernet functional type, contains ethernet configuration data
-                            usb_ethernet_functional_descriptor_t *eth = (usb_ethernet_functional_descriptor_t *)cs;
-                            size_t xferd_tmp;
-                            uint8_t mac_str[12];
-                            usb_GetStringDescriptor(ecm_device.usb.device, eth->iMacAddress, 0,
-                                                    mac_str, 12, &xferd_tmp);
-                            // convert to bytearray and save to ecm_device.usb.mac_addr
-                            for (int i = 0; i < 6; i++)
-                                ecm_device.usb.mac_addr[i] = nibble(mac_str[2 * i]) << 4 | nibble(mac_str[2 * i + 1]);
-                        }
-                        else if (cs->bDescriptorSubType == USB_UNION_FUNCTIONAL_DESCRIPTOR)
-                        {
-                            // if union functional type, this contains interface number for bulk transfer
-                            usb_union_functional_descriptor_t *func = (usb_union_functional_descriptor_t *)cs;
-                            ifnum = func->bInterface;
-                            parse_state = PARSE_AWAIT_BULK_IF;
-                        }
+                        usb_ethernet_functional_descriptor_t *eth = (usb_ethernet_functional_descriptor_t *)cs;
+                        size_t xferd_tmp;
+                        uint8_t mac_str[12];
+                        usb_GetStringDescriptor(ecm_device.usb.device, eth->iMacAddress, 0,
+                                                mac_str, 12, &xferd_tmp);
+                        // convert to bytearray and save to ecm_device.usb.mac_addr
+                        for (int i = 0; i < 6; i++)
+                            ecm_device.usb.mac_addr[i] = nibble(mac_str[2 * i]) << 4 | nibble(mac_str[2 * i + 1]);
+                        parse_state = PARSE_AWAIT_CS_INTERFACE;
+                    }
+                    if ((parse_state == PARSE_AWAIT_CS_INTERFACE) && (cs->bDescriptorSubType == USB_UNION_FUNCTIONAL_DESCRIPTOR))
+                    {
+
+                        // if union functional type, this contains interface number for bulk transfer
+                        usb_union_functional_descriptor_t *func = (usb_union_functional_descriptor_t *)cs;
+                        ifnum = func->bInterface;
+                        parse_state = PARSE_AWAIT_BULK_IF;
                     }
                     break;
                 }
-                parsed_len += desc->bLength;
-                desc = (usb_descriptor_t *)(((uint8_t *)desc) + desc->bLength);
             }
+            parsed_len += desc->bLength;
+            desc = (usb_descriptor_t *)(((uint8_t *)desc) + desc->bLength);
         }
     }
+    printf("device parse fail\n");
     return USB_ERROR_NO_DEVICE;
 init_success:
+    printf("got config\n");
     if (usb_SetConfiguration(ecm_device.usb.device, ecm_device.usb.config.addr, ecm_device.usb.config.len))
         return USB_ERROR_FAILED;
     if (usb_SetInterface(ecm_device.usb.device, ecm_device.usb.if_data.addr, ecm_device.usb.if_data.len))
@@ -270,6 +270,7 @@ init_success:
     ecm_device.usb.if_data.endpoint.in = usb_GetDeviceEndpoint(ecm_device.usb.device, ecm_device.usb.if_data.endpoint.addr_in);
     ecm_device.usb.if_data.endpoint.out = usb_GetDeviceEndpoint(ecm_device.usb.device, ecm_device.usb.if_data.endpoint.addr_out);
     ecm_device.status = ECM_READY;
+    ecm_receive();
     return USB_SUCCESS;
 }
 
