@@ -6,13 +6,13 @@
 // #include <debug.h>
 #include <keypadc.h>
 #include <usbdrvce.h>
-#include "lwip/init.h"
-#include "lwip/netif.h"
-#include "lwip/timeouts.h"
-#include "lwip/snmp.h"
-#include "lwip/dhcp.h"
-#include "lwip/apps/httpd.h"
-#include "lwip/ethip6.h"
+#include "include/lwip/init.h"
+#include "include/lwip/netif.h"
+#include "include/lwip/timeouts.h"
+#include "include/lwip/snmp.h"
+#include "include/lwip/dhcp.h"
+#include "include/lwip/apps/httpd.h"
+#include "include/lwip/ethip6.h"
 #include "ecm.h"
 
 #define MAX_DEViCES 10
@@ -44,10 +44,11 @@ int main(void)
         return 1;
 
     // wait for ecm device to be ready
+    bool netif_init = false;
     kb_SetMode(MODE_3_CONTINUOUS);
     do
     {
-        if (ecm_device.status == ECM_READY)
+        if (ecm_device.status == ECM_READY && netif_init == false)
         {
             // queue ecm_receive
             // configure ip addr info
