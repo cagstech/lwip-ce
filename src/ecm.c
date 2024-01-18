@@ -9,8 +9,8 @@
 #include <usbdrvce.h>
 #include "include/lwip/netif.h"
 #include "include/lwip/pbuf.h"
-// #include "lwip/stats.h"
-// #include "lwip/snmp.h"
+#include "lwip/stats.h"
+#include "lwip/snmp.h"
 
 #include "ecm.h"
 
@@ -48,6 +48,7 @@ typedef struct
 } usb_ethernet_functional_descriptor_t;
 
 uint8_t in_buf[ECM_MTU];
+uint8_t out_buf[ECM_MTU];
 ecm_device_t ecm_device = {0};
 
 enum _descriptor_parser_await_states
@@ -70,7 +71,7 @@ void hexdump(uint8_t *hex, size_t len)
     }
 }
 
-inline uint8_t nibble(uint8_t c)
+uint8_t nibble(uint8_t c)
 {
     c -= 0x30;
     if (c < 10)
@@ -259,64 +260,63 @@ usb_error_t ecm_init(void)
                 desc = (usb_descriptor_t *)(((uint8_t *)desc) + desc->bLength);
             }
         }
+    }
+    return USB_ERROR_NO_DEVICE;
+init_success:
+    if (usb_SetConfiguration(ecm_device.usb.device, ecm_device.usb.config.addr, ecm_device.usb.config.len))
+        return USB_ERROR_FAILED;
+    if (usb_SetInterface(ecm_device.usb.device, ecm_device.usb.if_data.addr, ecm_device.usb.if_data.len))
+        return USB_ERROR_FAILED;
+    ecm_device.usb.if_data.endpoint.in = usb_GetDeviceEndpoint(ecm_device.usb.device, ecm_device.usb.if_data.endpoint.addr_in);
+    ecm_device.usb.if_data.endpoint.out = usb_GetDeviceEndpoint(ecm_device.usb.device, ecm_device.usb.if_data.endpoint.addr_out);
+    ecm_device.status = ECM_READY;
+    return USB_SUCCESS;
+}
+
+usb_error_t ecm_receive_callback(usb_endpoint_t endpoint,
+                                 usb_transfer_status_t status,
+                                 size_t transferred,
+                                 usb_transfer_data_t *data)
+{
+    if (status & USB_TRANSFER_NO_DEVICE)
+    {
+        printf("transfer error\n");
         return USB_ERROR_NO_DEVICE;
-    init_success:
-        if (usb_SetConfiguration(ecm_device.usb.device, ecm_device.usb.config.addr, ecm_device.usb.config.len))
-            return USB_ERROR_FAILED;
-        if (usb_SetInterface(ecm_device.usb.device, ecm_device.usb.if_data.addr, ecm_device.usb.if_data.len))
-            return USB_ERROR_FAILED;
-        ecm_device.usb.if_data.endpoint.in = usb_GetDeviceEndpoint(ecm_device.usb.device, ecm_device.usb.if_data.endpoint.addr_in);
-        ecm_device.usb.if_data.endpoint.out = usb_GetDeviceEndpoint(ecm_device.usb.device, ecm_device.usb.if_data.endpoint.addr_out);
-        ecm_device.status = ECM_READY;
-        return USB_SUCCESS;
     }
-
-    bool transfer_fail = 0;
-    usb_error_t ecm_receive_callback(usb_endpoint_t endpoint,
-                                     usb_transfer_status_t status,
-                                     size_t transferred,
-                                     usb_transfer_data_t * data)
+    if (transferred)
     {
-        if (status & USB_TRANSFER_NO_DEVICE)
+        printf("packet received, %u bytes\n", transferred);
+        struct pbuf *p = pbuf_alloc(PBUF_RAW, transferred, PBUF_POOL);
+        if (p != NULL)
         {
-            printf("transfer error\n");
-            transfer_fail = 1;
-            return USB_ERROR_NO_DEVICE;
+            pbuf_take(p, in_buf, transferred);
+            if (ecm_device.netif.input(p, &ecm_device.netif) != ERR_OK)
+                pbuf_free(p);
         }
-        if (transferred)
-        {
-            printf("packet received, %u bytes\n", transferred);
-            struct pbuf *p = pbuf_alloc(PBUF_RAW, size, PBUF_POOL);
-            if (p != NULL)
-            {
-                pbuf_take(p, buf, transferred);
-                if (ecm_device.netif.input(p, &ecm_device.netif) != ERR_OK)
-                    pbuf_free(p);
-            }
-        }
-        return usb_ScheduleBulkTransfer(ecm_device.usb.if_data.endpoint.in, in_buf, ECM_MTU, ecm_receive_callback, NULL);
     }
+    return usb_ScheduleBulkTransfer(ecm_device.usb.if_data.endpoint.in, in_buf, ECM_MTU, ecm_receive_callback, NULL);
+}
 
-    usb_error_t ecm_receive(void)
-    {
-        return usb_ScheduleBulkTransfer(ecm_device.usb.if_data.endpoint.in, in_buf, ECM_MTU, ecm_receive_callback, NULL);
-    }
+usb_error_t ecm_receive(void)
+{
+    return usb_ScheduleBulkTransfer(ecm_device.usb.if_data.endpoint.in, in_buf, ECM_MTU, ecm_receive_callback, NULL);
+}
 
-    usb_error_t ecm_transmit_callback(usb_endpoint_t endpoint,
-                                      usb_transfer_status_t status,
-                                      size_t transferred,
-                                      usb_transfer_data_t * data)
-    {
-        printf("%u bytes sent\n", transferred);
-        return USB_SUCCESS;
-    }
+usb_error_t ecm_transmit_callback(usb_endpoint_t endpoint,
+                                  usb_transfer_status_t status,
+                                  size_t transferred,
+                                  usb_transfer_data_t *data)
+{
+    printf("%u bytes sent\n", transferred);
+    return USB_SUCCESS;
+}
 
-    usb_error_t ecm_transmit(struct netif * netif, struct pbuf * p)
-    {
-        // LINK_STATS_INC(link.xmit);
-        /* Update SNMP stats (only if you use SNMP) */
-        // MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
-        // pbuf_copy_partial(p, buf, p->tot_len, 0);
-        printf("sending: %s\n", buf);
-        return usb_ScheduleBulkTransfer(ecm_device.usb.if_data.endpoint.out, buf, len, ecm_transmit_callback, NULL);
-    }
+usb_error_t ecm_transmit(struct netif *netif, struct pbuf *p)
+{
+    LINK_STATS_INC(link.xmit);
+    // Update SNMP stats(only if you use SNMP)
+    MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
+    pbuf_copy_partial(p, out_buf, p->tot_len, 0);
+    printf("sending %u bytes\n", p->tot_len);
+    return usb_ScheduleBulkTransfer(ecm_device.usb.if_data.endpoint.out, out_buf, p->tot_len, ecm_transmit_callback, NULL);
+}
