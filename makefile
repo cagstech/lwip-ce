@@ -2,22 +2,16 @@
 # Makefile Options
 # ----------------------------
 
-NAME = ECMDRVCE
+NAME = DEMO
 ICON = icon.png
-DESCRIPTION = "ECM driver test"
-COMPRESSED = NO
-ARCHIVED = NO
-HAS_PRINTF := YES
-LTO = NO
+DESCRIPTION = lwIP Networking Stack
 
+APP_NAME = lwIP
+APP_VERSION = 0
 
-CFLAGS = -Wall -Wextra -Oz
-CXXFLAGS = -Wall -Wextra -Oz
+CFLAGS = -Wall -Wextra -Oz -Isrc/include
+CXXFLAGS = -Wall -Wextra -Oz -Isrc/include
 
 # ----------------------------
 
-ifndef CEDEV
-$(error CEDEV environment path variable is not set)
-endif
-
-include $(CEDEV)/meta/makefile.mk
+include app_tools/makefile

@@ -9,7 +9,8 @@ typedef enum _socket_error
   SOCKET_ECM_INIT_FAIL,
 } socket_error_t;
 
-struct _socket
+struct socket
 {
+};
 
-} socket;
+#endif

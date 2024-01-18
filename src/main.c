@@ -31,7 +31,7 @@ my_netif_init(struct netif *netif)
     netif->output_ip6 = ethip6_output;
     netif->mtu = ECM_MTU;
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6;
-    MIB2_INIT_NETIF(ecm_device.netif, snmp_ifType_ethernet_csmacd, 100000000);
+    MIB2_INIT_NETIF(netif, snmp_ifType_ethernet_csmacd, 100000000);
     memcpy(netif->hwaddr, ecm_device.usb.mac_addr, ETH_HWADDR_LEN);
     netif->hwaddr_len = ETH_HWADDR_LEN;
     return ERR_OK;
@@ -52,24 +52,26 @@ int main(void)
         {
             // queue ecm_receive
             // configure ip addr info
+            lwip_init();
             ip4_addr_t addr = IPADDR4_INIT_BYTES(192, 168, 25, 2);
             ip4_addr_t netmask = IPADDR4_INIT_BYTES(255, 255, 255, 0);
             ip4_addr_t gateway = IPADDR4_INIT_BYTES(192, 168, 1, 1);
             netif_add(&ecm_device.netif, &addr, &netmask, &gateway, NULL, my_netif_init, netif_input);
-            netif.name[0] = 'e';
-            netif.name[1] = 'n';
-            netif.num = 0;
+            ecm_device.netif.name[0] = 'e';
+            ecm_device.netif.name[1] = 'n';
+            ecm_device.netif.num = 0;
             netif_create_ip6_linklocal_address(&ecm_device.netif, 1);
-            netif.ip6_autoconfig_enabled = 1;
+            ecm_device.netif.ip6_autoconfig_enabled = 1;
             netif_set_status_callback(&ecm_device.netif, netif_status_callback);
             netif_set_default(&ecm_device.netif);
             netif_set_up(&ecm_device.netif);
             ecm_receive();
+            netif_init = true;
         }
+        if (kb_IsDown(kb_KeyClear))
+            break;
         usb_HandleEvents();
     } while (1);
-
-    lwip_init();
 
     usb_Cleanup();
     /* Start DHCP and HTTPD */
