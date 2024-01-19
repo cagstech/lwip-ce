@@ -14,6 +14,7 @@
 #include "lwip/err.h"
 #include "lwip/netif.h"
 #include "lwip/pbuf.h"
+#include "lwip/ip4_addr.h"
 
 enum _ecm_device_status
 {
@@ -25,6 +26,12 @@ typedef struct _ecm_device_t
 {
   uint8_t status;
   struct netif netif;
+  struct
+  {
+    ip4_addr_t addr;
+    ip4_addr_t netmask;
+    ip4_addr_t gateway;
+  } addrinfo;
   struct
   {
     usb_device_t device;
@@ -58,7 +65,6 @@ extern ecm_device_t ecm_device;
 #define ECM_MTU 1518
 extern uint8_t in_buf[ECM_MTU];
 
-usb_error_t ecm_init(void);
 usb_error_t ecm_receive(void);
 usb_error_t ecm_transmit(struct netif *netif, struct pbuf *p);
 
