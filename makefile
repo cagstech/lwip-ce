@@ -11,6 +11,7 @@ APP_VERSION = 0
 
 CFLAGS = -Wall -Wextra -Oz -Isrc/include
 CXXFLAGS = -Wall -Wextra -Oz -Isrc/include
+OUTPUT_MAP = YES
 
 # ----------------------------
 
