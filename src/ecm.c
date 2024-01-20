@@ -15,9 +15,7 @@
 #include "include/lwip/ethip6.h"
 
 #include "ecm.h"
-
-// define prototypes from functions.asm
-uint8_t nibble(uint8_t c);
+struct netif ecm_netif = {0};
 
 // class-specific descriptor common class
 typedef struct
@@ -75,8 +73,13 @@ void hexdump(uint8_t *hex, size_t len)
     }
 }
 
-static err_t
-ecm_netif_init(struct netif *netif)
+static void
+netif_status_callback(struct netif *netif)
+{
+    dbg_printf("netif status changed %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
+}
+
+err_t ecm_netif_init(struct netif *netif)
 {
     netif->linkoutput = ecm_transmit;
     netif->output = etharp_output;
@@ -94,7 +97,7 @@ ecm_netif_init(struct netif *netif)
 #define USB_CS_INTERFACE_DESCRIPTOR 0x24
 #define USB_UNION_FUNCTIONAL_DESCRIPTOR 0x06
 #define USB_ETHERNET_FUNCTIONAL_DESCRIPTOR 0x0F
-usb_error_t init_ecm_device(void)
+bool init_ecm_device(void)
 {
     size_t xferd, parsed_len, desc_len;
     usb_error_t err;
@@ -109,11 +112,11 @@ usb_error_t init_ecm_device(void)
     } descriptor;
     err = usb_GetDeviceDescriptor(ecm_device.usb.device, &descriptor.dev, sizeof(usb_device_descriptor_t), &xferd);
     if (err || (xferd != sizeof(usb_device_descriptor_t)))
-        return USB_ERROR_FAILED;
+        return false;
 
     // check for main DeviceClass being type 0x00 - composite/if-specific
     if (descriptor.dev.bDeviceClass != USB_INTERFACE_SPECIFIC_CLASS)
-        return USB_ERROR_NOT_SUPPORTED;
+        return false;
 
     // parse both configs for the correct one
     uint8_t num_configs = descriptor.dev.bNumConfigurations;
@@ -238,7 +241,7 @@ usb_error_t init_ecm_device(void)
             desc = (usb_descriptor_t *)(((uint8_t *)desc) + desc->bLength);
         }
     }
-    return USB_ERROR_NO_DEVICE;
+    return false;
 init_success:
     if (usb_SetConfiguration(ecm_device.usb.device, ecm_device.usb.config.addr, ecm_device.usb.config.len))
         return USB_ERROR_FAILED;
@@ -247,26 +250,7 @@ init_success:
     ecm_device.usb.if_data.endpoint.in = usb_GetDeviceEndpoint(ecm_device.usb.device, ecm_device.usb.if_data.endpoint.addr_in);
     ecm_device.usb.if_data.endpoint.out = usb_GetDeviceEndpoint(ecm_device.usb.device, ecm_device.usb.if_data.endpoint.addr_out);
     ecm_device.status = ECM_READY;
-    printf("device configured\n");
-    if (netif_add(&ecm_device.netif, &ecm_device.addrinfo.addr, &ecm_device.addrinfo.netmask, &ecm_device.addrinfo.gateway, NULL, ecm_netif_init, netif_input))
-        printf("netif added\n");
-    ecm_device.netif.name[0] = 'e';
-    ecm_device.netif.name[1] = 'n';
-    ecm_device.netif.num = 0;
-    netif_create_ip6_linklocal_address(&ecm_device.netif, 1);
-    ecm_device.netif.ip6_autoconfig_enabled = 1;
-    // netif_set_status_callback(&ecm_device.netif, netif_status_callback);
-    netif_set_hostname(&ecm_device.netif, "ti84pce");
-    netif_set_default(&ecm_device.netif);
-    netif_set_up(&ecm_device.netif);
-    if (netif_is_up(&ecm_device.netif))
-    {
-        printf("netif is up\n");
-        ecm_receive();
-        if (!dhcp_start(&ecm_device.netif))
-            printf("dhcp init ok\n");
-    }
-    return USB_SUCCESS;
+    return true;
 }
 
 usb_error_t
@@ -278,7 +262,6 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
     switch (event)
     {
     case USB_DEVICE_CONNECTED_EVENT:
-        printf("device connected\n");
         if (!(usb_GetRole() & USB_ROLE_DEVICE))
         {
             usb_device_t usb_device = event_data;
@@ -286,17 +269,50 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
         }
         break;
     case USB_DEVICE_ENABLED_EVENT:
-        printf("device enabled\n");
         ecm_device.usb.device = event_data;
-        return init_ecm_device();
-    case USB_DEVICE_RESUMED_EVENT:
+        if (init_ecm_device())
+        {
+            ip4_addr_t addr = IPADDR4_INIT_BYTES(192, 168, 1, 79);
+            ip4_addr_t netmask = IPADDR4_INIT_BYTES(255, 255, 255, 0);
+            ip4_addr_t gateway = IPADDR4_INIT_BYTES(192, 168, 1, 1);
+            if (netif_add(&ecm_netif, &addr, &netmask, &gateway, NULL, ecm_netif_init, netif_input))
+                printf("netif added\n");
+            ecm_netif.name[0] = 'e';
+            ecm_netif.name[1] = 'n';
+            ecm_netif.num = 0;
+            netif_create_ip6_linklocal_address(&ecm_netif, 1);
+            ecm_netif.ip6_autoconfig_enabled = 1;
+            netif_set_status_callback(&ecm_netif, netif_status_callback);
+            netif_set_hostname(&ecm_netif, "ti84pce");
+            netif_set_default(&ecm_netif);
+            netif_set_up(&ecm_netif);
+            if (netif_is_up(&ecm_netif))
+            {
+                printf("netif is up\n");
+                netif_set_link_up(&ecm_netif);
+                ecm_receive();
+                if (!dhcp_start(&ecm_netif))
+                    printf("dhcp init ok\n");
+            }
+        }
+        else
+            printf("not an ecm device\n");
         break;
+    case USB_DEVICE_RESUMED_EVENT:
+        netif_set_up(&ecm_netif);
+        netif_set_link_up(&ecm_netif);
+        break;
+
     case USB_DEVICE_DISCONNECTED_EVENT:
     case USB_HOST_PORT_CONNECT_STATUS_CHANGE_INTERRUPT:
+        netif_remove(&ecm_netif);
+        return USB_ERROR_NO_DEVICE;
+
     case USB_DEVICE_SUSPENDED_EVENT:
     case USB_DEVICE_DISABLED_EVENT:
-        printf("device lost\n");
-        return USB_ERROR_NO_DEVICE;
+        netif_set_down(&ecm_netif);
+        netif_set_link_down(&ecm_netif);
+        break;
     }
     return USB_SUCCESS;
 }
@@ -314,11 +330,9 @@ usb_error_t ecm_receive_callback(usb_endpoint_t endpoint,
         if (p != NULL)
         {
             LINK_STATS_INC(link.recv);
-            MIB2_STATS_NETIF_ADD(&ecm_device.netif, ifinoctets, p->tot_len);
+            MIB2_STATS_NETIF_ADD(&ecm_netif, ifinoctets, p->tot_len);
             pbuf_take(p, in_buf, transferred);
-            if (ecm_device.netif.input(p, &ecm_device.netif) == ERR_OK)
-                printf("took %u bytes", transferred);
-            else
+            if (ecm_netif.input(p, &ecm_netif) != ERR_OK)
                 pbuf_free(p);
         }
         else
