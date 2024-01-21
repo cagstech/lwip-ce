@@ -72,13 +72,12 @@ int main(void)
     gfx_SetTextXY(2, LCD_HEIGHT - 10);
     lwip_init();
     // initialize usb hardware
-
+    struct udp_pcb *pcb = udp_new();
     if (usb_Init(ecm_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
         return 1;
 
     // wait for ecm device to be ready
     bool ip_setup_done = false;
-    pcb = udp_new();
 
     kb_SetMode(MODE_3_CONTINUOUS);
     do
@@ -93,7 +92,7 @@ int main(void)
         if (kb_IsDown(kb_Key2nd))
         {
             static const char *text1 = "The fox jumped over the dog.";
-            ip4_addr_t sendto = IPADDR4_INIT_BYTES(192, 168, 1, 216);
+            ip_addr_t sendto = IPADDR4_INIT_BYTES(192, 168, 2, 3);
             struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, strlen(text1), PBUF_RAM);
             if (p)
             {
