@@ -25,36 +25,19 @@ enum _ecm_device_status
 typedef struct _ecm_device_t
 {
   uint8_t status;
+  usb_device_t device;
+  uint8_t hwaddr[6];
   struct
   {
-    usb_device_t device;
-    uint8_t mac_addr[6];
-    struct
-    {
-      usb_configuration_descriptor_t *addr;
-      size_t len;
-    } config;
-    struct
-    {
-      usb_interface_descriptor_t *addr;
-      size_t len;
-    } if_control;
-    struct
-    {
-      usb_interface_descriptor_t *addr;
-      size_t len;
-      struct
-      {
-        uint8_t addr_in, addr_out;
-        usb_endpoint_t in, out;
-      } endpoint;
-    } if_data;
-
-  } usb;
+    size_t in, out;
+  } mtu;
+  struct
+  {
+    usb_endpoint_t in, out;
+  } endpoint;
   // usb_descriptor_t *conf_active;
-
 } ecm_device_t;
-extern ecm_device_t ecm_device;
+extern ecm_device_t ecm;
 extern struct netif ecm_netif;
 #define ECM_MTU 1518
 extern uint8_t in_buf[ECM_MTU];
