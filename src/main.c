@@ -14,7 +14,6 @@
 #include "include/lwip/tcp.h"
 #include "include/lwip/udp.h"
 #include "include/lwip/timeouts.h"
-#include "include/lwip/sys.h"
 #include "include/lwip/snmp.h"
 #include "include/lwip/pbuf.h"
 #include "include/lwip/dhcp.h"
@@ -71,8 +70,9 @@ int main(void)
     newline();
     gfx_SetTextXY(2, LCD_HEIGHT - 10);
     lwip_init();
-    // initialize usb hardware
-    struct udp_pcb *pcb = udp_new();
+    printf("lwIP public beta 1\n");
+    printf("Simple IRC connect\n");
+    pcb = udp_new();
     if (usb_Init(ecm_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
         return 1;
 
@@ -92,7 +92,7 @@ int main(void)
         if (kb_IsDown(kb_Key2nd))
         {
             static const char *text1 = "The fox jumped over the dog.";
-            ip_addr_t sendto = IPADDR4_INIT_BYTES(192, 168, 2, 3);
+            ip_addr_t sendto = IPADDR4_INIT_BYTES(192, 168, 1, 219);
             struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, strlen(text1), PBUF_RAM);
             if (p)
             {
@@ -107,7 +107,6 @@ int main(void)
         }
         if (kb_IsDown(kb_KeyClear))
             break;
-        sys_check_timeouts();
         usb_HandleEvents();
     } while (1);
     dhcp_stop(&ecm_netif);
