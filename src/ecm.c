@@ -9,17 +9,22 @@
 #include <usbdrvce.h>
 #include "include/lwip/netif.h"
 #include "include/lwip/pbuf.h"
+#include "include/lwip/timeouts.h"
 #include "lwip/stats.h"
 #include "lwip/snmp.h"
 #include "lwip/dhcp.h"
 #include "lwip/ethip6.h"
-#include "lwip/apps/httpd.h"
+#include "lwip/dns.h"
+#include "lwip/dhcp.h"
+#include "lwip/etharp.h"
 
 #include "ecm.h"
 struct netif ecm_netif = {0};
 ecm_device_t ecm = {0};
+const char *hostname = "ti84pce";
 
-uint8_t in_buf[ECM_MTU];
+uint8_t in_buf[ETHERNET_MTU];
+uint8_t interrupt_buf[64];
 
 // class-specific descriptor common class
 typedef struct
@@ -60,9 +65,23 @@ enum _descriptor_parser_await_states
     PARSE_HAS_MAC_ADDR = (1 << 1),
     PARSE_HAS_BULK_IF_NUM = (1 << 2),
     PARSE_HAS_BULK_IF = (1 << 3),
-    PARSE_HAS_ENDPOINT_IN = (1 << 4),
-    PARSE_HAS_ENDPOINT_OUT = (1 << 5)
+    PARSE_HAS_ENDPOINT_INT = (1 << 4),
+    PARSE_HAS_ENDPOINT_IN = (1 << 5),
+    PARSE_HAS_ENDPOINT_OUT = (1 << 6)
 };
+
+void hexdump(uint8_t *hex, size_t len)
+{
+    for (size_t i = 0; i < len; i++)
+    {
+        if ((i % 16 == 0) && (i != 0))
+            printf("\n");
+        else if ((i % 8 == 0) && (i != 0))
+            printf("  ");
+        printf("%02X", hex[i]);
+    }
+    printf("\n\n");
+}
 
 uint8_t nibble(uint16_t c)
 {
@@ -78,18 +97,76 @@ uint8_t nibble(uint16_t c)
     return 0xff;
 }
 
+static void netif_link_callback(struct netif *netif)
+{
+    printf("interface is up\n");
+    dhcp_start(netif);
+    // dns_init();
+}
+
 static void
 netif_status_callback(struct netif *netif)
 {
     printf("netif status changed %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
 }
 
+usb_error_t ecm_bulk_receive_callback(usb_endpoint_t endpoint,
+                                      usb_transfer_status_t status,
+                                      size_t transferred,
+                                      usb_transfer_data_t *data)
+{
+    if (status & USB_TRANSFER_NO_DEVICE)
+        return USB_ERROR_NO_DEVICE;
+    if (transferred)
+    {
+        struct pbuf *p = pbuf_alloc(PBUF_RAW, transferred, PBUF_POOL);
+        if (p != NULL)
+        {
+            LINK_STATS_INC(link.recv);
+            MIB2_STATS_NETIF_ADD(&ecm_netif, ifinoctets, p->tot_len);
+            pbuf_take(p, in_buf, transferred);
+            if (ecm_netif.input(p, &ecm_netif) != ERR_OK)
+                pbuf_free(p);
+        }
+        else
+            printf("pbuf alloc error");
+    }
+    return usb_ScheduleBulkTransfer(ecm.endpoint.in, in_buf, ETHERNET_MTU, ecm_bulk_receive_callback, NULL);
+}
+
+#define INTERRUPT_REQUEST_TYPE 0b10100001
+#define INTERRUPT_NOTIFY_NETWORK_CONNECTION 0
+usb_error_t ecm_interrupt_receive_callback(usb_endpoint_t endpoint,
+                                           usb_transfer_status_t status,
+                                           size_t transferred,
+                                           usb_transfer_data_t *data)
+{
+    usb_control_setup_t *ctl = (usb_control_setup_t *)interrupt_buf;
+    usb_control_setup_t *nc = (usb_control_setup_t *)(((uint8_t *)ctl) + ctl->wLength + sizeof(usb_control_setup_t));
+    if (nc->bmRequestType == INTERRUPT_REQUEST_TYPE && nc->bRequest == INTERRUPT_NOTIFY_NETWORK_CONNECTION)
+    {
+        if (nc->wValue)
+        {
+            netif_set_up(&ecm_netif);
+            netif_set_link_up(&ecm_netif);
+            usb_ScheduleBulkTransfer(ecm.endpoint.in, in_buf, ETHERNET_MTU, ecm_bulk_receive_callback, NULL);
+        }
+        else
+        {
+            netif_set_link_down(&ecm_netif);
+            netif_set_down(&ecm_netif);
+        }
+    }
+
+    return usb_ScheduleInterruptTransfer(ecm.endpoint.interrupt, interrupt_buf, 64, ecm_interrupt_receive_callback, NULL);
+}
+
 err_t ecm_netif_init(struct netif *netif)
 {
     netif->linkoutput = ecm_transmit;
     netif->output = etharp_output;
-    netif->output_ip6 = ethip6_output;
-    netif->mtu = ECM_MTU;
+    //  netif->output_ip6 = ethip6_output;
+    netif->mtu = ETHERNET_MTU;
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6;
     MIB2_INIT_NETIF(netif, snmp_ifType_ethernet_csmacd, 100000000);
     memcpy(netif->hwaddr, ecm.hwaddr, NETIF_MAX_HWADDR_LEN);
@@ -119,7 +196,7 @@ bool init_ecm_device(void)
     } if_bulk;
     struct
     {
-        uint8_t in, out;
+        uint8_t in, out, interrupt;
     } endpoint_addr;
     union
     {
@@ -160,12 +237,13 @@ bool init_ecm_device(void)
             switch (desc->bDescriptorType)
             {
             case USB_ENDPOINT_DESCRIPTOR:
+            {
                 // we should only look for this IF we have found the ECM control interface,
                 // and have retrieved the bulk data interface number from the CS_INTERFACE descriptor
                 // see case USB_CS_INTERFACE_DESCRIPTOR and case USB_INTERFACE_DESCRIPTOR
+                usb_endpoint_descriptor_t *endpoint = (usb_endpoint_descriptor_t *)desc;
                 if (parse_state & PARSE_HAS_BULK_IF)
                 {
-                    usb_endpoint_descriptor_t *endpoint = (usb_endpoint_descriptor_t *)desc;
                     if (endpoint->bEndpointAddress & (USB_DEVICE_TO_HOST))
                     {
                         endpoint_addr.in = endpoint->bEndpointAddress; // set out endpoint address
@@ -180,10 +258,17 @@ bool init_ecm_device(void)
                     }
                     if ((parse_state & PARSE_HAS_ENDPOINT_IN) &&
                         (parse_state & PARSE_HAS_ENDPOINT_OUT) &&
+                        (parse_state & PARSE_HAS_ENDPOINT_INT) &&
                         (parse_state & PARSE_HAS_MAC_ADDR))
                         goto init_success; // if we have both, we are done -- hard exit
                 }
-                break;
+                else if (parse_state & PARSE_HAS_CONTROL_IF)
+                {
+                    endpoint_addr.interrupt = endpoint->bEndpointAddress;
+                    parse_state |= PARSE_HAS_ENDPOINT_INT;
+                }
+            }
+            break;
             case USB_INTERFACE_DESCRIPTOR:
                 // we should look for this to either:
                 // (1) find the CDC Control Class/ECM interface, or
@@ -272,6 +357,8 @@ init_success:
         return USB_ERROR_FAILED;
     ecm.endpoint.in = usb_GetDeviceEndpoint(ecm.device, endpoint_addr.in);
     ecm.endpoint.out = usb_GetDeviceEndpoint(ecm.device, endpoint_addr.out);
+    ecm.endpoint.interrupt = usb_GetDeviceEndpoint(ecm.device, endpoint_addr.interrupt);
+    usb_RefDevice(ecm.device);
     ecm.status = ECM_READY;
     return true;
 }
@@ -282,6 +369,7 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
 {
 
     /* Enable newly connected devices */
+    sys_check_timeouts();
     switch (event)
     {
     case USB_DEVICE_CONNECTED_EVENT:
@@ -295,78 +383,37 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
         ecm.device = event_data;
         if (init_ecm_device())
         {
-            ip4_addr_t addr = IPADDR4_INIT_BYTES(192, 168, 2, 2);
-            ip4_addr_t mask = IPADDR4_INIT_BYTES(255, 255, 255, 0);
-            ip4_addr_t gateway = IPADDR4_INIT_BYTES(192, 168, 2, 1);
-            if (netif_add(&ecm_netif, &addr, &mask, &gateway, NULL, ecm_netif_init, netif_input))
+            ip_addr_t addr = IPADDR4_INIT_BYTES(192, 168, 2, 2);
+            ip_addr_t mask = IPADDR4_INIT_BYTES(255, 255, 255, 0);
+            ip_addr_t gateway = IPADDR4_INIT_BYTES(192, 168, 2, 1);
+            if (netif_add(&ecm_netif, NULL, NULL, &gateway, NULL, ecm_netif_init, netif_input))
                 printf("netif added\n");
             ecm_netif.name[0] = 'e';
             ecm_netif.name[1] = 'n';
             ecm_netif.num = 0;
-            netif_create_ip6_linklocal_address(&ecm_netif, 1);
-            ecm_netif.ip6_autoconfig_enabled = 1;
+            // netif_create_ip6_linklocal_address(&ecm_netif, 1);
+            // ecm_netif.ip6_autoconfig_enabled = 1;
             netif_set_status_callback(&ecm_netif, netif_status_callback);
-            netif_set_hostname(&ecm_netif, "ti84pce");
+            netif_set_link_callback(&ecm_netif, netif_link_callback);
             netif_set_default(&ecm_netif);
             netif_set_up(&ecm_netif);
-            if (netif_is_up(&ecm_netif))
-            {
-                printf("netif is up\n");
-                ecm_receive();
-                netif_set_link_up(&ecm_netif);
-                // dhcp_start(&ecm_netif);
-                httpd_init();
-            }
+            netif_set_hostname(&ecm_netif, hostname);
+            usb_ScheduleInterruptTransfer(ecm.endpoint.interrupt, interrupt_buf, 64, ecm_interrupt_receive_callback, NULL);
         }
         else
             printf("not an ecm device\n");
         break;
-    case USB_DEVICE_RESUMED_EVENT:
-        netif_set_up(&ecm_netif);
-        netif_set_link_up(&ecm_netif);
-        break;
 
+    case USB_DEVICE_RESUMED_EVENT:
+        usb_ScheduleInterruptTransfer(ecm.endpoint.interrupt, interrupt_buf, 64, ecm_interrupt_receive_callback, NULL);
+        break;
     case USB_DEVICE_DISCONNECTED_EVENT:
     case USB_HOST_PORT_CONNECT_STATUS_CHANGE_INTERRUPT:
         netif_remove(&ecm_netif);
         return USB_ERROR_NO_DEVICE;
-
-    case USB_DEVICE_SUSPENDED_EVENT:
-    case USB_DEVICE_DISABLED_EVENT:
-        netif_set_down(&ecm_netif);
-        netif_set_link_down(&ecm_netif);
         break;
     }
     return USB_SUCCESS;
-}
-
-usb_error_t ecm_receive_callback(usb_endpoint_t endpoint,
-                                 usb_transfer_status_t status,
-                                 size_t transferred,
-                                 usb_transfer_data_t *data)
-{
-    if (status & USB_TRANSFER_NO_DEVICE)
-        return USB_ERROR_NO_DEVICE;
-    if (transferred)
-    {
-        struct pbuf *p = pbuf_alloc(PBUF_RAW, transferred, PBUF_POOL);
-        if (p != NULL)
-        {
-            LINK_STATS_INC(link.recv);
-            MIB2_STATS_NETIF_ADD(&ecm_netif, ifinoctets, p->tot_len);
-            pbuf_take(p, in_buf, transferred);
-            if (ecm_netif.input(p, &ecm_netif) != ERR_OK)
-                pbuf_free(p);
-        }
-        else
-            printf("pbuf alloc error");
-    }
-    return usb_ScheduleBulkTransfer(ecm.endpoint.in, in_buf, ECM_MTU, ecm_receive_callback, NULL);
-}
-
-usb_error_t ecm_receive(void)
-{
-    return usb_ScheduleBulkTransfer(ecm.endpoint.in, in_buf, ECM_MTU, ecm_receive_callback, NULL);
 }
 
 usb_error_t ecm_transmit_callback(usb_endpoint_t endpoint,
@@ -379,13 +426,14 @@ usb_error_t ecm_transmit_callback(usb_endpoint_t endpoint,
 
 usb_error_t ecm_transmit(struct netif *netif, struct pbuf *p)
 {
-    static u8_t obuf[ECM_MTU];
-    if (p->tot_len <= ECM_MTU)
+    static u8_t obuf[ETHERNET_MTU];
+    if (p->tot_len <= ETHERNET_MTU)
     {
         LINK_STATS_INC(link.xmit);
         // Update SNMP stats(only if you use SNMP)
         MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
-        pbuf_copy_partial(p, obuf, p->tot_len, 0);
-        return usb_ScheduleBulkTransfer(ecm.endpoint.out, obuf, p->tot_len, ecm_transmit_callback, NULL);
+        printf("%u\n", pbuf_copy_partial(p, obuf, p->tot_len, 0));
+        hexdump(obuf, p->tot_len);
+        return usb_BulkTransfer(ecm.endpoint.out, obuf, p->tot_len, ecm_transmit_callback, NULL);
     }
 }
