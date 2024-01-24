@@ -33,14 +33,14 @@ typedef struct _ecm_device_t
   } mtu;
   struct
   {
-    usb_endpoint_t in, out;
+    usb_endpoint_t in, out, interrupt;
   } endpoint;
   // usb_descriptor_t *conf_active;
 } ecm_device_t;
 extern ecm_device_t ecm;
 extern struct netif ecm_netif;
-#define ECM_MTU 1518
-extern uint8_t in_buf[ECM_MTU];
+#define ETHERNET_MTU 1518
+extern uint8_t in_buf[ETHERNET_MTU];
 
 usb_error_t ecm_receive(void);
 usb_error_t ecm_transmit(struct netif *netif, struct pbuf *p);
