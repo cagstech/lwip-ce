@@ -16,3 +16,5 @@
   } while (0)
 
 #endif // LWIP_CC_H
+
+#define BYTE_ORDER LITTLE_ENDIAN

@@ -4,7 +4,7 @@
 #define LWIP_DEBUG 1
 
 #define LWIP_IPV4 1
-#define LWIP_IPV6 1
+#define LWIP_IPV6 0
 
 #define NO_SYS 1
 #define LWIP_ETHERNET 1
@@ -30,7 +30,7 @@
 
 #define LWIP_NUM_NETIF_CLIENT_DATA (LWIP_MDNS_RESPONDER)
 
-#define LWIP_HAVE_LOOPIF 0
+#define LWIP_HAVE_LOOPIF 1
 #define LWIP_NETIF_LOOPBACK 1
 #define LWIP_LOOPBACK_MAX_PBUFS 10
 
@@ -60,13 +60,14 @@
 #define SOCKETS_DEBUG LWIP_DBG_OFF
 #define DNS_DEBUG LWIP_DBG_OFF
 #define AUTOIP_DEBUG LWIP_DBG_OFF
+#define ACD_DEBUG LWIP_DBG_ON
 #define DHCP_DEBUG LWIP_DBG_ON
 #define IP_DEBUG LWIP_DBG_OFF
 #define IP_REASS_DEBUG LWIP_DBG_OFF
 #define ICMP_DEBUG LWIP_DBG_OFF
 #define IGMP_DEBUG LWIP_DBG_OFF
-#define UDP_DEBUG LWIP_DBG_ON
-#define TCP_DEBUG LWIP_DBG_OFF
+#define UDP_DEBUG LWIP_DBG_OFF
+#define TCP_DEBUG LWIP_DBG_ON
 #define TCP_INPUT_DEBUG LWIP_DBG_OFF
 #define TCP_OUTPUT_DEBUG LWIP_DBG_OFF
 #define TCP_RTO_DEBUG LWIP_DBG_OFF
@@ -204,10 +205,12 @@ a lot of data that needs to be copied, this should be set high. */
 /* Define LWIP_DHCP to 1 if you want DHCP configuration of
    interfaces. */
 #define LWIP_DHCP LWIP_UDP
-
+#define LWIP_DHCP_PROVIDE_DNS_SERVERS 1
 /* 1 if you want to do an ARP check on the offered address
    (recommended). */
 #define DHCP_DOES_ARP_CHECK (LWIP_DHCP)
+#define LWIP_DHCP_DOES_ACD_CHECK 0
+#define LWIP_ACD 1
 
 /* ---------- AUTOIP options ------- */
 #define LWIP_AUTOIP (LWIP_DHCP)
@@ -268,6 +271,9 @@ a lot of data that needs to be copied, this should be set high. */
 #define MD5_SUPPORT 1    /* Set > 0 for MD5 (see also CHAP) */
 
 #endif /* PPP_SUPPORT */
+
+/* miscellanous */
+#define HTTPD_SERVER_PORT 8888
 
 #define LWIP_RAND rand
 
