@@ -99,7 +99,6 @@ uint8_t nibble(uint16_t c)
 
 static void netif_link_callback(struct netif *netif)
 {
-    printf("interface is up\n");
     dhcp_start(netif);
     // dns_init();
 }
@@ -165,7 +164,7 @@ err_t ecm_netif_init(struct netif *netif)
 {
     netif->linkoutput = ecm_transmit;
     netif->output = etharp_output;
-    //  netif->output_ip6 = ethip6_output;
+    netif->output_ip6 = ethip6_output;
     netif->mtu = ETHERNET_MTU;
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6;
     MIB2_INIT_NETIF(netif, snmp_ifType_ethernet_csmacd, 100000000);

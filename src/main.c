@@ -47,22 +47,32 @@ void outchar(char c)
     }
 }
 
-struct udp_pcb *pcb;
-/*
-static err_t
-veth_netif_init(struct netif *netif)
+// struct tcp_pcb pcb;
+struct tcp_pcb_listen pcbl;
+
+#define CHAT_MAX_CONNS 10
+struct _conn
 {
-    netif->linkoutput = veth_transmit;
-    netif->output = etharp_output;
-    netif->output_ip6 = ethip6_output;
-    netif->mtu = ETHERNET_MTU;
-    netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6;
-    MIB2_INIT_NETIF(netif, snmp_ifType_ethernet_csmacd, 100000000);
-    memcpy(netif->hwaddr, mac_addr, ETH_HWADDR_LEN);
-    netif->hwaddr_len = ETH_HWADDR_LEN;
-    return ERR_OK;
+    ip_addr_t user_ip;
+    struct tcp_pcb *user_pcb;
+
+} struct _conn connections[CHAT_MAX_CONNS];
+
+void broadcast(void *data)
+{
+    printf("%s\n", data);
+    for (int i = 0; i < CHAT_MAX_CONNS; i++)
+    {
+        tcp_write(connections[i].user_pcb, data, strlen(data) + 1, 0);
+        tcp_output(connections[i].user_pcb);
+    }
 }
-*/
+
+err_t tcp_accept_conn(void *arg, struct tcp_pcb *newpcb, err_t err)
+{
+    broacast("new client from %s\n", ipaddr_ntoa(newpcb->localip));
+}
+
 int main(void)
 {
     os_ClrHome();
@@ -72,22 +82,22 @@ int main(void)
     lwip_init();
     printf("lwIP public beta 1\n");
     printf("Simple IRC connect\n");
-    pcb = udp_new();
+    pcbl = tcp_new();
     if (usb_Init(ecm_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
         return 1;
 
     // wait for ecm device to be ready
-    bool ip_setup_done = false;
+    bool tcp_listener_up = false;
 
     kb_SetMode(MODE_3_CONTINUOUS);
     do
     {
-        if (kb_IsDown(kb_KeyAlpha))
+        if (dhcp_supplied_address(&ecm_netif) && (!tcp_listener_up))
         {
-            if (dhcp_supplied_address(&ecm_netif))
-                printf("dhcp_addr %s\n", ip4addr_ntoa(netif_ip4_addr(&ecm_netif)));
-            else
-                printf("no ip configd\n");
+            printf("dhcp_addr %s\n", ip4addr_ntoa(netif_ip4_addr(&ecm_netif)));
+            printf("enabling tcp listener\n");
+            tcp_accept(&pcbl, tcp_accept_conn);
+            tcp_listen(&pcbl);
         }
         if (kb_IsDown(kb_Key2nd))
         {
