@@ -7,6 +7,7 @@
 #define LWIP_IPV6 1
 
 #define NO_SYS 1
+#define LWIP_TIMERS 1
 #define LWIP_ETHERNET 1
 #define LWIP_CALLBACK_API 1
 #define LWIP_SOCKET 0

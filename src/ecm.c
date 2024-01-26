@@ -382,10 +382,7 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
         ecm.device = event_data;
         if (init_ecm_device())
         {
-            ip_addr_t addr = IPADDR4_INIT_BYTES(192, 168, 2, 2);
-            ip_addr_t mask = IPADDR4_INIT_BYTES(255, 255, 255, 0);
-            ip_addr_t gateway = IPADDR4_INIT_BYTES(192, 168, 2, 1);
-            if (netif_add(&ecm_netif, NULL, NULL, &gateway, NULL, ecm_netif_init, netif_input))
+            if (netif_add(&ecm_netif, NULL, NULL, NULL, NULL, ecm_netif_init, netif_input))
                 printf("netif added\n");
             ecm_netif.name[0] = 'e';
             ecm_netif.name[1] = 'n';
@@ -431,8 +428,8 @@ usb_error_t ecm_transmit(struct netif *netif, struct pbuf *p)
         LINK_STATS_INC(link.xmit);
         // Update SNMP stats(only if you use SNMP)
         MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
-        printf("%u\n", pbuf_copy_partial(p, obuf, p->tot_len, 0));
-        hexdump(obuf, p->tot_len);
+        pbuf_copy_partial(p, obuf, p->tot_len, 0);
+        // hexdump(obuf, p->tot_len);
         return usb_BulkTransfer(ecm.endpoint.out, obuf, p->tot_len, ecm_transmit_callback, NULL);
     }
 }
