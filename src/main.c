@@ -23,7 +23,7 @@
 // #include "veth.h"
 
 struct tcp_pcb *pcb;
-ip_addr_t remote_ip = IPADDR4_INIT_BYTES(192, 168, 1, 219);
+ip_addr_t remote_ip = IPADDR4_INIT_BYTES(192, 168, 1, 216);
 
 static void newline(void)
 {
@@ -58,15 +58,30 @@ void dns_lookup_callback(const char *name, const ip_addr_t *ipaddr, void *callba
         memcpy(&remote_ip, ipaddr, sizeof(ipaddr));
 }
 
+err_t tcp_recv_callback(void *arg, struct tcp_pcb *tpcb, u16_t len)
+{
+    printf("tcp: packet received\n");
+    tcp_recved(tpcb, len);
+    return ERR_OK;
+}
+
+err_t tcp_sent_callback(void *arg, struct tcp_pcb *tpcb, u16_t len)
+{
+    printf("tcp: packet sent\n");
+    return ERR_OK;
+}
+
 err_t tcp_connect_callback(void *arg, struct tcp_pcb *tpcb, err_t err)
 {
-    printf("connected to server\n");
+    printf("tcp: connected to server\n");
+    return ERR_OK;
 }
 
 #define CHAT_MAX_CONNS 10
 
 int main(void)
 {
+    const char *text1 = "The fox jumped over the dog.";
     os_ClrHome();
     gfx_Begin();
     newline();
@@ -92,19 +107,29 @@ int main(void)
             // dns_gethostbyname("acagliano.ddns.net", &remote_ip, dns_lookup_callback, NULL);
             // printf("enabling tcp listener\n");
             // tcp_bind(pcb, IP4_ADDR_ANY, 0);
-            tcp_connect(pcb, &remote_ip, 8881, tcp_connect_callback);
+            if (tcp_connect(pcb, &remote_ip, 8881, tcp_connect_callback))
+            {
+                printf("tcp connect error\n");
+                break;
+            }
+            tcp_sent(pcb, tcp_sent_callback);
+            tcp_recv(pcb, tcp_recv_callback);
             tcp_listener_up = true;
         }
         if (kb_IsDown(kb_Key2nd))
         {
-            static const char *text1 = "The fox jumped over the dog.";
-            tcp_write(pcb, text1, strlen(text1) + 1, TCP_WRITE_FLAG_COPY);
-            tcp_output(pcb);
+            printf("sending: %s\n", text1);
+            if (tcp_sndbuf(pcb) >= strlen(text1))
+            {
+                tcp_write(pcb, text1, strlen(text1), 0);
+                tcp_output(pcb);
+            }
         }
         if (kb_IsDown(kb_KeyClear))
             break;
         usb_HandleEvents();
     } while (1);
+    tcp_close(pcb);
     dhcp_stop(&ecm_netif);
     usb_Cleanup();
     gfx_End();
