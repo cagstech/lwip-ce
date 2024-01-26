@@ -43,8 +43,8 @@ class Server:
                 return
             time.sleep(0.002)
 
-        def broadcast(self, data):
-            print(f"{data}\n")
+    def broadcast(self, data):
+        print(f"{data}\n")
 
 
 class ClientDisconnectErr(Exception):
@@ -69,19 +69,15 @@ class Client:
             try:
                 data = self.conn.recv(PACKET_MTU)
                 if not data:
-                    raise ClientDisconnectErr(f"{self.user} disconnected!")
+                    raise ClientDisconnectErr(
+                        f"{self.ip}:{self.port} disconnected!")
 
-                self.data_stream += data
-
-                print(
-                    f"{self.ip}:{self.port}: {binascii.hexlify(bytearray(self.data_stream))}")
-
-                self.data_stream = self.data_stream[self.data_size:]
+                Client.server.broadcast(data.decode('utf-8'))
 
             except ClientDisconnectErr as e:
                 self.conn.close()
                 del Client.server.clients[self.conn]
-                Client.server.broadcast(f"{self.ip}:{self.port} disconnected")
+                Client.server.broadcast(e)
                 return
 
             except:
