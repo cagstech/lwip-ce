@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <ti/screen.h>
+#include <sys/timers.h>
 #undef NDEBUG
 // #include <debug.h>
 
@@ -14,11 +15,15 @@
 #include "include/lwip/tcp.h"
 #include "include/lwip/udp.h"
 #include "include/lwip/timeouts.h"
+#include "include/lwip/sys.h"
 #include "include/lwip/snmp.h"
 #include "include/lwip/pbuf.h"
 #include "include/lwip/dhcp.h"
 #include "ecm.h"
 // #include "veth.h"
+
+struct tcp_pcb *pcb;
+ip_addr_t remote_ip = IPADDR4_INIT_BYTES(192, 168, 1, 219);
 
 static void newline(void)
 {
@@ -47,31 +52,18 @@ void outchar(char c)
     }
 }
 
-// struct tcp_pcb pcb;
-struct tcp_pcb_listen pcbl;
+void dns_lookup_callback(const char *name, const ip_addr_t *ipaddr, void *callback_arg)
+{
+    if (ipaddr)
+        memcpy(&remote_ip, ipaddr, sizeof(ipaddr));
+}
+
+err_t tcp_connect_callback(void *arg, struct tcp_pcb *tpcb, err_t err)
+{
+    printf("connected to server\n");
+}
 
 #define CHAT_MAX_CONNS 10
-struct _conn
-{
-    ip_addr_t user_ip;
-    struct tcp_pcb *user_pcb;
-
-} struct _conn connections[CHAT_MAX_CONNS];
-
-void broadcast(void *data)
-{
-    printf("%s\n", data);
-    for (int i = 0; i < CHAT_MAX_CONNS; i++)
-    {
-        tcp_write(connections[i].user_pcb, data, strlen(data) + 1, 0);
-        tcp_output(connections[i].user_pcb);
-    }
-}
-
-err_t tcp_accept_conn(void *arg, struct tcp_pcb *newpcb, err_t err)
-{
-    broacast("new client from %s\n", ipaddr_ntoa(newpcb->localip));
-}
 
 int main(void)
 {
@@ -79,41 +71,35 @@ int main(void)
     gfx_Begin();
     newline();
     gfx_SetTextXY(2, LCD_HEIGHT - 10);
-    lwip_init();
     printf("lwIP public beta 1\n");
     printf("Simple IRC connect\n");
-    pcbl = tcp_new();
+    lwip_init();
     if (usb_Init(ecm_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
         return 1;
 
     // wait for ecm device to be ready
+    pcb = tcp_new();
     bool tcp_listener_up = false;
 
     kb_SetMode(MODE_3_CONTINUOUS);
     do
     {
+        // printf("%lu\n", sys_now());
         if (dhcp_supplied_address(&ecm_netif) && (!tcp_listener_up))
         {
             printf("dhcp_addr %s\n", ip4addr_ntoa(netif_ip4_addr(&ecm_netif)));
-            printf("enabling tcp listener\n");
-            tcp_accept(&pcbl, tcp_accept_conn);
-            tcp_listen(&pcbl);
+            // printf("dns query for remote\n");
+            // dns_gethostbyname("acagliano.ddns.net", &remote_ip, dns_lookup_callback, NULL);
+            // printf("enabling tcp listener\n");
+            // tcp_bind(pcb, IP4_ADDR_ANY, 0);
+            tcp_connect(pcb, &remote_ip, 8881, tcp_connect_callback);
+            tcp_listener_up = true;
         }
         if (kb_IsDown(kb_Key2nd))
         {
             static const char *text1 = "The fox jumped over the dog.";
-            ip_addr_t sendto = IPADDR4_INIT_BYTES(192, 168, 1, 219);
-            struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, strlen(text1), PBUF_RAM);
-            if (p)
-            {
-                pbuf_take(p, text1, strlen(text1));
-                printf("%i\n", udp_sendto(pcb, p, &sendto, 51000));
-            }
-            else
-            {
-                printf("buf alloc err\n");
-                pbuf_free(p);
-            }
+            tcp_write(pcb, text1, strlen(text1) + 1, TCP_WRITE_FLAG_COPY);
+            tcp_output(pcb);
         }
         if (kb_IsDown(kb_KeyClear))
             break;
