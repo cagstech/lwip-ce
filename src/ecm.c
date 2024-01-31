@@ -160,9 +160,42 @@ usb_error_t ecm_interrupt_receive_callback(usb_endpoint_t endpoint,
     return usb_ScheduleInterruptTransfer(ecm.endpoint.interrupt, interrupt_buf, 64, ecm_interrupt_receive_callback, NULL);
 }
 
+usb_error_t ecm_bulk_transmit_callback(usb_endpoint_t endpoint,
+                                       usb_transfer_status_t status,
+                                       size_t transferred,
+                                       usb_transfer_data_t *data)
+{
+    // Handle completion or error of the transfer, if needed
+    if (status != USB_TRANSFER_COMPLETED)
+    {
+        return ERR_IF;
+        // Handle error
+    }
+    return USB_SUCCESS;
+}
+
+uint8_t obuf[ETHERNET_MTU];
+err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p)
+{
+    uint8_t *sendbuf = pbuf_get_contiguous(p, obuf, ETHERNET_MTU, p->tot_len, 0);
+    if (sendbuf)
+    {
+        LINK_STATS_INC(link.xmit);
+        // Update SNMP stats(only if you use SNMP)
+        MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
+        // hexdump(obuf, p->tot_len);
+        printf("bulk xfer out\n");
+        if (usb_BulkTransfer(ecm.endpoint.out, sendbuf, p->tot_len, ecm_bulk_transmit_callback, NULL) == USB_SUCCESS)
+            return ERR_OK;
+        return ERR_IF;
+    }
+    else
+        return ERR_MEM;
+}
+
 err_t ecm_netif_init(struct netif *netif)
 {
-    netif->linkoutput = ecm_transmit;
+    netif->linkoutput = ecm_bulk_transmit;
     netif->output = etharp_output;
     netif->output_ip6 = ethip6_output;
     netif->mtu = ETHERNET_MTU;
@@ -410,26 +443,4 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
         break;
     }
     return USB_SUCCESS;
-}
-
-usb_error_t ecm_transmit_callback(usb_endpoint_t endpoint,
-                                  usb_transfer_status_t status,
-                                  size_t transferred,
-                                  usb_transfer_data_t *data)
-{
-    return USB_SUCCESS;
-}
-
-usb_error_t ecm_transmit(struct netif *netif, struct pbuf *p)
-{
-    static u8_t obuf[ETHERNET_MTU];
-    if (p->tot_len <= ETHERNET_MTU)
-    {
-        LINK_STATS_INC(link.xmit);
-        // Update SNMP stats(only if you use SNMP)
-        MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
-        pbuf_copy_partial(p, obuf, p->tot_len, 0);
-        // hexdump(obuf, p->tot_len);
-        return usb_BulkTransfer(ecm.endpoint.out, obuf, p->tot_len, ecm_transmit_callback, NULL);
-    }
 }
