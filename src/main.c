@@ -7,6 +7,7 @@
 #include <sys/timers.h>
 #undef NDEBUG
 // #include <debug.h>
+// #define ENABLE_VETH 1
 
 #include <keypadc.h>
 #include <usbdrvce.h>
@@ -20,6 +21,10 @@
 #include "include/lwip/pbuf.h"
 #include "include/lwip/dhcp.h"
 #include "ecm.h"
+
+#ifdef ENABLE_VETH
+#include "veth.h"
+#endif
 // #include "veth.h"
 
 struct tcp_pcb *pcb, *cpcb;
@@ -168,6 +173,7 @@ err_t tcp_connect_callback(void *arg, struct tcp_pcb *tpcb, err_t err)
 int main(void)
 {
     const char *text1 = "The fox jumped over the dog.";
+    struct netif vethif;
     os_ClrHome();
     gfx_Begin();
     newline();
@@ -178,6 +184,17 @@ int main(void)
     if (usb_Init(ecm_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
         return 1;
 
+#ifdef ENABLE_VETH
+    netif_add_noaddr(&vethif, NULL, vethif_init, netif_input);
+    netif.name[0] = 'e';
+    netif.name[1] = 'n';
+    netif.num = 1;
+    netif_create_ip6_linklocal_address(&netif, 1);
+    netif.ip6_autoconfig_enabled = 1;
+    netif_set_status_callback(&netif, netif_status_callback);
+    netif_set_default(&netif);
+    netif_set_up(&netif);
+#endif
     // wait for ecm device to be ready
     bool tcp_connected = false;
 
@@ -206,7 +223,7 @@ int main(void)
         if (kb_IsDown(kb_Key2nd))
         {
             printf("sending: %s\n", text1);
-            if (tcp_write(pcb, text1, strlen(text1), TCP_WRITE_FLAG_COPY) == ERR_OK)
+            if (tcp_write(pcb, text1, strlen(text1), 0) == ERR_OK)
                 tcp_output(pcb);
             while (kb_IsDown(kb_Key2nd))
                 ;
@@ -214,6 +231,7 @@ int main(void)
         if (kb_IsDown(kb_KeyClear))
             break;
         usb_HandleEvents();
+        sys_check_timeouts();
     } while (1);
     tcp_abort(pcb);
     dhcp_stop(&ecm_netif);
