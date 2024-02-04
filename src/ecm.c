@@ -401,7 +401,6 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
 {
 
     /* Enable newly connected devices */
-    sys_check_timeouts();
     switch (event)
     {
     case USB_DEVICE_CONNECTED_EVENT:
