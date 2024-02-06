@@ -183,17 +183,6 @@ int main(void)
     if (usb_Init(ecm_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
         return 1;
 
-#ifdef ENABLE_VETH
-    netif_add_noaddr(&vethif, NULL, vethif_init, netif_input);
-    netif.name[0] = 'e';
-    netif.name[1] = 'n';
-    netif.num = 1;
-    netif_create_ip6_linklocal_address(&netif, 1);
-    netif.ip6_autoconfig_enabled = 1;
-    netif_set_status_callback(&netif, netif_status_callback);
-    netif_set_default(&netif);
-    netif_set_up(&netif);
-#endif
     // wait for ecm device to be ready
     bool tcp_connected = false;
 
