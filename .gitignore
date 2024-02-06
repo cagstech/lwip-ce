@@ -61,6 +61,4 @@
 <<<<<<< HEAD
 
 obj/
-fsdata.c
-=======
->>>>>>> 4b3f2b7409890e8cb420d7373e209b409af36583
+src/apps/http/fsdata.c
