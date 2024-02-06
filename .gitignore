@@ -58,3 +58,6 @@
 /contrib/apps/LwipMibCompiler/MibViewer/obj
 /contrib/apps/LwipMibCompiler/SharpSnmpLib/bin
 /contrib/apps/LwipMibCompiler/SharpSnmpLib/obj
+
+obj/
+*/fsdata.c
