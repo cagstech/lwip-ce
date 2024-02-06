@@ -192,9 +192,9 @@ int main(void)
     netif_create_ip6_linklocal_address(&netif, 1);
     netif.ip6_autoconfig_enabled = 1;
     netif_set_status_callback(&netif, netif_status_callback);
-    netif_set_default(&netif);
     netif_set_up(&netif);
 #endif
+    netif_set_default(&netif);
     // wait for ecm device to be ready
     bool tcp_connected = false;
 

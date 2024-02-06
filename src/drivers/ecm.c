@@ -12,18 +12,14 @@
 #include "include/lwip/timeouts.h"
 #include "lwip/stats.h"
 #include "lwip/snmp.h"
-#include "lwip/dhcp.h"
 #include "lwip/ethip6.h"
-#include "lwip/dns.h"
-#include "lwip/dhcp.h"
 #include "lwip/etharp.h"
 
+#include "defaults.h"
 #include "ecm.h"
 struct netif ecm_netif = {0};
 ecm_device_t ecm = {0};
-const char *hostname = "ti84pce";
 
-uint8_t in_buf[ETHERNET_MTU];
 uint8_t interrupt_buf[64];
 
 // class-specific descriptor common class
@@ -95,18 +91,6 @@ uint8_t nibble(uint16_t c)
     if (c < 6)
         return c + 10;
     return 0xff;
-}
-
-static void netif_link_callback(struct netif *netif)
-{
-    dhcp_start(netif);
-    // dns_init();
-}
-
-static void
-netif_status_callback(struct netif *netif)
-{
-    printf("netif status changed %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
 }
 
 usb_error_t ecm_bulk_receive_callback(usb_endpoint_t endpoint,
@@ -203,7 +187,7 @@ err_t ecm_netif_init(struct netif *netif)
     MIB2_INIT_NETIF(netif, snmp_ifType_ethernet_csmacd, 100000000);
     memcpy(netif->hwaddr, ecm.hwaddr, NETIF_MAX_HWADDR_LEN);
     netif->hwaddr_len = NETIF_MAX_HWADDR_LEN;
-    printf("\n");
+    netif_init_defaults(netif);
     return ERR_OK;
 }
 
@@ -416,16 +400,8 @@ ecm_handle_usb_event(usb_event_t event, void *event_data,
         {
             if (netif_add(&ecm_netif, NULL, NULL, NULL, NULL, ecm_netif_init, netif_input))
                 printf("netif added\n");
-            ecm_netif.name[0] = 'e';
-            ecm_netif.name[1] = 'n';
-            ecm_netif.num = 0;
-            // netif_create_ip6_linklocal_address(&ecm_netif, 1);
-            // ecm_netif.ip6_autoconfig_enabled = 1;
-            netif_set_status_callback(&ecm_netif, netif_status_callback);
-            netif_set_link_callback(&ecm_netif, netif_link_callback);
             netif_set_default(&ecm_netif);
             netif_set_up(&ecm_netif);
-            netif_set_hostname(&ecm_netif, hostname);
             usb_ScheduleInterruptTransfer(ecm.endpoint.interrupt, interrupt_buf, 64, ecm_interrupt_receive_callback, NULL);
         }
         else
