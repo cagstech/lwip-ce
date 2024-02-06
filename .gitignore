@@ -60,4 +60,4 @@
 /contrib/apps/LwipMibCompiler/SharpSnmpLib/obj
 
 obj/
-*/fsdata.c
+fsdata.c
