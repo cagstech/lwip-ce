@@ -61,4 +61,4 @@
 <<<<<<< HEAD
 
 obj/
-src/apps/http/fsdata.c
+*fsdata.c*
