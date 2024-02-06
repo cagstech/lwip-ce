@@ -39,8 +39,6 @@ typedef struct _ecm_device_t
 } ecm_device_t;
 extern ecm_device_t ecm;
 extern struct netif ecm_netif;
-#define ETHERNET_MTU 1518
-extern uint8_t in_buf[ETHERNET_MTU];
 
 usb_error_t ecm_receive(void);
 usb_error_t ecm_transmit(struct netif *netif, struct pbuf *p);
