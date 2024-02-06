@@ -20,11 +20,9 @@
 #include "include/lwip/snmp.h"
 #include "include/lwip/pbuf.h"
 #include "include/lwip/dhcp.h"
-#include "ecm.h"
+#include "drivers/ecm.h"
+#include "drivers/veth.h"
 
-#ifdef ENABLE_VETH
-#include "veth.h"
-#endif
 // #include "veth.h"
 
 struct tcp_pcb *pcb, *cpcb;
@@ -181,20 +179,11 @@ int main(void)
     printf("lwIP public beta 1\n");
     printf("Simple IRC connect\n");
     lwip_init();
+
+    netif_add_noaddr(&vethif, NULL, vethif_init, netif_input);
     if (usb_Init(ecm_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
         return 1;
 
-#ifdef ENABLE_VETH
-    netif_add_noaddr(&vethif, NULL, vethif_init, netif_input);
-    netif.name[0] = 'e';
-    netif.name[1] = 'n';
-    netif.num = 1;
-    netif_create_ip6_linklocal_address(&netif, 1);
-    netif.ip6_autoconfig_enabled = 1;
-    netif_set_status_callback(&netif, netif_status_callback);
-    netif_set_up(&netif);
-#endif
-    netif_set_default(&netif);
     // wait for ecm device to be ready
     bool tcp_connected = false;
 
