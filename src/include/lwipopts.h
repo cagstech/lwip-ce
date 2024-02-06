@@ -14,6 +14,7 @@
 #define LWIP_NETCONN 0
 #define LWIP_NETIF_API 0
 #define LWIP_NETIF_HOSTNAME 1
+#define LWIP_NETIF_REMOVE_CALLBACK 1
 
 #define LWIP_CHKSUM_ALGORITHM 1 // todo: does this do anything?
 

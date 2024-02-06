@@ -5,7 +5,6 @@
 #include "defaults.h"
 
 const char *hostname = "ti84pce";
-uint8_t in_buf[ETHERNET_MTU];
 
 void netif_link_callback(struct netif *netif)
 {

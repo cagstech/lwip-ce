@@ -21,6 +21,7 @@ struct netif ecm_netif = {0};
 ecm_device_t ecm = {0};
 
 uint8_t interrupt_buf[64];
+uint8_t *ecm_tx_buf, *ecm_rx_buf;
 
 // class-specific descriptor common class
 typedef struct
@@ -107,14 +108,14 @@ usb_error_t ecm_bulk_receive_callback(usb_endpoint_t endpoint,
         {
             LINK_STATS_INC(link.recv);
             MIB2_STATS_NETIF_ADD(&ecm_netif, ifinoctets, p->tot_len);
-            pbuf_take(p, in_buf, transferred);
+            pbuf_take(p, ecm_rx_buf, transferred);
             if (ecm_netif.input(p, &ecm_netif) != ERR_OK)
                 pbuf_free(p);
         }
         else
             printf("pbuf alloc error");
     }
-    return usb_ScheduleBulkTransfer(ecm.endpoint.in, in_buf, ETHERNET_MTU, ecm_bulk_receive_callback, NULL);
+    return usb_ScheduleBulkTransfer(ecm.endpoint.in, ecm_rx_buf, ETHERNET_MTU, ecm_bulk_receive_callback, NULL);
 }
 
 #define INTERRUPT_REQUEST_TYPE 0b10100001
@@ -132,7 +133,7 @@ usb_error_t ecm_interrupt_receive_callback(usb_endpoint_t endpoint,
         {
             netif_set_up(&ecm_netif);
             netif_set_link_up(&ecm_netif);
-            usb_ScheduleBulkTransfer(ecm.endpoint.in, in_buf, ETHERNET_MTU, ecm_bulk_receive_callback, NULL);
+            usb_ScheduleBulkTransfer(ecm.endpoint.in, ecm_rx_buf, ETHERNET_MTU, ecm_bulk_receive_callback, NULL);
         }
         else
         {
@@ -158,23 +159,27 @@ usb_error_t ecm_bulk_transmit_callback(usb_endpoint_t endpoint,
     return USB_SUCCESS;
 }
 
-uint8_t obuf[ETHERNET_MTU];
 err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p)
 {
-    uint8_t *sendbuf = pbuf_get_contiguous(p, obuf, ETHERNET_MTU, p->tot_len, 0);
+    uint8_t *sendbuf = pbuf_get_contiguous(p, ecm_tx_buf, ETHERNET_MTU, p->tot_len, 0);
     if (sendbuf)
     {
         LINK_STATS_INC(link.xmit);
         // Update SNMP stats(only if you use SNMP)
         MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
         // hexdump(obuf, p->tot_len);
-        printf("bulk xfer out\n");
         if (usb_BulkTransfer(ecm.endpoint.out, sendbuf, p->tot_len, ecm_bulk_transmit_callback, NULL) == USB_SUCCESS)
             return ERR_OK;
         return ERR_IF;
     }
     else
         return ERR_MEM;
+}
+
+void ecm_remove_callback(struct netif *netif)
+{
+    pbuf_free((struct pbuf *)ecm_tx_buf);
+    pbuf_free((struct pbuf *)ecm_rx_buf);
 }
 
 err_t ecm_netif_init(struct netif *netif)
@@ -184,10 +189,14 @@ err_t ecm_netif_init(struct netif *netif)
     netif->output_ip6 = ethip6_output;
     netif->mtu = ETHERNET_MTU;
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6;
+    ecm_tx_buf = (uint8_t *)pbuf_alloc(PBUF_RAW, ETHERNET_MTU, PBUF_RAM);
+    ecm_rx_buf = (uint8_t *)pbuf_alloc(PBUF_RAW, ETHERNET_MTU, PBUF_RAM);
     MIB2_INIT_NETIF(netif, snmp_ifType_ethernet_csmacd, 100000000);
     memcpy(netif->hwaddr, ecm.hwaddr, NETIF_MAX_HWADDR_LEN);
     netif->hwaddr_len = NETIF_MAX_HWADDR_LEN;
     netif_init_defaults(netif);
+    netif_set_remove_callback(netif, ecm_remove_callback);
+    netif_set_default(netif);
     return ERR_OK;
 }
 
