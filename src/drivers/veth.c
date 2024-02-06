@@ -72,6 +72,8 @@ err_t vethif_init(struct netif *netif)
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6;
     veth_tx_buf = (uint8_t *)pbuf_alloc(PBUF_RAW, ETHERNET_MTU, PBUF_RAM);
     veth_rx_buf = (uint8_t *)pbuf_alloc(PBUF_RAW, ETHERNET_MTU, PBUF_RAM);
+    if (!(veth_tx_buf && veth_rx_buf))
+        return ERR_MEM;
     MIB2_INIT_NETIF(netif, snmp_ifType_ethernet_csmacd, 100000000);
     memcpy(netif->hwaddr, veth_mac_addr, ETH_HWADDR_LEN);
     netif->hwaddr_len = ETH_HWADDR_LEN;
