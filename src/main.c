@@ -7,7 +7,7 @@
 #include <sys/timers.h>
 #undef NDEBUG
 // #include <debug.h>
-// #define ENABLE_VETH 1
+#define ENABLE_VETH 1
 
 #include <keypadc.h>
 #include <usbdrvce.h>
@@ -22,7 +22,9 @@
 #include "include/lwip/dhcp.h"
 
 #include "drivers/ecm.h"
+#ifdef ENABLE_VETH
 #include "drivers/veth.h"
+#endif
 
 struct tcp_pcb *pcb, *cpcb;
 ip_addr_t remote_ip = IPADDR4_INIT_BYTES(192, 168, 1, 24);
@@ -178,8 +180,9 @@ int main(void)
     printf("lwIP public beta 1\n");
     printf("Simple IRC connect\n");
     lwip_init();
-
+#ifdef ENABLE_VETH
     netif_add_noaddr(&vethif, NULL, vethif_init, netif_input);
+#endif
     if (usb_Init(ecm_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
         return 1;
 
