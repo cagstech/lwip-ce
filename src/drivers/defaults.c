@@ -5,6 +5,7 @@
 #include "defaults.h"
 
 const char *hostname = "ti84pce";
+bool hasIP = false;
 
 void netif_link_callback(struct netif *netif)
 {
@@ -15,6 +16,8 @@ void netif_link_callback(struct netif *netif)
 void netif_status_callback(struct netif *netif)
 {
   printf("netif status changed %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
+  if (dhcp_supplied_address(netif))
+    hasIP = true;
 }
 
 void netif_init_defaults(struct netif *netif)

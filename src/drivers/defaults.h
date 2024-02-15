@@ -11,4 +11,6 @@
 
 void netif_init_defaults(struct netif *netif);
 
+extern bool hasIP;
+
 #endif

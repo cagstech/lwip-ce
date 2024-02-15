@@ -14,7 +14,7 @@ ssize_t veth_rx(void);
 
 void veth_tx(u8_t *tx_buf, size_t size);
 
-struct pbuf *veth_receive(void);
+void *veth_receive(void);
 
 err_t veth_transmit(struct netif *netif, struct pbuf *p);
 

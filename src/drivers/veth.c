@@ -28,7 +28,7 @@ void veth_tx(u8_t *tx_buf, size_t size)
                      : "l"(-1), "e"(tx_buf), "c"(size));
 }
 
-struct pbuf *veth_receive(void)
+void *veth_receive(void)
 {
     ssize_t size = veth_rx();
     if (size == -1)
@@ -57,8 +57,8 @@ err_t veth_transmit(struct netif *netif, struct pbuf *p)
 
 void veth_remove_callback(struct netif *netif)
 {
-    pbuf_free((struct pbuf *)veth_tx_buf);
-    pbuf_free((struct pbuf *)veth_rx_buf);
+    free(veth_tx_buf);
+    free(veth_rx_buf);
 }
 
 uint8_t veth_mac_addr[] = {0xF3, 0xC7, 0xE1, 0x85, 0xCB, 0x5F};
@@ -69,9 +69,9 @@ err_t vethif_init(struct netif *netif)
     netif->output_ip6 = ethip6_output;
     netif->mtu = ETHERNET_MTU;
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6;
-    veth_tx_buf = (uint8_t *)pbuf_alloc(PBUF_RAW, ETHERNET_MTU, PBUF_RAM);
-    veth_rx_buf = (uint8_t *)pbuf_alloc(PBUF_RAW, ETHERNET_MTU, PBUF_RAM);
-    if (!(veth_tx_buf && veth_rx_buf))
+    veth_tx_buf = malloc(ETHERNET_MTU);
+    veth_rx_buf = malloc(ETHERNET_MTU);
+    if ((veth_tx_buf == NULL) || (veth_rx_buf == NULL))
         return ERR_MEM;
     MIB2_INIT_NETIF(netif, snmp_ifType_ethernet_csmacd, 100000000);
     memcpy(netif->hwaddr, veth_mac_addr, ETH_HWADDR_LEN);
@@ -81,4 +81,5 @@ err_t vethif_init(struct netif *netif)
     netif_set_up(netif);
     netif_set_link_up(netif);
     netif_set_default(netif);
+    hasIP = true;
 }
