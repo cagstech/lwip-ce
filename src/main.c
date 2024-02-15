@@ -7,7 +7,7 @@
 #include <sys/timers.h>
 #undef NDEBUG
 // #include <debug.h>
-#define ENABLE_VETH 1
+// #define ENABLE_VETH 1
 
 #include <keypadc.h>
 #include <usbdrvce.h>
@@ -22,12 +22,17 @@
 #include "include/lwip/dhcp.h"
 
 #include "drivers/ecm.h"
+#include "drivers/defaults.h"
 #ifdef ENABLE_VETH
 #include "drivers/veth.h"
 #endif
 
 struct tcp_pcb *pcb, *cpcb;
+#ifdef ENABLE_VETH
+ip_addr_t remote_ip = IPADDR4_INIT_BYTES(192, 168, 2, 3);
+#else
 ip_addr_t remote_ip = IPADDR4_INIT_BYTES(192, 168, 1, 24);
+#endif
 
 static void newline(void)
 {
@@ -110,11 +115,13 @@ err_t tcp_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t e
     {
         // Data received successfully
         printf("tcp: received, length = %d\n", p->tot_len);
+        printf("%s\n", p->payload);
 
         // Process or handle the received data
         // process_received_data(p);
         tcp_recved(tpcb, p->tot_len);
         pbuf_free(p);
+        return ERR_OK;
     }
 
     else if (err == ERR_OK && p == NULL)
@@ -122,14 +129,15 @@ err_t tcp_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t e
         // The remote side has closed the connection
         printf("tcp: connection closed by remote\n");
         // Optionally, perform cleanup or take appropriate action
+        tcp_close(pcb);
+        return ERR_ABRT;
     }
     else
     {
         // Handle receive error
         printf("tcp: receive error - %s\n", lwip_strerr(err));
+        return err;
     }
-
-    return ERR_OK;
 }
 
 err_t tcp_sent_callback(void *arg, struct tcp_pcb *tpcb, u16_t len)
@@ -172,7 +180,11 @@ err_t tcp_connect_callback(void *arg, struct tcp_pcb *tpcb, err_t err)
 int main(void)
 {
     const char *text1 = "The fox jumped over the dog.";
-    struct netif vethif;
+#ifdef ENABLE_VETH
+    ip4_addr_t addr = IPADDR4_INIT_BYTES(192, 168, 2, 2);
+    ip4_addr_t netmask = IPADDR4_INIT_BYTES(255, 255, 255, 0);
+    ip4_addr_t gateway = IPADDR4_INIT_BYTES(192, 168, 2, 1);
+#endif
     os_ClrHome();
     gfx_Begin();
     newline();
@@ -181,7 +193,7 @@ int main(void)
     printf("Simple IRC connect\n");
     lwip_init();
 #ifdef ENABLE_VETH
-    netif_add_noaddr(&vethif, NULL, vethif_init, netif_input);
+    netif_add(&veth_netif, &addr, &netmask, &gateway, NULL, vethif_init, netif_input);
 #endif
     if (usb_Init(ecm_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
         return 1;
@@ -192,10 +204,8 @@ int main(void)
     kb_SetMode(MODE_3_CONTINUOUS);
     do
     {
-        // printf("%lu\n", sys_now());
-        if (dhcp_supplied_address(&ecm_netif) && (!tcp_connected))
+        if (hasIP && !tcp_connected)
         {
-            printf("dhcp_addr %s\n", ip4addr_ntoa(netif_ip4_addr(&ecm_netif)));
             // printf("dns query for remote\n");
             // dns_gethostbyname("acagliano.ddns.net", &remote_ip, dns_lookup_callback, NULL);
             // printf("enabling tcp listener\n");
@@ -214,13 +224,22 @@ int main(void)
         if (kb_IsDown(kb_Key2nd))
         {
             printf("sending: %s\n", text1);
-            if (tcp_write(pcb, text1, strlen(text1), 0) == ERR_OK)
-                tcp_output(pcb);
+            if (tcp_sndbuf(pcb) >= strlen(text1))
+            {
+                if (tcp_write(pcb, text1, strlen(text1), TCP_WRITE_FLAG_COPY))
+                    printf("tcp write error\n");
+            }
+            else
+                printf("tcp sndbuf full\n");
             while (kb_IsDown(kb_Key2nd))
                 ;
         }
         if (kb_IsDown(kb_KeyClear))
             break;
+
+#ifdef ENABLE_VETH
+        veth_receive();
+#endif
         usb_HandleEvents();
         sys_check_timeouts();
     } while (1);
@@ -228,9 +247,4 @@ int main(void)
     dhcp_stop(&ecm_netif);
     usb_Cleanup();
     gfx_End();
-
-    // todo: actually check for this
-    // netif_set_link_up(&netif);
-
-    // kb_SetMode(MODE_3_CONTINUOUS);
 }

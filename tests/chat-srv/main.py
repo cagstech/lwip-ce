@@ -13,6 +13,7 @@ class Server:
     def __init__(self):
         try:
             # Create a socket object
+            self.running = False
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock.settimeout(None)
             # Reserve a port for your service. Default + instance num
@@ -45,6 +46,8 @@ class Server:
 
     def broadcast(self, data):
         print(f"{data}\n")
+        for conn in self.clients:
+            conn.send(bytes(f"{data}\0", 'utf-8'))
 
 
 class ClientDisconnectErr(Exception):

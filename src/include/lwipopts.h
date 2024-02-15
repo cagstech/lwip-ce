@@ -1,7 +1,17 @@
 #ifndef LWIP_LWIPOPTS_H
 #define LWIP_LWIPOPTS_H
 
+#include "ti/getkey.h"
 #define LWIP_DEBUG 1
+#define LWIP_PLATFORM_ASSERT(x)                            \
+   do                                                      \
+   {                                                       \
+      printf("Assertion \"%s\" failed at line %d in %s\n", \
+             x, __LINE__, __FILE__);                       \
+      fflush(NULL);                                        \
+      os_GetKey();                                         \
+      abort();                                             \
+   } while (0)
 
 #define LWIP_IPV4 1
 #define LWIP_IPV6 1
@@ -63,13 +73,13 @@
 #define DNS_DEBUG LWIP_DBG_OFF
 #define AUTOIP_DEBUG LWIP_DBG_OFF
 #define ACD_DEBUG LWIP_DBG_OFF
-#define DHCP_DEBUG LWIP_DBG_ON
+#define DHCP_DEBUG LWIP_DBG_OFF
 #define IP_DEBUG LWIP_DBG_OFF
 #define IP_REASS_DEBUG LWIP_DBG_OFF
 #define ICMP_DEBUG LWIP_DBG_OFF
 #define IGMP_DEBUG LWIP_DBG_OFF
 #define UDP_DEBUG LWIP_DBG_OFF
-#define TCP_DEBUG LWIP_DBG_ON
+#define TCP_DEBUG LWIP_DBG_OFF
 #define TCP_INPUT_DEBUG LWIP_DBG_OFF
 #define TCP_OUTPUT_DEBUG LWIP_DBG_OFF
 #define TCP_RTO_DEBUG LWIP_DBG_OFF
@@ -112,7 +122,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define MEMP_NUM_TCP_PCB_LISTEN 8
 /* MEMP_NUM_TCP_SEG: the number of simultaneously queued TCP
    segments. */
-#define MEMP_NUM_TCP_SEG 16
+#define MEMP_NUM_TCP_SEG 20
 /* MEMP_NUM_SYS_TIMEOUT: the number of simulateously active
    timeouts. */
 #define MEMP_NUM_SYS_TIMEOUT 17
@@ -131,7 +141,7 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* ---------- Pbuf options ---------- */
 /* PBUF_POOL_SIZE: the number of buffers in the pbuf pool. */
-#define PBUF_POOL_SIZE 60
+#define PBUF_POOL_SIZE 100
 
 /* PBUF_POOL_BUFSIZE: the size of each pbuf in the pbuf pool. */
 #define PBUF_POOL_BUFSIZE 256
@@ -158,14 +168,16 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCP_QUEUE_OOSEQ 1
 
 /* TCP Maximum segment size. */
-#define TCP_MSS 1024
+#define TCP_MSS 536
+
+#define TCP_OVERSIZE TCP_MSS
 
 /* TCP sender buffer space (bytes). */
-#define TCP_SND_BUF 2048
+#define TCP_SND_BUF (3 * TCP_MSS)
 
 /* TCP sender buffer space (pbufs). This must be at least = 2 *
    TCP_SND_BUF/TCP_MSS for things to work. */
-#define TCP_SND_QUEUELEN (4 * TCP_SND_BUF / TCP_MSS)
+#define TCP_SND_QUEUELEN ((4 * (TCP_SND_BUF) + (TCP_MSS - 1)) / (TCP_MSS))
 
 /* TCP writable space (bytes). This must be less than or equal
    to TCP_SND_BUF. It is the amount of space which must be
@@ -173,7 +185,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCP_SNDLOWAT (TCP_SND_BUF / 2)
 
 /* TCP receive window. */
-#define TCP_WND (10 * 1024)
+#define TCP_WND (6 * TCP_MSS)
 
 /* Maximum number of retransmissions of data segments. */
 #define TCP_MAXRTX 12
