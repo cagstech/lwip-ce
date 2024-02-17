@@ -21,11 +21,14 @@
 #include "include/lwip/pbuf.h"
 #include "include/lwip/dhcp.h"
 
-#include "drivers/ecm.h"
-#include "drivers/defaults.h"
-#ifdef ENABLE_VETH
-#include "drivers/veth.h"
-#endif
+#include "drivers.h"
+
+enum
+{
+    INPUT_LOWER,
+    INPUT_UPPER,
+    INPUT_NUMBER
+};
 
 struct tcp_pcb *pcb, *cpcb;
 #ifdef ENABLE_VETH
@@ -175,11 +178,29 @@ err_t tcp_connect_callback(void *arg, struct tcp_pcb *tpcb, err_t err)
     return ERR_OK;
 }
 
-#define CHAT_MAX_CONNS 10
+const kb_lkey_t keys_alpha[] = {kb_KeyMath, kb_KeyApps, kb_KeyPrgm, kb_KeyRecip, kb_KeySin, kb_KeyCos, kb_KeyTan, kb_KeyPower, kb_KeySquare, kb_KeyComma, kb_KeyLParen, kb_KeyRParen, kb_KeyDiv, kb_KeyLog, kb_Key7, kb_Key8, kb_Key9, kb_KeyMul, kb_KeyLn, kb_Key4, kb_Key5, kb_Key6, kb_KeySub, kb_KeySto, kb_Key1, kb_Key2, kb_KeyDecPnt};
+const kb_lkey_t keys_num[] = {kb_Key0, kb_Key1, kb_Key2, kb_Key3, kb_Key4, kb_Key5, kb_Key6, kb_Key7, kb_Key8, kb_Key9, kb_KeyDecPnt};
+
+const char lc_chars[] = "abcdefghijklmnopqrstuvwxyz.";
+const char uc_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.";
+const char num_chars[] = "0123456789.";
+
+struct keyconfig
+{
+    size_t len;
+    kb_lkey_t *active_keys;
+    char *active_chars;
+};
 
 int main(void)
 {
     const char *text1 = "The fox jumped over the dog.";
+    struct keyconfig keyconfig[3] =
+        {
+            {sizeof(keys_alpha), keys_alpha, lc_chars},
+            {sizeof(keys_alpha), keys_alpha, uc_chars},
+            {sizeof(keys_num), keys_num, num_chars}};
+
 #ifdef ENABLE_VETH
     ip4_addr_t addr = IPADDR4_INIT_BYTES(192, 168, 2, 2);
     ip4_addr_t netmask = IPADDR4_INIT_BYTES(255, 255, 255, 0);
@@ -195,16 +216,20 @@ int main(void)
 #ifdef ENABLE_VETH
     netif_add(&veth_netif, &addr, &netmask, &gateway, NULL, vethif_init, netif_input);
 #endif
-    if (usb_Init(ecm_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
+    if (usb_Init(cs_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
         return 1;
 
     // wait for ecm device to be ready
     bool tcp_connected = false;
-
+    uint8_t input_mode = INPUT_LOWER;
+    uint8_t string_length = 0;
+#define MAX_CHAT_LEN 256
+    char chat_string[MAX_CHAT_LEN] = {0};
+    bool string_changed = true;
     kb_SetMode(MODE_3_CONTINUOUS);
     do
     {
-        if (hasIP && !tcp_connected)
+        if (dhcp_supplied_address(&eth_netif) && !tcp_connected)
         {
             // printf("dns query for remote\n");
             // dns_gethostbyname("acagliano.ddns.net", &remote_ip, dns_lookup_callback, NULL);
@@ -220,31 +245,68 @@ int main(void)
                 break;
             }
             tcp_connected = true;
+            gfx_FillScreen(255);
         }
-        if (kb_IsDown(kb_Key2nd))
+        if (kb_IsDown(kb_KeyAlpha))
         {
-            printf("sending: %s\n", text1);
-            if (tcp_sndbuf(pcb) >= strlen(text1))
-            {
-                if (tcp_write(pcb, text1, strlen(text1), TCP_WRITE_FLAG_COPY))
-                    printf("tcp write error\n");
-            }
-            else
-                printf("tcp sndbuf full\n");
-            while (kb_IsDown(kb_Key2nd))
+            input_mode++;
+            if (input_mode > INPUT_NUMBER)
+                input_mode = INPUT_LOWER;
+            while (kb_IsDown(kb_KeyAlpha))
                 ;
         }
+        if (kb_IsDown(kb_KeyDel))
+        {
+            if (string_length > 0)
+            {
+                string_length--;
+                chat_string[string_length] = 0;
+                string_changed = true;
+            }
+            while (kb_IsDown(kb_KeyDel))
+                ;
+        }
+        if (kb_IsDown(kb_KeyEnter))
+        {
+            if ((string_length > 0) && (tcp_sndbuf(pcb) >= string_length))
+            {
+                if (tcp_write(pcb, chat_string, string_length, TCP_WRITE_FLAG_COPY) == ERR_OK)
+                {
+                    tcp_output(pcb);
+                    memset(chat_string, 0, string_length);
+                    string_length = 0;
+                    string_changed = true;
+                }
+            }
+            while (kb_IsDown(kb_KeyEnter))
+                ;
+        }
+        for (size_t i = 0; i < keyconfig[input_mode].len; i++)
+        {
+            if (kb_IsDown(*(((kb_lkey_t *)keyconfig[input_mode].active_keys) + i)))
+            {
+                chat_string[string_length++] = *(keyconfig[input_mode].active_chars + i);
+                string_changed = true;
+            }
+            while (kb_IsDown(*(((kb_lkey_t *)keyconfig[input_mode].active_keys) + i)))
+                ;
+        }
+
         if (kb_IsDown(kb_KeyClear))
             break;
-
 #ifdef ENABLE_VETH
         veth_receive();
 #endif
         usb_HandleEvents();
         sys_check_timeouts();
+        if (string_changed && tcp_connected &&)
+        {
+            gfx_PrintStringXY(chat_string, 0, 230);
+            string_changed = false;
+        }
     } while (1);
     tcp_abort(pcb);
-    dhcp_stop(&ecm_netif);
+    dhcp_stop(&eth_netif);
     usb_Cleanup();
     gfx_End();
 }
