@@ -5,11 +5,11 @@
 #include <ctype.h>
 #include <ti/screen.h>
 #include <sys/timers.h>
+#include <ti/getcsc.h>
 #undef NDEBUG
 // #include <debug.h>
 // #define ENABLE_VETH 1
 
-#include <keypadc.h>
 #include <usbdrvce.h>
 #include "include/lwip/init.h"
 #include "include/lwip/netif.h"
@@ -20,6 +20,7 @@
 #include "include/lwip/snmp.h"
 #include "include/lwip/pbuf.h"
 #include "include/lwip/dhcp.h"
+#include "include/lwip/dns.h"
 
 #include "drivers.h"
 
@@ -30,19 +31,39 @@ enum
     INPUT_NUMBER
 };
 
-struct tcp_pcb *pcb, *cpcb;
+struct tcp_pcb *pcb;
 #ifdef ENABLE_VETH
 ip_addr_t remote_ip = IPADDR4_INIT_BYTES(192, 168, 2, 3);
 #else
-ip_addr_t remote_ip = IPADDR4_INIT_BYTES(192, 168, 1, 24);
+ip_addr_t remote_ip = IPADDR4_INIT_BYTES(0, 0, 0, 0);
+const char *remote_host = "acagliano.ddns.net";
 #endif
+bool tcp_connected = false;
+bool outchar_scroll_up = true;
+bool loopit;
+
+err_t tcp_connect_callback(void *arg, struct tcp_pcb *tpcb, err_t err);
+
+void exit_funcs(void)
+{
+    if (pcb->state != CLOSED)
+        tcp_close(pcb);
+    dhcp_stop(&eth_netif);
+    usb_Cleanup();
+    gfx_End();
+}
 
 static void newline(void)
 {
-    memmove(gfx_vram, gfx_vram + (LCD_WIDTH * 10), LCD_WIDTH * (LCD_HEIGHT - 10));
-    gfx_SetColor(255);
-    gfx_FillRectangle_NoClip(0, LCD_HEIGHT - 10, LCD_WIDTH, 10);
-    gfx_SetTextXY(2, LCD_HEIGHT - 10);
+    if (outchar_scroll_up)
+    {
+        memmove(gfx_vram, gfx_vram + (LCD_WIDTH * 10), LCD_WIDTH * (LCD_HEIGHT - 30));
+        gfx_SetColor(255);
+        gfx_FillRectangle_NoClip(0, LCD_HEIGHT - 30, LCD_WIDTH, 10);
+        gfx_SetTextXY(2, LCD_HEIGHT - 30);
+    }
+    else
+        gfx_SetTextXY(2, gfx_GetTextY() + 10);
 }
 void outchar(char c)
 {
@@ -56,7 +77,7 @@ void outchar(char c)
     }
     else
     {
-        if (gfx_GetTextX() >= LCD_WIDTH - 8)
+        if (gfx_GetTextX() >= LCD_WIDTH - 16)
         {
             newline();
         }
@@ -66,8 +87,19 @@ void outchar(char c)
 
 void dns_lookup_callback(const char *name, const ip_addr_t *ipaddr, void *callback_arg)
 {
-    if (ipaddr)
-        memcpy(&remote_ip, ipaddr, sizeof(ipaddr));
+    if (ipaddr == NULL)
+    {
+        printf("dns lookup failed\n");
+        exit_funcs();
+        exit(1);
+    }
+    printf("dns lookup ok\n%s\n", ipaddr_ntoa(ipaddr));
+    if (tcp_connect(pcb, ipaddr, 8881, tcp_connect_callback) != ERR_OK)
+    {
+        printf("tcp connect err\n");
+        exit_funcs();
+        exit(1);
+    }
 }
 
 void tcp_error_callback(void *arg, err_t err)
@@ -117,7 +149,6 @@ err_t tcp_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t e
     if (err == ERR_OK && p != NULL)
     {
         // Data received successfully
-        printf("tcp: received, length = %d\n", p->tot_len);
         printf("%s\n", p->payload);
 
         // Process or handle the received data
@@ -132,8 +163,12 @@ err_t tcp_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t e
         // The remote side has closed the connection
         printf("tcp: connection closed by remote\n");
         // Optionally, perform cleanup or take appropriate action
-        tcp_close(pcb);
-        return ERR_ABRT;
+        tcp_close(tpcb);
+        loopit = false;
+
+        // The remote host has acknowledged the close
+        // You can perform any necessary cleanup here
+        return ERR_OK;
     }
     else
     {
@@ -142,29 +177,29 @@ err_t tcp_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t e
         return err;
     }
 }
-
+/*
 err_t tcp_sent_callback(void *arg, struct tcp_pcb *tpcb, u16_t len)
 {
     LWIP_UNUSED_ARG(arg);
     LWIP_UNUSED_ARG(tpcb);
     // Data has been successfully sent
-    printf("tcp: sent, length = %d\n", len);
 
     // Optionally, perform additional actions after successful send
 
     return ERR_OK;
 }
-
+*/
 err_t tcp_connect_callback(void *arg, struct tcp_pcb *tpcb, err_t err)
 {
     LWIP_UNUSED_ARG(arg);
     if (err == ERR_OK)
     {
         // Connection successfully established
-        printf("tcp: connected\n");
-        tcp_sent(tpcb, tcp_sent_callback);
+        //  tcp_sent(tpcb, tcp_sent_callback);
         tcp_recv(tpcb, tcp_recv_callback);
         tcp_err(tpcb, tcp_error_callback);
+        tcp_connected = true;
+        printf("_____irc begin_____\n");
     }
     else
     {
@@ -178,29 +213,15 @@ err_t tcp_connect_callback(void *arg, struct tcp_pcb *tpcb, err_t err)
     return ERR_OK;
 }
 
-const kb_lkey_t keys_alpha[] = {kb_KeyMath, kb_KeyApps, kb_KeyPrgm, kb_KeyRecip, kb_KeySin, kb_KeyCos, kb_KeyTan, kb_KeyPower, kb_KeySquare, kb_KeyComma, kb_KeyLParen, kb_KeyRParen, kb_KeyDiv, kb_KeyLog, kb_Key7, kb_Key8, kb_Key9, kb_KeyMul, kb_KeyLn, kb_Key4, kb_Key5, kb_Key6, kb_KeySub, kb_KeySto, kb_Key1, kb_Key2, kb_KeyDecPnt};
-const kb_lkey_t keys_num[] = {kb_Key0, kb_Key1, kb_Key2, kb_Key3, kb_Key4, kb_Key5, kb_Key6, kb_Key7, kb_Key8, kb_Key9, kb_KeyDecPnt};
-
-const char lc_chars[] = "abcdefghijklmnopqrstuvwxyz.";
-const char uc_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.";
-const char num_chars[] = "0123456789.";
-
-struct keyconfig
-{
-    size_t len;
-    kb_lkey_t *active_keys;
-    char *active_chars;
-};
+char *chars_lower = "\0\0\0\0\0\0\0\0\0\0\"wrmh\0\0?[vqlg\0\0.zupkfc\0 ytojeb\0\0xsnida\0\0\0\0\0\0\0\0";
+char *chars_upper = "\0\0\0\0\0\0\0\0\0\0\"WRMH\0\0?[VQLG\0\0:ZUPKFC\0 YTOJEB\0\0XSNIDA\0\0\0\0\0\0\0\0";
+char *chars_num = "\0\0\0\0\0\0\0\0\0\0+-*/^\0\0?359)\0\0\0.258(\0\0\0000147,\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+char mode_indic[] = {'a', 'A', '1'};
 
 int main(void)
 {
-    const char *text1 = "The fox jumped over the dog.";
-    struct keyconfig keyconfig[3] =
-        {
-            {sizeof(keys_alpha), keys_alpha, lc_chars},
-            {sizeof(keys_alpha), keys_alpha, uc_chars},
-            {sizeof(keys_num), keys_num, num_chars}};
-
+    sk_key_t key = 0;
+    char *ref_str = chars_lower;
 #ifdef ENABLE_VETH
     ip4_addr_t addr = IPADDR4_INIT_BYTES(192, 168, 2, 2);
     ip4_addr_t netmask = IPADDR4_INIT_BYTES(255, 255, 255, 0);
@@ -209,9 +230,9 @@ int main(void)
     os_ClrHome();
     gfx_Begin();
     newline();
-    gfx_SetTextXY(2, LCD_HEIGHT - 10);
-    printf("lwIP public beta 1\n");
-    printf("Simple IRC connect\n");
+    gfx_SetTextXY(2, LCD_HEIGHT - 30);
+    printf("lwIP private beta test\n");
+    printf("Simple TCP Text Chat\n");
     lwip_init();
 #ifdef ENABLE_VETH
     netif_add(&veth_netif, &addr, &netmask, &gateway, NULL, vethif_init, netif_input);
@@ -220,57 +241,70 @@ int main(void)
         return 1;
 
     // wait for ecm device to be ready
-    bool tcp_connected = false;
     uint8_t input_mode = INPUT_LOWER;
     uint8_t string_length = 0;
-#define MAX_CHAT_LEN 256
+#define MAX_CHAT_LEN 64
     char chat_string[MAX_CHAT_LEN] = {0};
+    char username[16] = {0};
     bool string_changed = true;
-    kb_SetMode(MODE_3_CONTINUOUS);
+    char *active_string = username;
+    loopit = true;
     do
     {
-        if (dhcp_supplied_address(&eth_netif) && !tcp_connected)
-        {
-            // printf("dns query for remote\n");
-            // dns_gethostbyname("acagliano.ddns.net", &remote_ip, dns_lookup_callback, NULL);
-            // printf("enabling tcp listener\n");
-            // tcp_bind(pcb, IP4_ADDR_ANY, 0);
-            pcb = tcp_new();
-            if (pcb == NULL)
-                return 2;
-            tcp_arg(pcb, pcb);
-            if (tcp_connect(pcb, &remote_ip, 8881, tcp_connect_callback))
-            {
-                printf("tcp: connect error\n");
-                break;
-            }
-            tcp_connected = true;
-            gfx_FillScreen(255);
-        }
-        if (kb_IsDown(kb_KeyAlpha))
+        key = os_GetCSC();
+        if (key == sk_Mode || key == sk_Alpha)
         {
             input_mode++;
             if (input_mode > INPUT_NUMBER)
                 input_mode = INPUT_LOWER;
-            while (kb_IsDown(kb_KeyAlpha))
-                ;
+            ref_str = (input_mode == INPUT_LOWER) ? chars_lower : (input_mode == INPUT_UPPER) ? chars_upper
+                                                                                              : chars_num;
+            string_changed = true;
         }
-        if (kb_IsDown(kb_KeyDel))
+        else if (key == sk_Del)
         {
             if (string_length > 0)
             {
-                string_length--;
-                chat_string[string_length] = 0;
+                active_string[--string_length] = 0;
                 string_changed = true;
             }
-            while (kb_IsDown(kb_KeyDel))
-                ;
         }
-        if (kb_IsDown(kb_KeyEnter))
+        else if (key == sk_Enter)
         {
-            if ((string_length > 0) && (tcp_sndbuf(pcb) >= string_length))
+            if (active_string == username)
             {
-                if (tcp_write(pcb, chat_string, string_length, TCP_WRITE_FLAG_COPY) == ERR_OK)
+                err_t dns_resp;
+                if (dhcp_supplied_address(&eth_netif))
+                {
+                    pcb = tcp_new();
+                    if (pcb == NULL)
+                        return 2;
+                    tcp_arg(pcb, pcb);
+                    dns_resp = dns_gethostbyname(remote_host, &remote_ip, dns_lookup_callback, NULL);
+                    printf("dns lookup for: %s\n", remote_host);
+                    if (dns_resp == ERR_OK)
+                    {
+                        printf("host in dns cache\n");
+                        if (tcp_connect(pcb, &remote_ip, 8881, tcp_connect_callback) != ERR_OK)
+                        {
+                            printf("tcp connect err\n");
+                            break;
+                        }
+                    }
+                    else if (dns_resp != ERR_INPROGRESS)
+                    {
+                        printf("hostname lookup err");
+                        break;
+                    }
+                    active_string = chat_string;
+                    string_length = 0;
+                }
+            }
+            else if ((string_length > 0) && (tcp_sndbuf(pcb) >= string_length))
+            {
+                uint8_t tbuf[MAX_CHAT_LEN + 20] = {0};
+                sprintf(tbuf, "[%s] %s", username, chat_string);
+                if (tcp_write(pcb, tbuf, strlen(tbuf), TCP_WRITE_FLAG_COPY) == ERR_OK)
                 {
                     tcp_output(pcb);
                     memset(chat_string, 0, string_length);
@@ -278,35 +312,41 @@ int main(void)
                     string_changed = true;
                 }
             }
-            while (kb_IsDown(kb_KeyEnter))
-                ;
+            string_changed = true;
         }
-        for (size_t i = 0; i < keyconfig[input_mode].len; i++)
+        else if (key == sk_Clear)
         {
-            if (kb_IsDown(*(((kb_lkey_t *)keyconfig[input_mode].active_keys) + i)))
-            {
-                chat_string[string_length++] = *(keyconfig[input_mode].active_chars + i);
-                string_changed = true;
-            }
-            while (kb_IsDown(*(((kb_lkey_t *)keyconfig[input_mode].active_keys) + i)))
-                ;
-        }
-
-        if (kb_IsDown(kb_KeyClear))
+            tcp_close(pcb);
             break;
+        }
+        else if (ref_str[key] && (string_length < MAX_CHAT_LEN))
+        {
+            active_string[string_length++] = ref_str[key];
+            string_changed = true;
+        }
 #ifdef ENABLE_VETH
         veth_receive();
 #endif
         usb_HandleEvents();
         sys_check_timeouts();
-        if (string_changed && tcp_connected &&)
+        if (string_changed)
         {
-            gfx_PrintStringXY(chat_string, 0, 230);
+            outchar_scroll_up = false;
+            gfx_SetColor(255);
+            gfx_FillRectangle(0, 220, 320, 20);
+            gfx_SetColor(0);
+            gfx_HorizLine(0, 220, 320);
+            gfx_SetTextXY(0, 221);
+            if (active_string == username)
+                printf("user: ");
+            printf("%s", active_string);
+            gfx_SetTextFGColor(11);
+            gfx_PrintChar(mode_indic[input_mode]);
+            gfx_SetTextFGColor(0);
+            gfx_SetTextXY(2, LCD_HEIGHT - 30);
             string_changed = false;
+            outchar_scroll_up = true;
         }
-    } while (1);
-    tcp_abort(pcb);
-    dhcp_stop(&eth_netif);
-    usb_Cleanup();
-    gfx_End();
+    } while (loopit == true);
+    exit_funcs();
 }
