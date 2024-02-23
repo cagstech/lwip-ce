@@ -35,6 +35,7 @@ class Server:
         while self.running:
             try:
                 conn, addr = self.sock.accept()
+                self.broadcast(f"new client from {addr}")
                 self.clients[conn] = client = Client(conn, addr)
                 thread = threading.Thread(target=client.handle_connection)
                 self.threads.append(thread)
@@ -76,8 +77,7 @@ class Client:
         return
 
     def handle_connection(self):
-        server.broadcast(f"new client from {self.ip}:{self.port}")
-        self.conn.send(bytes(f"welcome to the lwIP private beta\0", 'utf-8'))
+        self.conn.send(bytes(f"welcome to the lwIP private beta!\0", 'utf-8'))
         self.data_stream = b''
         self.data_size = 0
         self.conn.settimeout(300)

@@ -13,7 +13,9 @@
 #include <usbdrvce.h>
 #include "include/lwip/init.h"
 #include "include/lwip/netif.h"
-#include "include/lwip/tcp.h"
+#include "include/lwip/altcp_tls.h"
+#include "include/lwip/altcp_tcp.h"
+#include "include/lwip/altcp.h"
 #include "include/lwip/udp.h"
 #include "include/lwip/timeouts.h"
 #include "include/lwip/sys.h"
@@ -30,28 +32,15 @@ enum
     INPUT_UPPER,
     INPUT_NUMBER
 };
-
-struct tcp_pcb *pcb;
-#ifdef ENABLE_VETH
-ip_addr_t remote_ip = IPADDR4_INIT_BYTES(192, 168, 2, 3);
-#else
-ip_addr_t remote_ip = IPADDR4_INIT_BYTES(0, 0, 0, 0);
-const char *remote_host = "acagliano.ddns.net";
-#endif
-bool tcp_connected = false;
+char *chars_lower = "\0\0\0\0\0\0\0\0\0\0\"wrmh\0\0?[vqlg\0\0.zupkfc\0 ytojeb\0\0xsnida\0\0\0\0\0\0\0\0";
+char *chars_upper = "\0\0\0\0\0\0\0\0\0\0\"WRMH\0\0?[VQLG\0\0:ZUPKFC\0 YTOJEB\0\0XSNIDA\0\0\0\0\0\0\0\0";
+char *chars_num = "\0\0\0\0\0\0\0\0\0\0+-*/^\0\0?359)\0\0\0.258(\0\0\0000147,\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+char mode_indic[] = {'a', 'A', '1'};
 bool outchar_scroll_up = true;
 bool loopit;
 
-err_t tcp_connect_callback(void *arg, struct tcp_pcb *tpcb, err_t err);
-
-void exit_funcs(void)
-{
-    if (pcb->state != CLOSED)
-        tcp_close(pcb);
-    dhcp_stop(&eth_netif);
-    usb_Cleanup();
-    gfx_End();
-}
+ip_addr_t remote_ip = IPADDR4_INIT_BYTES(0, 0, 0, 0);
+const char *remote_host = "acagliano.ddns.net";
 
 static void newline(void)
 {
@@ -85,6 +74,21 @@ void outchar(char c)
     }
 }
 
+struct altcp_pcb *pcb;
+bool tcp_connected = false;
+altcp_allocator_t tcp_allocator = {altcp_tcp_alloc, NULL};
+
+err_t tcp_connect_callback(void *arg, struct altcp_pcb *tpcb, err_t err);
+
+void exit_funcs(void)
+{
+    if (pcb->state != CLOSED)
+        altcp_close(pcb);
+    dhcp_stop(&eth_netif);
+    usb_Cleanup();
+    gfx_End();
+}
+
 void dns_lookup_callback(const char *name, const ip_addr_t *ipaddr, void *callback_arg)
 {
     if (ipaddr == NULL)
@@ -94,7 +98,7 @@ void dns_lookup_callback(const char *name, const ip_addr_t *ipaddr, void *callba
         exit(1);
     }
     printf("dns lookup ok\n%s\n", ipaddr_ntoa(ipaddr));
-    if (tcp_connect(pcb, ipaddr, 8881, tcp_connect_callback) != ERR_OK)
+    if (altcp_connect(pcb, ipaddr, 8881, tcp_connect_callback) != ERR_OK)
     {
         printf("tcp connect err\n");
         exit_funcs();
@@ -104,7 +108,7 @@ void dns_lookup_callback(const char *name, const ip_addr_t *ipaddr, void *callba
 
 void tcp_error_callback(void *arg, err_t err)
 {
-    struct tcp_pcb *pcb = (struct tcp_pcb *)arg;
+    struct altcp_pcb *pcb = (struct tcp_pcb *)arg;
 
     if (err == ERR_OK)
     {
@@ -135,15 +139,15 @@ void tcp_error_callback(void *arg, err_t err)
     // Close the TCP connection (if not already closed)
     if (pcb != NULL)
     {
-        tcp_arg(pcb, NULL);
-        tcp_sent(pcb, NULL);
-        tcp_recv(pcb, NULL);
-        tcp_err(pcb, NULL);
-        tcp_close(pcb);
+        altcp_arg(pcb, NULL);
+        altcp_sent(pcb, NULL);
+        altcp_recv(pcb, NULL);
+        altcp_err(pcb, NULL);
+        altcp_close(pcb);
     }
 }
 
-err_t tcp_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
+err_t tcp_recv_callback(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
     LWIP_UNUSED_ARG(arg);
     if (err == ERR_OK && p != NULL)
@@ -153,7 +157,7 @@ err_t tcp_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t e
 
         // Process or handle the received data
         // process_received_data(p);
-        tcp_recved(tpcb, p->tot_len);
+        altcp_recved(tpcb, p->tot_len);
         pbuf_free(p);
         return ERR_OK;
     }
@@ -163,7 +167,7 @@ err_t tcp_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t e
         // The remote side has closed the connection
         printf("tcp: connection closed by remote\n");
         // Optionally, perform cleanup or take appropriate action
-        tcp_close(tpcb);
+        altcp_close(tpcb);
         loopit = false;
 
         // The remote host has acknowledged the close
@@ -189,17 +193,17 @@ err_t tcp_sent_callback(void *arg, struct tcp_pcb *tpcb, u16_t len)
     return ERR_OK;
 }
 */
-err_t tcp_connect_callback(void *arg, struct tcp_pcb *tpcb, err_t err)
+err_t tcp_connect_callback(void *arg, struct altcp_pcb *tpcb, err_t err)
 {
     LWIP_UNUSED_ARG(arg);
     if (err == ERR_OK)
     {
         // Connection successfully established
         //  tcp_sent(tpcb, tcp_sent_callback);
-        tcp_recv(tpcb, tcp_recv_callback);
-        tcp_err(tpcb, tcp_error_callback);
+        altcp_recv(tpcb, tcp_recv_callback);
+        altcp_err(tpcb, tcp_error_callback);
         tcp_connected = true;
-        printf("_____irc begin_____\n");
+        printf("_____begin text chat_____\n");
     }
     else
     {
@@ -213,20 +217,10 @@ err_t tcp_connect_callback(void *arg, struct tcp_pcb *tpcb, err_t err)
     return ERR_OK;
 }
 
-char *chars_lower = "\0\0\0\0\0\0\0\0\0\0\"wrmh\0\0?[vqlg\0\0.zupkfc\0 ytojeb\0\0xsnida\0\0\0\0\0\0\0\0";
-char *chars_upper = "\0\0\0\0\0\0\0\0\0\0\"WRMH\0\0?[VQLG\0\0:ZUPKFC\0 YTOJEB\0\0XSNIDA\0\0\0\0\0\0\0\0";
-char *chars_num = "\0\0\0\0\0\0\0\0\0\0+-*/^\0\0?359)\0\0\0.258(\0\0\0000147,\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
-char mode_indic[] = {'a', 'A', '1'};
-
 int main(void)
 {
     sk_key_t key = 0;
     char *ref_str = chars_lower;
-#ifdef ENABLE_VETH
-    ip4_addr_t addr = IPADDR4_INIT_BYTES(192, 168, 2, 2);
-    ip4_addr_t netmask = IPADDR4_INIT_BYTES(255, 255, 255, 0);
-    ip4_addr_t gateway = IPADDR4_INIT_BYTES(192, 168, 2, 1);
-#endif
     os_ClrHome();
     gfx_Begin();
     newline();
@@ -234,9 +228,6 @@ int main(void)
     printf("lwIP private beta test\n");
     printf("Simple TCP Text Chat\n");
     lwip_init();
-#ifdef ENABLE_VETH
-    netif_add(&veth_netif, &addr, &netmask, &gateway, NULL, vethif_init, netif_input);
-#endif
     if (usb_Init(cs_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
         return 1;
 
@@ -276,16 +267,16 @@ int main(void)
                 err_t dns_resp;
                 if (dhcp_supplied_address(&eth_netif))
                 {
-                    pcb = tcp_new();
+                    pcb = altcp_new(&tcp_allocator);
                     if (pcb == NULL)
                         return 2;
-                    tcp_arg(pcb, pcb);
+                    altcp_arg(pcb, pcb);
                     dns_resp = dns_gethostbyname(remote_host, &remote_ip, dns_lookup_callback, NULL);
                     printf("dns lookup for: %s\n", remote_host);
                     if (dns_resp == ERR_OK)
                     {
                         printf("host in dns cache\n");
-                        if (tcp_connect(pcb, &remote_ip, 8881, tcp_connect_callback) != ERR_OK)
+                        if (altcp_connect(pcb, &remote_ip, 8881, tcp_connect_callback) != ERR_OK)
                         {
                             printf("tcp connect err\n");
                             break;
@@ -300,13 +291,13 @@ int main(void)
                     string_length = 0;
                 }
             }
-            else if ((string_length > 0) && (tcp_sndbuf(pcb) >= string_length))
+            else if ((string_length > 0) && (altcp_sndbuf(pcb) >= string_length))
             {
                 uint8_t tbuf[MAX_CHAT_LEN + 20] = {0};
                 sprintf(tbuf, "[%s] %s", username, chat_string);
-                if (tcp_write(pcb, tbuf, strlen(tbuf), TCP_WRITE_FLAG_COPY) == ERR_OK)
+                if (altcp_write(pcb, tbuf, strlen(tbuf), TCP_WRITE_FLAG_COPY) == ERR_OK)
                 {
-                    tcp_output(pcb);
+                    altcp_output(pcb);
                     memset(chat_string, 0, string_length);
                     string_length = 0;
                     string_changed = true;
@@ -316,7 +307,7 @@ int main(void)
         }
         else if (key == sk_Clear)
         {
-            tcp_close(pcb);
+            altcp_close(pcb);
             break;
         }
         else if (ref_str[key] && (string_length < MAX_CHAT_LEN))
@@ -324,9 +315,6 @@ int main(void)
             active_string[string_length++] = ref_str[key];
             string_changed = true;
         }
-#ifdef ENABLE_VETH
-        veth_receive();
-#endif
         usb_HandleEvents();
         sys_check_timeouts();
         if (string_changed)

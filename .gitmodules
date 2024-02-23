@@ -1,3 +1,6 @@
 [submodule "app_tools"]
 	path = app_tools
 	url = git@github.com:CE-Programming/app_tools.git
+[submodule "mbedtls"]
+	path = mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls.git

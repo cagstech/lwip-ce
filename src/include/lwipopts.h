@@ -24,7 +24,7 @@
 #define LWIP_NETCONN 0
 #define LWIP_NETIF_API 0
 #define LWIP_NETIF_HOSTNAME 1
-#define LWIP_NETIF_REMOVE_CALLBACK 1
+#define LWIP_NETIF_REMOVE_CALLBACK 0
 
 #define LWIP_CHKSUM_ALGORITHM 1 // todo: does this do anything?
 
@@ -158,6 +158,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCP_TTL 255
 
 #define LWIP_ALTCP (LWIP_TCP)
+// #define LWIP_HAVE_MBEDTLS (LWIP_TCP)
 #ifdef LWIP_HAVE_MBEDTLS
 #define LWIP_ALTCP_TLS (LWIP_TCP)
 #define LWIP_ALTCP_TLS_MBEDTLS (LWIP_TCP)
