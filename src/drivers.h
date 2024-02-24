@@ -15,8 +15,10 @@
 #define USB_UNION_FUNCTIONAL_DESCRIPTOR 0x06
 #define USB_ETHERNET_FUNCTIONAL_DESCRIPTOR 0x0F
 
+#define USB_CDC_ETHERNET_DESCRIPTORS NULL
+
 // supported devices
-enum _cs_usb_devices
+enum eth_usb_devices
 {
   DEVICE_NONE,
   DEVICE_ECM = 0x06,
@@ -40,7 +42,7 @@ extern eth_device_t eth;
 extern struct netif eth_netif;
 // extern uint8_t eth_rx_buf[ETHERNET_MTU];
 
-usb_error_t cs_handle_usb_event(usb_event_t event, void *event_data,
-                                usb_callback_data_t *callback_data);
+usb_error_t eth_handle_usb_event(usb_event_t event, void *event_data,
+                                 usb_callback_data_t *callback_data);
 
 #endif

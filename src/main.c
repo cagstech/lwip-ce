@@ -74,9 +74,10 @@ void outchar(char c)
     }
 }
 
-struct altcp_pcb *pcb;
+struct altcp_pcb *pcb, *spcb;
 bool tcp_connected = false;
 altcp_allocator_t tcp_allocator = {altcp_tcp_alloc, NULL};
+struct altcp_tls_config *tls_conf;
 
 err_t tcp_connect_callback(void *arg, struct altcp_pcb *tpcb, err_t err);
 
@@ -98,7 +99,7 @@ void dns_lookup_callback(const char *name, const ip_addr_t *ipaddr, void *callba
         exit(1);
     }
     printf("dns lookup ok\n%s\n", ipaddr_ntoa(ipaddr));
-    if (altcp_connect(pcb, ipaddr, 8881, tcp_connect_callback) != ERR_OK)
+    if (altcp_connect(spcb, ipaddr, 8881, tcp_connect_callback) != ERR_OK)
     {
         printf("tcp connect err\n");
         exit_funcs();
@@ -228,12 +229,13 @@ int main(void)
     printf("lwIP private beta test\n");
     printf("Simple TCP Text Chat\n");
     lwip_init();
-    if (usb_Init(cs_handle_usb_event, NULL, NULL /* descriptors */, USB_DEFAULT_INIT_FLAGS))
+    if (usb_Init(eth_handle_usb_event, NULL, USB_CDC_ETHERNET_DESCRIPTORS, USB_DEFAULT_INIT_FLAGS))
         return 1;
 
     // wait for ecm device to be ready
     uint8_t input_mode = INPUT_LOWER;
     uint8_t string_length = 0;
+    tls_conf = altcp_tls_create_config_client(NULL, 0);
 #define MAX_CHAT_LEN 64
     char chat_string[MAX_CHAT_LEN] = {0};
     char username[16] = {0};
@@ -270,13 +272,14 @@ int main(void)
                     pcb = altcp_new(&tcp_allocator);
                     if (pcb == NULL)
                         return 2;
-                    altcp_arg(pcb, pcb);
+                    spcb = altcp_tls_wrap(tls_conf, pcb);
+                    altcp_arg(spcb, spcb);
                     dns_resp = dns_gethostbyname(remote_host, &remote_ip, dns_lookup_callback, NULL);
                     printf("dns lookup for: %s\n", remote_host);
                     if (dns_resp == ERR_OK)
                     {
                         printf("host in dns cache\n");
-                        if (altcp_connect(pcb, &remote_ip, 8881, tcp_connect_callback) != ERR_OK)
+                        if (altcp_connect(spcb, &remote_ip, 8881, tcp_connect_callback) != ERR_OK)
                         {
                             printf("tcp connect err\n");
                             break;
@@ -291,13 +294,13 @@ int main(void)
                     string_length = 0;
                 }
             }
-            else if ((string_length > 0) && (altcp_sndbuf(pcb) >= string_length))
+            else if ((string_length > 0) && (altcp_sndbuf(spcb) >= string_length))
             {
                 uint8_t tbuf[MAX_CHAT_LEN + 20] = {0};
                 sprintf(tbuf, "[%s] %s", username, chat_string);
-                if (altcp_write(pcb, tbuf, strlen(tbuf), TCP_WRITE_FLAG_COPY) == ERR_OK)
+                if (altcp_write(spcb, tbuf, strlen(tbuf), TCP_WRITE_FLAG_COPY) == ERR_OK)
                 {
-                    altcp_output(pcb);
+                    altcp_output(spcb);
                     memset(chat_string, 0, string_length);
                     string_length = 0;
                     string_changed = true;
