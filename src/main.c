@@ -235,7 +235,7 @@ int main(void)
     // wait for ecm device to be ready
     uint8_t input_mode = INPUT_LOWER;
     uint8_t string_length = 0;
-    tls_conf = altcp_tls_create_config_client(NULL, 0);
+    // tls_conf = altcp_tls_create_config_client(NULL, 0);
 #define MAX_CHAT_LEN 64
     char chat_string[MAX_CHAT_LEN] = {0};
     char username[16] = {0};
@@ -272,7 +272,8 @@ int main(void)
                     pcb = altcp_new(&tcp_allocator);
                     if (pcb == NULL)
                         return 2;
-                    spcb = altcp_tls_wrap(tls_conf, pcb);
+                    // spcb = altcp_tls_wrap(tls_conf, pcb);
+                    spcb = pcb;
                     altcp_arg(spcb, spcb);
                     dns_resp = dns_gethostbyname(remote_host, &remote_ip, dns_lookup_callback, NULL);
                     printf("dns lookup for: %s\n", remote_host);

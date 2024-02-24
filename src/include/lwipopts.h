@@ -158,11 +158,10 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCP_TTL 255
 
 #define LWIP_ALTCP (LWIP_TCP)
-#define LWIP_HAVE_MBEDTLS (LWIP_TCP)
+// #define LWIP_HAVE_MBEDTLS (LWIP_TCP)
 #ifdef LWIP_HAVE_MBEDTLS
 #define LWIP_ALTCP_TLS (LWIP_TCP)
 #define LWIP_ALTCP_TLS_MBEDTLS (LWIP_TCP)
-#define MBEDTLS_SSL_TLS_C 1
 #endif
 
 /* Controls if TCP should queue segments that arrive out of
