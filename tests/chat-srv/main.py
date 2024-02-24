@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import sys
 import socket
 import threading
 import traceback
@@ -7,11 +7,13 @@ import time
 import binascii
 SERVER_PORT = 8881
 PACKET_MTU = 1024
+SERVER_UP = False
 
 
 class Server:
     def __init__(self):
         try:
+            global SERVER_UP
             # Create a socket object
             self.running = False
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -21,18 +23,45 @@ class Server:
             self.threads = []
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.sock.bind(('', SERVER_PORT))
+            SERVER_UP = True
             self.main_thread = threading.Thread(target=self.run)
             self.main_thread.start()
-            self.running = True
         except:
             print(traceback.format_exc(limit=None, chain=True))
             return
+        self.fromserver()
+        exit(0)
+
+    def fromserver(self):
+        global SERVER_UP
+        while SERVER_UP:
+            try:
+                emitthis = input("")
+                if (emitthis == "/stop"):
+                    print(f"Server shutting down in 5s. Goodbye!")
+                    for conn in self.clients:
+                        conn.send(
+                            bytes(f"Server shutting down in 5s. Goodbye!\0", 'utf-8'))
+                    time.sleep(5)
+                    for conn in self.clients:
+                        conn.close()
+                    time.sleep(1)
+                    SERVER_UP = False
+                    break
+                else:
+                    self.broadcast(f"[server] {emitthis}")
+            except:
+                print(traceback.format_exc(limit=None, chain=True))
+                pass
+        print("Server closed!")
+        return
 
     def run(self):
+        global SERVER_UP
         print(f"server running on port {SERVER_PORT}")
         Client.server = self
         self.sock.listen(1)
-        while self.running:
+        while SERVER_UP:
             try:
                 conn, addr = self.sock.accept()
                 self.broadcast(f"new client from {addr}")
@@ -40,17 +69,6 @@ class Server:
                 thread = threading.Thread(target=client.handle_connection)
                 self.threads.append(thread)
                 thread.start()
-            except KeyboardInterrupt:
-                for conn in self.clients:
-                    conn.send(
-                        bytes(f"Server shutting down in 5s. Goodbye!\0", 'utf-8'))
-                time.sleep(5)
-                for conn in self.clients:
-                    conn.close()
-                time.sleep(1)
-                self.running = False
-                print("All resources cleaned. Trigger kb interrupt again.")
-                return
             except:
                 print(traceback.format_exc(limit=None, chain=True))
                 return
@@ -77,11 +95,12 @@ class Client:
         return
 
     def handle_connection(self):
+        global SERVER_UP
         self.conn.send(bytes(f"welcome to the lwIP private beta!\0", 'utf-8'))
         self.data_stream = b''
         self.data_size = 0
         self.conn.settimeout(300)
-        while Client.server.running:
+        while SERVER_UP:
             try:
                 data = self.conn.recv(PACKET_MTU)
                 if not data:
@@ -102,4 +121,3 @@ class Client:
 
 
 server = Server()
-server.run()

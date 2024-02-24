@@ -382,8 +382,8 @@ init_success:
 }
 
 usb_error_t
-cs_handle_usb_event(usb_event_t event, void *event_data,
-                    usb_callback_data_t *callback_data)
+eth_handle_usb_event(usb_event_t event, void *event_data,
+                     usb_callback_data_t *callback_data)
 {
 
   /* Enable newly connected devices */
