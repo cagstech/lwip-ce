@@ -9,9 +9,8 @@ DESCRIPTION = lwIP Networking Stack
 APP_NAME = lwIP
 APP_VERSION = 0
 
-CFLAGS = -Wall -Wextra -Oz -I src/include -I mbedtls/include
-CXXFLAGS = -Wall -Wextra -Oz -Isrc/include -Imbedtls/include
-EXTRA_C_SOURCES = mbedtls/library/*.c
+CFLAGS = -Wall -Wextra -Oz -I src/include -I src/apps/altcp_tls/mbedtls/include
+CXXFLAGS = -Wall -Wextra -Oz -Isrc/include
 OUTPUT_MAP = YES
 
 # ----------------------------
