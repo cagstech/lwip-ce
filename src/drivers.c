@@ -91,8 +91,34 @@ void ecm_process(struct pbuf *p)
     pbuf_free(p);
 }
 
+uint8_t ncm_hsig = "NCMH";
+// NCM Transfer Header Definition
+struct ncm_nth
+{
+  uint8_t dwSignature[4]; // "NCMH"
+  uint16_t wHeaderLength; // size of this header structure
+  uint16_t wSequence;     // counter for NTB's sent
+  uint16_t wBlockLength;  // size of the NTB
+  uint16_t wNdpIndex;     // offset to first NDP
+};
+struct ncm_datagram_pointers
+{
+  uint16_t wDatagramIndex; // offset of datagram, if 0, then is end of datagram list
+  uint16_t wDatagramLen;   // length of datagram, if 0, then is end of datagram list
+};
+
+uint8_t ncm_ndp_sig = "NCM0";
+struct ncm_ndp
+{
+  uint8_t dwSignature[4]; // "NCM0"
+  uint16_t wLength;       // size of NDP16
+  uint16_t wNextNdpIndex; // offset to next NDP16
+  struct ncm_datagram_pointers wDatagrams[];
+};
+
 void ncm_process(struct pbuf *p)
 {
+
   return;
 }
 

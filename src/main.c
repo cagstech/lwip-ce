@@ -32,12 +32,19 @@ enum
     INPUT_UPPER,
     INPUT_NUMBER
 };
+
+enum _protomode
+{
+    MODE_TCP,
+    MODE_UDP
+};
 char *chars_lower = "\0\0\0\0\0\0\0\0\0\0\"wrmh\0\0?[vqlg\0\0.zupkfc\0 ytojeb\0\0xsnida\0\0\0\0\0\0\0\0";
 char *chars_upper = "\0\0\0\0\0\0\0\0\0\0\"WRMH\0\0?[VQLG\0\0:ZUPKFC\0 YTOJEB\0\0XSNIDA\0\0\0\0\0\0\0\0";
 char *chars_num = "\0\0\0\0\0\0\0\0\0\0+-*/^\0\0?359)\0\0\0.258(\0\0\0000147,\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 char mode_indic[] = {'a', 'A', '1'};
 bool outchar_scroll_up = true;
 bool loopit;
+bool protomode = MODE_TCP;
 
 ip_addr_t remote_ip = IPADDR4_INIT_BYTES(0, 0, 0, 0);
 const char *remote_host = "acagliano.ddns.net";
@@ -74,17 +81,32 @@ void outchar(char c)
     }
 }
 
-struct altcp_pcb *pcb, *spcb;
+struct altcp_pcb *tcp_pcb, *spcb;
+struct udp_pcb *udp_pcb;
 bool tcp_connected = false;
 altcp_allocator_t tcp_allocator = {altcp_tcp_alloc, NULL};
 struct altcp_tls_config *tls_conf;
 
 err_t tcp_connect_callback(void *arg, struct altcp_pcb *tpcb, err_t err);
 
+void udp_recv_func(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port)
+{
+    LWIP_UNUSED_ARG(arg);
+    LWIP_UNUSED_ARG(pcb);
+    LWIP_UNUSED_ARG(addr);
+    LWIP_UNUSED_ARG(port);
+
+    // Data received successfully
+    if (protomode == MODE_UDP)
+        printf("%s\n", p->payload);
+
+    pbuf_free(p);
+}
+
 void exit_funcs(void)
 {
-    if (pcb->state != CLOSED)
-        altcp_close(pcb);
+    if (spcb->state != CLOSED)
+        altcp_close(spcb);
     dhcp_stop(&eth_netif);
     usb_Cleanup();
     gfx_End();
@@ -98,8 +120,9 @@ void dns_lookup_callback(const char *name, const ip_addr_t *ipaddr, void *callba
         exit_funcs();
         exit(1);
     }
-    printf("dns lookup ok\n%s\n", ipaddr_ntoa(ipaddr));
-    if (altcp_connect(spcb, ipaddr, 8881, tcp_connect_callback) != ERR_OK)
+    printf("dns lookup ok: %s\n", ipaddr_ntoa(ipaddr));
+    memcpy(&remote_ip, ipaddr, sizeof(ip_addr_t));
+    if (altcp_connect(spcb, &remote_ip, 8881, tcp_connect_callback) != ERR_OK)
     {
         printf("tcp connect err\n");
         exit_funcs();
@@ -109,7 +132,7 @@ void dns_lookup_callback(const char *name, const ip_addr_t *ipaddr, void *callba
 
 void tcp_error_callback(void *arg, err_t err)
 {
-    struct altcp_pcb *pcb = (struct tcp_pcb *)arg;
+    struct altcp_pcb *pcb = (struct altcp_pcb *)arg;
 
     if (err == ERR_OK)
     {
@@ -154,7 +177,8 @@ err_t tcp_recv_callback(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, err_t
     if (err == ERR_OK && p != NULL)
     {
         // Data received successfully
-        printf("%s\n", p->payload);
+        if (protomode == MODE_TCP)
+            printf("%s\n", p->payload);
 
         // Process or handle the received data
         // process_received_data(p);
@@ -245,7 +269,7 @@ int main(void)
     do
     {
         key = os_GetCSC();
-        if (key == sk_Mode || key == sk_Alpha)
+        if (key == sk_Alpha)
         {
             input_mode++;
             if (input_mode > INPUT_NUMBER)
@@ -253,6 +277,14 @@ int main(void)
             ref_str = (input_mode == INPUT_LOWER) ? chars_lower : (input_mode == INPUT_UPPER) ? chars_upper
                                                                                               : chars_num;
             string_changed = true;
+        }
+        else if (key == sk_Mode)
+        {
+            protomode = (protomode == MODE_TCP);
+            if (protomode == MODE_TCP)
+                printf("tcp mode enabled\n");
+            else if (protomode == MODE_UDP)
+                printf("udp mode enabled\n");
         }
         else if (key == sk_Del)
         {
@@ -269,11 +301,13 @@ int main(void)
                 err_t dns_resp;
                 if (dhcp_supplied_address(&eth_netif))
                 {
-                    pcb = altcp_new(&tcp_allocator);
-                    if (pcb == NULL)
+                    tcp_pcb = altcp_new(&tcp_allocator);
+                    udp_pcb = udp_new();
+                    if (tcp_pcb == NULL)
                         return 2;
                     // spcb = altcp_tls_wrap(tls_conf, pcb);
-                    spcb = pcb;
+                    spcb = tcp_pcb;
+                    udp_recv(udp_pcb, udp_recv_func, NULL);
                     altcp_arg(spcb, spcb);
                     dns_resp = dns_gethostbyname(remote_host, &remote_ip, dns_lookup_callback, NULL);
                     printf("dns lookup for: %s\n", remote_host);
@@ -294,24 +328,39 @@ int main(void)
                     active_string = chat_string;
                     string_length = 0;
                 }
+                string_changed = true;
             }
-            else if ((string_length > 0) && (altcp_sndbuf(spcb) >= string_length))
+            else if (string_length > 0)
             {
                 uint8_t tbuf[MAX_CHAT_LEN + 20] = {0};
                 sprintf(tbuf, "[%s] %s", username, chat_string);
-                if (altcp_write(spcb, tbuf, strlen(tbuf), TCP_WRITE_FLAG_COPY) == ERR_OK)
+                if (protomode == MODE_TCP)
                 {
-                    altcp_output(spcb);
-                    memset(chat_string, 0, string_length);
-                    string_length = 0;
-                    string_changed = true;
+                    if (altcp_sndbuf(spcb) >= string_length)
+                    {
+                        if (altcp_write(spcb, tbuf, strlen(tbuf), TCP_WRITE_FLAG_COPY) == ERR_OK)
+                        {
+                            altcp_output(spcb);
+                        }
+                    }
                 }
+                if (protomode == MODE_UDP)
+                {
+                    struct pbuf *tpbuf = pbuf_alloc(PBUF_RAW, strlen(tbuf), PBUF_RAM);
+                    if (tpbuf)
+                    {
+                        pbuf_take(tpbuf, tbuf, strlen(tbuf));
+                        udp_sendto(udp_pcb, tpbuf, &remote_ip, 8881);
+                    }
+                }
+                memset(chat_string, 0, string_length);
+                string_length = 0;
+                string_changed = true;
             }
-            string_changed = true;
         }
         else if (key == sk_Clear)
         {
-            altcp_close(pcb);
+            altcp_close(spcb);
             break;
         }
         else if (ref_str[key] && (string_length < MAX_CHAT_LEN))
