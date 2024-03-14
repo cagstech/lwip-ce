@@ -82,46 +82,6 @@ void eth_link_callback(struct netif *netif)
     dhcp_start(netif);
 }
 
-/** ECM-SPECIFIC LINKOUTPUT/CALLBACK FUNCTIONS */
-
-// process ECM frame
-void ecm_process(struct pbuf *p)
-{
-  if (eth_netif.input(p, &eth_netif) != ERR_OK)
-    pbuf_free(p);
-}
-
-uint8_t ncm_hsig = "NCMH";
-// NCM Transfer Header Definition
-struct ncm_nth
-{
-  uint8_t dwSignature[4]; // "NCMH"
-  uint16_t wHeaderLength; // size of this header structure
-  uint16_t wSequence;     // counter for NTB's sent
-  uint16_t wBlockLength;  // size of the NTB
-  uint16_t wNdpIndex;     // offset to first NDP
-};
-struct ncm_datagram_pointers
-{
-  uint16_t wDatagramIndex; // offset of datagram, if 0, then is end of datagram list
-  uint16_t wDatagramLen;   // length of datagram, if 0, then is end of datagram list
-};
-
-uint8_t ncm_ndp_sig = "NCM0";
-struct ncm_ndp
-{
-  uint8_t dwSignature[4]; // "NCM0"
-  uint16_t wLength;       // size of NDP16
-  uint16_t wNextNdpIndex; // offset to next NDP16
-  struct ncm_datagram_pointers wDatagrams[];
-};
-
-void ncm_process(struct pbuf *p)
-{
-
-  return;
-}
-
 // bulk RX callback (general)
 usb_error_t bulk_receive_callback(usb_endpoint_t endpoint,
                                   usb_transfer_status_t status,
@@ -182,6 +142,133 @@ usb_error_t bulk_transmit_callback(usb_endpoint_t endpoint,
   return USB_SUCCESS;
 }
 
+// ################ NCM DRIVER ################
+// Defines NCM headers and NDP structure definitions
+// Defines NCM RX/TX functions
+
+// NCM Transfer Header Definition
+struct ncm_nth
+{
+  uint8_t dwSignature[4]; // "NCMH"
+  uint16_t wHeaderLength; // size of this header structure
+  uint16_t wSequence;     // counter for NTB's sent
+  uint16_t wBlockLength;  // size of the NTB
+  uint16_t wNdpIndex;     // offset to first NDP
+};
+// NCM Datagram indexes                     // should point to first NDP
+struct ncm_dptr
+{
+  uint16_t wDatagramIndex; // offset of datagram, if 0, then is end of datagram list
+  uint16_t wDatagramLen;   // length of datagram, if 0, then is end of datagram list
+};
+// NCM NDP Definition
+struct ncm_ndp
+{
+  uint8_t dwSignature[4]; // "NCM0"
+  uint16_t wLength;       // size of NDP16
+  uint16_t wNextNdpIndex; // offset to next NDP16
+  struct ncm_dptr wDatagrams[];
+};
+// Define base NTH
+struct ncm_nth ncm_nth_base = {
+    {'N', 'C', 'M', 'H'}, // this should never be edited
+    12,                   // this is the length of the header (always 12?)
+    0,                    // increment by 1 per transfer?
+    0,                    // length of transfer
+    12};
+// Define base NDP
+struct ncm_ndp ncm_ndp_base = {
+    {'N', 'C', 'M', '0'}, // this should never be edited
+    0,                    // this is the size of the NDP16
+    0};                   // this is the index (offset) of next NDP16
+
+// Parse NCM data structures for packets
+void ncm_process(struct pbuf *p)
+{
+  struct ncm_nth *nth = (struct ncm_nth *)p->payload;
+
+  // validate header signature
+  if (memcmp(nth->dwSignature, "NCMH", 4))
+    return ERR_IF;
+  // get ptr to first ndp
+  struct ncm_ndp *ndp = (struct ncm_ndp *)(p->payload + nth->wNdpindex);
+  do
+  {
+    if (memcmp(ndp->dwSignature, "NCM0", 4))
+      continue; // skip malformed NDP??
+    uint16_t idx = -1;
+    do
+    {
+      // allocate new pbuf for the datagram
+      idx++;
+      struct pbuf *tbuf = pbuf_alloc(PBUF_RAW, ndp->wDatagrams[idx].wDatagramLen, PBUF_RAM);
+      if (tbuf == NULL)
+        return ERR_MEM;
+      // copy datagram to new pbuf
+      pbuf_take(tbuf, p->payload + ndp->wDatagrams[idx].wDatagramIndex, ndp->wDatagrams[idx].wDatagramLen);
+
+      // if handoff error, free pbuf
+      if (eth_netif.input(tbuf, &eth_netif) != ERR_OK)
+        pbuf_free(tbuf);
+    } while (ndp->wDatagrams[idx].wDatagramIndex && ndp->wDatagrams[idx].wDatagramLen == 0);
+    ndp = (struct ncm_ndp *)(p->payload + ndp->wNextNdpIndex);
+  } while (ndp->wNextNdpIndex);
+  pbuf_free(p); // free coalesced pbuf
+}
+
+// Chain packets into NCM data structures until full or timeout
+#define NCM_METADATA_LEN sizeof(struct ncm_nth) + sizeof(struct ncm_ndp)
+err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
+{
+  size_t tbuflen = p->tot_len + NCM_METADATA_LEN + 8;
+  if (tbuflen > ETHERNET_MTU)
+  {
+    printf("pbuf payload exceeds mtu\n");
+    return ERR_MEM;
+  }
+  struct pbuf *tbuf = pbuf_alloc(PBUF_RAW, tbuflen, PBUF_RAM);
+  if (tbuf == NULL)
+    return ERR_MEM;
+
+  // copy NTH and NDP into USB TX buf
+  pbuf_take(tbuf, ncm_nth_base, sizeof(ncm_nth_base));
+  pbuf_take_at(tbuf, ncm_ndp_base, sizeof(ncm_ndp_base), sizeof(ncm_nth_base));
+
+  // cast to structure types and edit fields for TX instance
+  struct ncm_nth *nth = (struct ncm_nth *)tbuf->payload;
+  struct ncm_ndp *ndp = (struct ncm_ndp *)(tbuf->payload + sizeof(ncm_nth_base));
+  nth->tbuflen;                                                     // total size of TX
+  ndp->wLength = tbuflen - sizeof(ncm_nth_base);                    // size of NDP
+  ndp->wNextNdpIndex = 0;                                           // we're only using a single NDP, next idx = 0
+  ndp->wDatagrams[0].wDatagramIndex = NCM_METADATA_LEN + 4;         // index of first datagram (only?)
+  ndp->wDatagrams[0].wDatagramLen = p->tot_len;                     // length of datagram
+  ndp->wDatagrams[1].wDatagramIndex = 0;                            // NDP termination
+  ndp->wDatagrams[1].wDatagramLen = 0;                              // NDP termination
+  pbuf_take_at(tbuf, p->payload, p->tot_len, NCM_METADATA_LEN + 8); // copy payload to TX buf
+
+  LINK_STATS_INC(link.xmit);
+  // Update SNMP stats(only if you use SNMP)
+  MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
+
+  if (usb_ScheduleBulkTransfer(eth.endpoint.out, tbuf->payload, tbuflen, bulk_transmit_callback, tbuf) == USB_SUCCESS)
+  {
+    ncm_nth_base.wSequence++; // increment sequence in NTH
+    return ERR_OK;
+  }
+  else
+    return ERR_IF;
+}
+
+// ################ ECM DRIVER ################
+// Defines ECM RX/TX functions
+
+// process ECM frame
+void ecm_process(struct pbuf *p)
+{
+  if (eth_netif.input(p, &eth_netif) != ERR_OK)
+    pbuf_free(p);
+}
+
 // bulk tx ECM
 err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p)
 {
@@ -200,12 +287,6 @@ err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p)
     return ERR_OK;
   else
     return ERR_IF;
-}
-
-// bulk tx NCM
-err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
-{
-  return ERR_IF;
 }
 
 err_t eth_netif_init(struct netif *netif)
@@ -229,7 +310,7 @@ err_t eth_netif_init(struct netif *netif)
   return ERR_OK;
 }
 
-bool init_cs_usb_device(uint8_t device_class)
+bool init_ethernet_usb_device(uint8_t device_class)
 {
   size_t xferd, parsed_len, desc_len;
   usb_error_t err;
@@ -363,17 +444,28 @@ bool init_cs_usb_device(uint8_t device_class)
           case USB_ETHERNET_FUNCTIONAL_DESCRIPTOR:
           {
             usb_ethernet_functional_descriptor_t *ethdesc = (usb_ethernet_functional_descriptor_t *)cs;
-            size_t xferd_tmp;
-#define HWADDR_DESCRIPTOR_LEN (sizeof(usb_string_descriptor_t) + (sizeof(wchar_t) * 12))
-            uint8_t desc_buf[HWADDR_DESCRIPTOR_LEN] = {0};
-            usb_string_descriptor_t *mac_addr = (usb_string_descriptor_t *)desc_buf;
-            err = usb_GetStringDescriptor(eth.device, ethdesc->iMacAddress, 0, mac_addr, HWADDR_DESCRIPTOR_LEN, &xferd_tmp);
-            if (!err)
+
+            if (ethdesc->iMacAddress)
             {
-              for (int i = 0; i < NETIF_MAX_HWADDR_LEN; i++)
+// if mac address index is valid (non-zero), return string descriptor
+// string is a UTF-16 nibble-encoded mac address
+#define HWADDR_DESCRIPTOR_LEN (sizeof(usb_string_descriptor_t) + (sizeof(wchar_t) * 12))
+              size_t xferd_tmp;
+              uint8_t desc_buf[HWADDR_DESCRIPTOR_LEN];
+              usb_string_descriptor_t *mac_addr = (usb_string_descriptor_t *)desc_buf;
+              err = usb_GetStringDescriptor(eth.device, ethdesc->iMacAddress, 0, mac_addr, HWADDR_DESCRIPTOR_LEN, &xferd_tmp);
+              if (!err)
               {
-                eth.hwaddr[i] = (nibble(mac_addr->bString[2 * i]) << 4) | nibble(mac_addr->bString[2 * i + 1]);
+                for (int i = 0; i < NETIF_MAX_HWADDR_LEN; i++)
+                {
+                  eth.hwaddr[i] = (nibble(mac_addr->bString[2 * i]) << 4) | nibble(mac_addr->bString[2 * i + 1]);
+                }
+                parse_state |= PARSE_HAS_MAC_ADDR;
               }
+            }
+            else
+            {
+              // generate random MAC addr
               parse_state |= PARSE_HAS_MAC_ADDR;
             }
           }
@@ -424,12 +516,12 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
     break;
   case USB_DEVICE_ENABLED_EVENT:
     eth.device = event_data;
-    if (init_cs_usb_device(USB_NCM_SUBCLASS))
+    if (init_ethernet_usb_device(USB_NCM_SUBCLASS))
     {
       eth.process = ncm_process;
       eth.emit = ncm_bulk_transmit;
     }
-    else if (init_cs_usb_device(USB_ECM_SUBCLASS))
+    else if (init_ethernet_usb_device(USB_ECM_SUBCLASS))
     {
       eth.process = ecm_process;
       eth.emit = ecm_bulk_transmit;
