@@ -8,6 +8,7 @@
 #include "lwip/snmp.h"
 #include "lwip/dhcp.h"
 #include "lwip/dns.h"
+#include "include/lwip/timeouts.h"
 
 #include "drivers.h"
 
@@ -107,7 +108,28 @@ usb_error_t bulk_receive_callback(usb_endpoint_t endpoint,
 
 // interrupt rx callback
 #define INTERRUPT_REQUEST_TYPE 0b10100001
-#define INTERRUPT_NOTIFY_NETWORK_CONNECTION 0
+enum _interrupt_request_types
+{
+  INTERRUPT_NOTIFY_NETWORK_CONNECTION = 0,
+  INTERRUPT_SET_ETHERNET_MULTICAST_FILTERS = 0x40,
+  INTERRUPT_SET_ETHERNET_POWER_MANAGEMENT_PATTERN_FILTER,
+  INTERRUPT_GET_ETHERNET_POWER_MANAGEMENT_PATTERN_FILTER,
+  INTERRUPT_SET_ETHERNET_PACKET_FILTER,
+  INTERRUPT_GET_ETHERNET_STATISTIC,
+  INTERRUPT_GET_NTB_PARAMETERS = 0x80,
+  INTERRUPT_GET_NET_ADDRESS,
+  INTERRUPT_SET_NET_ADDRESS,
+  INTERRUPT_GET_NTB_FORMAT,
+  INTERRUPT_SET_NTB_FORMAT,
+  INTERRUPT_GET_NTB_INPUT_SIZE,
+  INTERRUPT_SET_NTB_INPUT_SIZE,
+  INTERRUPT_GET_MAX_DATAGRAM_SIZE,
+  INTERRUPT_SET_MAX_DATAGRAM_SIZE,
+  INTERRUPT_GET_CRC_MODE,
+  INTERRUPT_SET_CRC_MODE,
+  INTERRUPT_RESERVED // nothing here
+};
+
 usb_error_t interrupt_receive_callback(usb_endpoint_t endpoint,
                                        usb_transfer_status_t status,
                                        size_t transferred,
@@ -115,17 +137,23 @@ usb_error_t interrupt_receive_callback(usb_endpoint_t endpoint,
 {
   usb_control_setup_t *ctl = (usb_control_setup_t *)interrupt_buf;
   usb_control_setup_t *nc = (usb_control_setup_t *)(((uint8_t *)ctl) + ctl->wLength + sizeof(usb_control_setup_t));
-  if (nc->bmRequestType == INTERRUPT_REQUEST_TYPE && nc->bRequest == INTERRUPT_NOTIFY_NETWORK_CONNECTION)
+  switch (eth.type)
   {
-    if (nc->wValue)
+  case DEVICE_NCM:
+    break;
+  default:
+    if (nc->bmRequestType == INTERRUPT_REQUEST_TYPE && nc->bRequest == INTERRUPT_NOTIFY_NETWORK_CONNECTION)
     {
-      netif_set_up(&eth_netif);
-      netif_set_link_up(&eth_netif);
-    }
-    else
-    {
-      netif_set_link_down(&eth_netif);
-      netif_set_down(&eth_netif);
+      if (nc->wValue)
+      {
+        netif_set_up(&eth_netif);
+        netif_set_link_up(&eth_netif);
+      }
+      else
+      {
+        netif_set_link_down(&eth_netif);
+        netif_set_down(&eth_netif);
+      }
     }
   }
 
@@ -145,6 +173,7 @@ usb_error_t bulk_transmit_callback(usb_endpoint_t endpoint,
 }
 
 // ################ NCM DRIVER ################
+// "Network Control Model"
 // Defines NCM headers and NDP structure definitions
 // Defines NCM RX/TX functions
 
@@ -152,7 +181,7 @@ usb_error_t bulk_transmit_callback(usb_endpoint_t endpoint,
 struct ncm_nth
 {
   uint8_t dwSignature[4]; // "NCMH"
-  uint16_t wHeaderLength; // size of this header structure
+  uint16_t wHeaderLength; // size of this header structure (should be 12 for NTB-16)
   uint16_t wSequence;     // counter for NTB's sent
   uint16_t wBlockLength;  // size of the NTB
   uint16_t wNdpIndex;     // offset to first NDP
@@ -164,6 +193,7 @@ struct ncm_ndp
   uint8_t dwSignature[4]; // "NCM0"
   uint16_t wLength;       // size of NDP16
   uint16_t wNextNdpIndex; // offset to next NDP16
+  uint8_t idx[];          // datagram array
 };
 
 // NCM Datagram indexes                     // should point to first NDP
@@ -185,9 +215,17 @@ struct ncm_ndp ncm_ndp_default = {
     0,                    // this is the size of the NDP16
     0};                   // this is the index (offset) of next NDP16
 
-// Parse NCM data structures for packets
+#define NCM_NTH_LEN sizeof(struct ncm_nth)
+#define NCM_NDP_LEN sizeof(struct ncm_ndp)
+#define NCM_NDP_IDX_LEN (6 * sizeof(struct ncm_ndp_idx))
+#define NCM_METADATA_LEN (NCM_NTH_LEN + NCM_NDP_LEN + NCM_NDP_IDX_LEN)
+
+// ---------------------------------------
+// NCM Receive (process NCM_NDPs for datagrams)
 void ncm_process(struct pbuf *p)
 {
+  pbuf_coalesce(p, PBUF_RAW);
+
   struct ncm_nth *nth = (struct ncm_nth *)p->payload;
 
   // validate header signature
@@ -195,112 +233,124 @@ void ncm_process(struct pbuf *p)
     return;
   // get ptr to first ndp
   struct ncm_ndp *ndp = (struct ncm_ndp *)(p->payload + nth->wNdpIndex);
+  struct ncm_ndp_idx *ndp_idx;
   do
   {
     if (memcmp(ndp->dwSignature, "NCM0", 4))
       continue; // skip malformed NDP??
-    uint16_t idx = -1;
+    ndp_idx = (struct ncm_ndp_idx *)(ndp->idx);
+    uint8_t idx = 0;
     do
     {
       // allocate new pbuf for the datagram
-      idx++;
-      struct pbuf *tbuf = pbuf_alloc(PBUF_RAW, ndp->wDatagrams[idx].wDatagramLen, PBUF_REF);
+      struct pbuf *tbuf = pbuf_alloc(PBUF_RAW, ndp_idx[idx].wDatagramLen, PBUF_REF);
       if (tbuf == NULL)
         return;
       // copy datagram to new pbuf
-      if (pbuf_take(tbuf, p->payload + ndp->wDatagrams[idx].wDatagramIndex, ndp->wDatagrams[idx].wDatagramLen))
+      if (pbuf_take(tbuf, p->payload + ndp_idx[idx].wDatagramIndex, ndp_idx[idx].wDatagramLen))
         continue;
 
       // if handoff error, free pbuf
       if (eth_netif.input(tbuf, &eth_netif) != ERR_OK)
         pbuf_free(tbuf);
-    } while (ndp->wDatagrams[idx].wDatagramIndex && ndp->wDatagrams[idx].wDatagramLen == 0);
+      idx++;
+    } while (ndp_idx[idx].wDatagramIndex && ndp_idx[idx].wDatagramLen == 0);
+    if (ndp->wNextNdpIndex == 0)
+      break;
     ndp = (struct ncm_ndp *)(p->payload + ndp->wNextNdpIndex);
-  } while (ndp->wNextNdpIndex);
-  pbuf_free(p); // free coalesced pbuf
+  } while (1);
 }
 
-// Chain packets into NCM data structures until full or timeout
+// ---------------------------------------
+// NCM Transmit (enqueue incoming datagrams, TX on lwIP cyclic timer (or queue full))
 #define NCM_MAX_TX_DATAGRAMS 5
-#define NCM_NTH_LEN sizeof(struct ncm_nth)
-#define NCM_NDP_LEN sizeof(struct ncm_ndp)
-#define NCM_NDP_IDX_LEN (6 * sizeof(struct ncm_ndp_idx))
-#define NCM_METADATA_LEN (NCM_NTH_LEN + NCM_NDP_LEN + NCM_NDP_IDX_LEN)
 #define NCM_TIMEO_MS (1000 / 20)
 #define NCM_TX_MAXRETRIES 3
 
-err_t ncm_emit_tx(uint8_t *buf, size_t *len)
+uint8_t tx_buf[ETHERNET_MTU] = {0};
+size_t bytes_written = 0;
+uint8_t datagrams_written = 0;
+// uint32_t clock_last_tx;
+bool ncm_requeue;
+
+// Sends the current tx_buf frame and resets
+void ncm_bulk_transmit(void)
 {
+  memcpy(tx_buf, &ncm_nth_default, sizeof(ncm_nth_default));                           // copy nth defaults to TX buffer
+  memcpy(tx_buf + sizeof(ncm_nth_default), &ncm_ndp_default, sizeof(ncm_ndp_default)); // copy ndp defaults to TX buffer
   // cast to pointers to NTH/NDP (for in-place editing)
-  struct ncm_nth *nth = (struct ncm_nth *)buf;
-  // struct ncm_ndp *ndp = (struct ncm_ndp *)(buf + NCM_NTH_LEN);
+  struct ncm_nth *nth = (struct ncm_nth *)tx_buf;
+  struct ncm_ndp *ndp = (struct ncm_ndp *)(tx_buf + NCM_NTH_LEN);
 
   // update NTH/NDP header info for TX
-  nth->wBlockLength = NCM_METADATA_LEN + (*len); // length of entire USB TX
+  nth->wBlockLength = NCM_METADATA_LEN + bytes_written; // length of entire USB TX
+  ndp->wLength = NCM_NDP_LEN + (4 * datagrams_written);
   // nth->wNdpIndex = NCM_NTH_LEN;                  // offset to start of first NDP (should be in defaults)
 
-  if (usb_BulkTransfer(eth.endpoint.out, buf, len, NCM_TX_MAXRETRIES, &sent))
-    return ERR_IF;
-  if (sent != len)
-    return ERR_IF;
-  *len = 0;
+  // blocking USB transfer
+  size_t sent;
+  if (usb_BulkTransfer(eth.endpoint.out, tx_buf, NCM_METADATA_LEN + bytes_written, NCM_TX_MAXRETRIES, &sent))
+    return;
+  if (sent != (NCM_METADATA_LEN + bytes_written))
+    return;
+
+  // set bytes/datagrams written to 0, increment sequence count, clear datagrams
+  bytes_written = 0;
+  datagrams_written = 0;
   nth->wSequence++;
-  memset(buf + NCM_NTH_LEN + NCM_NDP_LEN, 0, ETHERNET_MTU - NCM_NDP_LEN - NCM_NTH_LEN);
-  return ERR_OK;
+  memset(tx_buf + NCM_NTH_LEN + NCM_NDP_LEN, 0, ETHERNET_MTU - NCM_NDP_LEN - NCM_NTH_LEN);
 }
 
-err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
+// Wraps ncm_bulk_transmit and requeues itself for lwIP timeouts
+void ncm_tx_timeout(void *arg)
 {
+  LWIP_UNUSED_ARG(arg);
+  ncm_bulk_transmit();
+  sys_timeout(NCM_TIMEO_MS, ncm_tx_timeout, NULL);
+}
 
-  // Declare NCM defaults
-  static uint8_t tx_buf[ETHERNET_MTU] = {0};                                          // static TX buffer
-  static size_t bytes_written = 0;                                                    // bytes written to TX buffer
-  static uint8_t datagrams_written = 0;                                               // datagrams enqueued
-  static uint32_t clock_last_tx = = sys_now();                                        // time at last TX (or time at first enqueue)
-  memcpy(tx_buf, ncm_nth_default, sizeof(ncm_nth_default));                           // copy nth defaults to TX buffer
-  memcpy(tx_buf + sizeof(ncm_nth_default), ncm_ndp_default, sizeof(ncm_ndp_default)); // copy ndp defaults to TX buffer
+// Chain packets into NCM data structures
+err_t ncm_enqueue_datagram(struct netif *netif, struct pbuf *p)
+{
   // cast to pointer to NDP_IDX (for in place editing)
   struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)(tx_buf + NCM_NTH_LEN + NCM_NDP_LEN);
   uint8_t *tx_data = tx_buf + NCM_METADATA_LEN;
-  usb_error_t err;
 
   // if this packet would overflow the TX data buffer, send TX first
   if ((NCM_METADATA_LEN + bytes_written + p->tot_len) > ETHERNET_MTU)
   {
-    if (ncm_emit_tx(tx_buf, &bytes_written))
+    ncm_bulk_transmit();
+    if (bytes_written) // if bytes_written not reset to 0, XMIT error occurred
       return ERR_IF;
-    datagrams_written = 0;
-    clock_last_tx = = sys_now();
   }
 
-  // update datagrams idx
+  // update datagrams idx and copy datagram to TX buffer
   idx[datagrams_written].wDatagramIndex = NCM_METADATA_LEN + bytes_written;
   idx[datagrams_written].wDatagramLen = p->tot_len;
-
-  // copy datagram to buffer
   if (pbuf_copy_partial(p, tx_data + bytes_written, p->tot_len, 0))
   {
     datagrams_written++; // increment datagrams written count
     bytes_written += p->tot_len;
-    pbuf_free(p); // should i do this?
+    // pbuf_free(p); // should i do this? - well, we don't do it in ECM
     LINK_STATS_INC(link.xmit);
     // Update SNMP stats(only if you use SNMP)
     MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
   }
 
-  // if timeout hit or packet queue full, send TX
-  if (((sys_now() - clock_last_tx) >= NCM_TIMEO_MS) ||
-      (datagrams_written >= NCM_MAX_TX_DATAGRAMS))
+  // if packet queue full, send TX
+  // send now so that if another segment is pushed before lwIP timeout
+  // we don't reject it
+  if (datagrams_written >= NCM_MAX_TX_DATAGRAMS)
   {
-    if (ncm_emit_tx(tx_buf, &bytes_written))
+    ncm_bulk_transmit();
+    if (bytes_written) // if bytes_written not reset to 0, XMIT error occurred
       return ERR_IF;
-    datagrams_written = 0;
-    clock_last_tx = = sys_now();
   }
   return ERR_OK;
 }
 
 // ################ ECM DRIVER ################
+// "Ethernet Control Model"
 // Defines ECM RX/TX functions
 
 // process ECM frame
@@ -563,7 +613,8 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
     if (init_ethernet_usb_device(USB_NCM_SUBCLASS))
     {
       eth.process = ncm_process;
-      eth.emit = ncm_bulk_transmit;
+      eth.emit = ncm_enqueue_datagram;
+      sys_timeout(NCM_TIMEO_MS, ncm_tx_timeout, NULL);
     }
     else if (init_ethernet_usb_device(USB_ECM_SUBCLASS))
     {
