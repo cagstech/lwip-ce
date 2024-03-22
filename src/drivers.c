@@ -185,7 +185,8 @@ usb_error_t bulk_transmit_callback(usb_endpoint_t endpoint,
                                    usb_transfer_data_t *data)
 {
   // Handle completion or error of the transfer, if needed
-  pbuf_free(data);
+  if (data)
+    pbuf_free(data);
   return USB_SUCCESS;
 }
 
@@ -196,7 +197,7 @@ usb_error_t bulk_transmit_callback(usb_endpoint_t endpoint,
 
 #define NCM_USB_MAXRETRIES 3
 
-// NCM NTB PARAMS
+// define response from GET_NTB_PARAMS
 struct ntb_params
 {
   uint16_t wLength;
@@ -212,7 +213,7 @@ struct ntb_params
   uint16_t wNdpOutAlignment;
   uint16_t wNtbOutMaxDatagrams;
 };
-struct ntb_params ntb_info;
+struct ntb_params ntb_info; // allocate one
 
 // NCM Transfer Header Definition
 struct ncm_nth
@@ -254,8 +255,6 @@ struct ncm_ndp ncm_ndp_default = {
 
 #define NCM_NTH_LEN sizeof(struct ncm_nth)
 #define NCM_NDP_LEN sizeof(struct ncm_ndp)
-#define NCM_NDP_IDX_LEN (6 * sizeof(struct ncm_ndp_idx))
-#define NCM_METADATA_LEN (NCM_NTH_LEN + NCM_NDP_LEN + NCM_NDP_IDX_LEN)
 
 // ---------------------------------------
 // NCM Receive (process NCM_NDPs for datagrams)
@@ -300,58 +299,79 @@ void ncm_process(struct pbuf *p)
 
 // ---------------------------------------
 // NCM Transmit (enqueue incoming datagrams, TX on lwIP cyclic timer (or queue full))
-#define NCM_TX_QUEUE_MAX 256
 #define NCM_TIMEO_MS (1000 / 20)
-struct pbuf *tx_queue[NCM_TX_QUEUE_MAX];
-uint8_t tx_enqueue_idx = 0;
-uint8_t tx_xmit_idx = 0;
+#define NCM_TX_SEGMENT_SIZE 16
+#define NCM_TX_SEGMENTS 128
+#define NCM_NTH_IDX 0
+#define NCM_NDP_IDX 1
+#define NCM_DATAGRAM_START 3
+#define NCM_MAX_TX_DATAGRAMS 5
+uint8_t tx_buf[NCM_TX_SEGMENTS][NCM_TX_SEGMENT_SIZE] = {0};
+uint8_t datagrams = 0, datagram_idx_current = NCM_DATAGRAM_START;
 
-// Sends the current tx_buf frame and resets
-void ncm_bulk_transmit(void)
+bool ncm_send(void)
 {
-  static uint8_t tx_buf_fmt[][ntb_info.wNdpOutAlignment] = tx_buf;
-  memcpy(&tx_buf_fmt[0], &ncm_nth_default, NCM_NTH_LEN);
-  memcpy(&tx_buf_fmt[2], &ncm_ndp_default, NCM_NDP_LEN); // copy ndp defaults to TX buffer
-  // cast to pointers to NTH/NDP (for in-place editing)
-  struct ncm_nth *nth = (struct ncm_nth *)&tx_buf_fmt[0];
-  struct ncm_ndp *ndp = (struct ncm_ndp *)&tx_buf_fmt[2];
+  // set nth and ndp details before send
+  static uint16_t sequence = 0;
+  size_t transferred;
 
-  // update NTH/NDP header info for TX
-  nth->wBlockLength = ETHERNET_MTU; // length of entire USB TX
-  ndp->wLength = NCM_NDP_LEN + (4 * datagrams_written);
-  nth->wNdpIndex = 2 * ntb_info.wNdpOutAlignment; // offset to start of first NDP (should be in defaults)
+  // copy NTH and NDP to outgoing buffer
+  memcpy(&tx_buf[1], &ncm_ndp_default, NCM_NDP_LEN);
+  memcpy(&tx_buf[0], &ncm_nth_default, NCM_NTH_LEN);
 
-  // blocking USB transfer
-  size_t sent;
-  if (usb_BulkTransfer(eth.endpoint.out, tx_buf, NCM_METADATA_LEN + bytes_written, NCM_USB_MAXRETRIES, &sent))
-    return;
-  if (sent != (NCM_METADATA_LEN + bytes_written))
-    return;
+  // cast to NCM Transfer Header and then set fields
+  struct ncm_nth *nth = (struct ncm_ndp *)&tx_buf[0];
+  nth->wSequence = sequence;
+  nth->wBlockLength = NCM_TX_SEGMENT_SIZE * NCM_TX_SEGMENTS;
+  nth->wNdpIndex = NCM_TX_SEGMENT_SIZE;
 
-  LINK_STATS_INC(link.xmit);
-  // Update SNMP stats(only if you use SNMP)
-  MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
-  // set bytes/datagrams written to 0, increment sequence count, clear datagrams
-  bytes_written = 0;
-  datagrams_written = 0;
-  memset(tx_buf + NCM_NTH_LEN + NCM_NDP_LEN, 0, ETHERNET_MTU - NCM_NDP_LEN - NCM_NTH_LEN);
+  // cast to NCM Datagram Pointer and then set fields
+  struct ncm_ndp *ndp = (struct ncm_ndp *)&tx_buf[1];
+  ndp->wLength = (NCM_TX_SEGMENTS - 1) * NCM_TX_SEGMENT_SIZE;
+  ndp->wNextNdpIndex = 0;
+
+  // transfer USB frame
+  struct pbuf *tbuf = pbuf_alloc(PBUF_RAW, NCM_TX_SEGMENT_SIZE * NCM_TX_SEGMENTS, PBUF_RAM);
+  if (tbuf == NULL)
+    return false;
+  pbuf_take(tbuf, tx_buf, NCM_TX_SEGMENT_SIZE * NCM_TX_SEGMENTS);
+  if (usb_ScheduleBulkTransfer(eth.endpoint.out, tbuf->payload, tbuf->tot_len, bulk_transmit_callback, tbuf))
+    return false;
+
+  sequence++;
+  datagram_idx_current = NCM_DATAGRAM_START;
+  datagrams = 0;
+  memset(tx_buf, 0, NCM_TX_SEGMENT_SIZE * NCM_TX_SEGMENTS);
+  return true;
 }
 
-// Wraps ncm_bulk_transmit and requeues itself for lwIP timeouts
+// sends tx buffer in its current state
 void ncm_tx_timeout(void *arg)
 {
   LWIP_UNUSED_ARG(arg);
-  if (bytes_written)
-    ncm_bulk_transmit();
+  ncm_send();
   sys_timeout(NCM_TIMEO_MS, ncm_tx_timeout, NULL);
 }
 
-// Chain packets into NCM data structures
-err_t ncm_enqueue_datagram(struct netif *netif, struct pbuf *p)
+err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
 {
-  // enqueue the packet for transmit
-  // do we need any other checks here?
-  tx_queue[tx_enqueue_idx++] = p;
+
+  struct ncm_ndp_idx *ndp_idx = (struct ncm_ndp_idx *)(((struct ncm_ndp *)&tx_buf[1])->idx);
+  uint8_t datagram_seg_size = (p->tot_len / NCM_TX_SEGMENT_SIZE) + 1;
+  if ((datagram_idx_current + datagram_seg_size) > 127)
+  {
+    if (!ncm_send())
+      return ERR_IF;
+  }
+
+  pbuf_copy_partial(p, &tx_buf[datagram_idx_current], p->tot_len, 0);
+  LINK_STATS_INC(link.xmit);
+  MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
+  ndp_idx[datagrams].wDatagramIndex = datagram_idx_current * NCM_TX_SEGMENT_SIZE;
+  ndp_idx[datagrams].wDatagramLen = p->tot_len;
+  datagrams++;
+  datagram_idx_current += datagram_seg_size;
+
   return ERR_OK;
 }
 
@@ -582,9 +602,11 @@ bool init_ethernet_usb_device(uint8_t device_class)
           }
           break;
           case USB_NCM_FUNCTIONAL_DESCRIPTOR:
+          {
             usb_ncm_functional_descriptor_t *ncm = (usb_ncm_functional_descriptor_t *)cs;
             eth.bm_capabilities = ncm->bmNetworkCapabilities;
-            break:
+          }
+          break;
           }
         }
       }
@@ -639,7 +661,7 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
     if (init_ethernet_usb_device(USB_NCM_SUBCLASS))
     {
       eth.process = ncm_process;
-      eth.emit = ncm_enqueue_datagram;
+      eth.emit = ncm_bulk_transmit;
 
       /* Query NTB Parameters for device (NCM devices) */
       // unlike ECM, NCM requires some initialization work
@@ -651,7 +673,7 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
       }
       /* Set NTB Max Input Size to 4 * ETHERNET_MTU */
       // if bit 5 of bm_capabilities set, function supports changing max datagram count
-      ntb_config_request->wLength = ((eth.bm_capabilities >> 5) & 1) ? 8 : 4;
+      ntb_config_request.wLength = ((eth.bm_capabilities >> 5) & 1) ? 8 : 4;
       if (usb_DefaultControlTransfer(eth.device, &ntb_config_request, &ntb_config_request_data, NCM_USB_MAXRETRIES, &transferred))
       {
         printf("error making ntb max size not turn the calculator into a fusion reactor.\n");
