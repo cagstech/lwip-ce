@@ -14,6 +14,7 @@
 #define USB_CS_INTERFACE_DESCRIPTOR 0x24
 #define USB_UNION_FUNCTIONAL_DESCRIPTOR 0x06
 #define USB_ETHERNET_FUNCTIONAL_DESCRIPTOR 0x0F
+#define USB_NCM_FUNCTIONAL_DESCRIPTOR 0x1A
 
 #define USB_CDC_ETHERNET_DESCRIPTORS NULL
 
@@ -30,6 +31,7 @@ typedef struct _eth_device_t
 {
   usb_device_t device;
   uint8_t type;
+  uint8_t bm_capabilities;
   uint8_t hwaddr[6];
   struct
   {
