@@ -254,59 +254,52 @@ struct ncm_ndp ncm_ndp_default = {
 // ---------------------------------------
 // NCM Receive (process NCM_NDPs for datagrams)
 #define NCM_MAX_OUT_DATAGRAMS 16
-struct ndp_resv
+
+void ncm_process(uint8_t *buf, size_t len)
 {
-  uint16_t ndp_idx;
-}
-
-void
-ncm_process(uint8_t *buf, size_t len)
-{
-  static uint8_t frame_count = 0; // this tells the input func if we're still working on an NTB (ignore header checks)
-
-  // static buffers to dump ndp and datagram indexes if they are beyond the current mtu boundary
-  // setting 16 as max for both because we hard limit to 16 datagrams per RX (see ControlTransfer)
-  static uint16_t ndp_idx[NCM_MAX_OUT_DATAGRAMS] = {0};
-  static uint16_t datagram_idx[NCM_MAX_OUT_DATAGRAMS] = {0};
-
-  // cast to NTH and then check header sig
-  struct ncm_nth *nth = (struct ncm_nth *)buf;
-  if (frame_count == 0)
+  static uint8_t frame_count = 0;
+  static struct ncm_ndp *ndp;
+  if (!frame_count)
+  {
+    // if frame count == 0 (first frame) check for NCM header
+    struct ncm_nth *nth = (struct ncm_nth *)buf;
     if (memcmp(nth->dwSignature, "NCMH", 4))
-      return; // header sig should be present if start of NTB
+      return;
+    // set pointer to NDP to buf + index
+    ndp = buf + (nth->wNdpIndex);
+  }
 
-  if ((nth->wNdpIndex < (frame_count + 1) * ETHERNET_MTU) &&
-      (nth->wNdpIndex >= frame_count * ETHERNET_MTU))
-    struct ncm_ndp *ndp = (struct ncm_ndp *)buf + (nth->wNdpIndex);
-
-  // get ptr to first ndp
-  struct ncm_ndp *ndp = (struct ncm_ndp *)(p->payload + nth->wNdpIndex);
-  struct ncm_ndp_idx *ndp_idx;
+  // repeat while wNextNdpIndex != 0
   do
   {
-    if (memcmp(ndp->dwSignature, "NCM0", 4))
-      continue; // skip malformed NDP??
-    ndp_idx = (struct ncm_ndp_idx *)(ndp->idx);
-    uint8_t idx = 0;
-    do
+    if ((ndp->wNextNdpIndex >= ETHERNET_MTU * frame_count) &&
+        (ndp->wNextNdpIndex < ETHERNET_MTU * (frame_count + 1)))
     {
-      // allocate new pbuf for the datagram
-      struct pbuf *tbuf = pbuf_alloc(PBUF_RAW, ndp_idx[idx].wDatagramLen, PBUF_REF);
-      if (tbuf == NULL)
-        return;
-      // copy datagram to new pbuf
-      if (pbuf_take(tbuf, p->payload + ndp_idx[idx].wDatagramIndex, ndp_idx[idx].wDatagramLen))
-        continue;
-
-      // if handoff error, free pbuf
-      if (eth_netif.input(tbuf, &eth_netif) != ERR_OK)
-        pbuf_free(tbuf);
-      idx++;
-    } while (ndp_idx[idx].wDatagramIndex && ndp_idx[idx].wDatagramLen == 0);
-    if (ndp->wNextNdpIndex == 0)
+      if (!ndp->wNextNdpIndex)
+        break;
+      struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)ndp->idx;
+      if (memcmp(ndp->dwSignature, "NCM0", 4))
+        continue; // skip malformed NDP??
+      uint8_t dg_idx = 0;
+      do
+      {
+        struct pbuf *p = pbuf_alloc(PBUF_RAW, idx[dg_idx].wDatagramLen, PBUF_POOL);
+        if (p == NULL)
+          continue;
+        pbuf_take(p, buf + idx[dg_idx].wDatagramIndex, idx[dg_idx].wDatagramLen);
+        if (eth_netif.input(p, &eth_netif) != ERR_OK)
+          pbuf_free(p);
+        dg_idx++;
+      } while (idx[dg_idx].wDatagramIndex && idx[dg_idx].wDatagramLen);
+    }
+    else
       break;
-    ndp = (struct ncm_ndp *)(p->payload + ndp->wNextNdpIndex);
+
+    ndp = buf + ndp->wNextNdpIndex;
   } while (1);
+  frame_count++;
+  if (!ndp->wNextNdpIndex)
+    frame_count = 0;
 }
 
 // ---------------------------------------
@@ -650,16 +643,6 @@ init_success:
   return true;
 }
 
-usb_control_setup_t get_ntb_params = {INTERRUPT_REQUEST_TYPE, REQUEST_GET_NTB_PARAMETERS, 0, 0, 0x1c};
-usb_control_setup_t ntb_config_request = {INTERRUPT_REQUEST_TYPE, REQUEST_SET_NTB_INPUT_SIZE, 0, 0, 8};
-struct _ntb_config_request_data
-{
-  uint32_t dwNtbInMaxSize;
-  uint16_t wNtbInMaxDatagrams;
-  uint16_t reserved;
-};
-struct _ntb_config_request_data ntb_config_request_data = {4 * ETHERNET_MTU, 16, 0};
-
 usb_error_t
 eth_handle_usb_event(usb_event_t event, void *event_data,
                      usb_callback_data_t *callback_data)
@@ -679,25 +662,31 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
     eth.device = event_data;
     if (init_ethernet_usb_device(USB_NCM_SUBCLASS))
     {
+      // NCM control setup packets/data for device configuration
+      usb_control_setup_t get_ntb_params = {INTERRUPT_REQUEST_TYPE, REQUEST_GET_NTB_PARAMETERS, 0, 0, 0x1c};
+      usb_control_setup_t ntb_config_request = {INTERRUPT_REQUEST_TYPE, REQUEST_SET_NTB_INPUT_SIZE, 0, 0, 4};
+      uint32_t ntb_in_new_size = 2048;
+
       eth.process = ncm_process;
       eth.emit = ncm_bulk_transmit;
 
-      /* Query NTB Parameters for device (NCM devices) */
       // unlike ECM, NCM requires some initialization work
       size_t transferred;
-      if (usb_DefaultControlTransfer(eth.device, &get_ntb_params, &ntb_info, NCM_USB_MAXRETRIES, &transferred))
-      {
-        printf("error getting ntb params\n");
+      usb_error_t err;
+
+      /* Query NTB Parameters for device (NCM devices) */
+      if ((err = usb_DefaultControlTransfer(eth.device, &get_ntb_params, &ntb_info, NCM_USB_MAXRETRIES, &transferred)))
+        printf("error getting ntb params.\n");
+
+      /* Set NTB Max Input Size to 2048 (recd minimum NCM spec v 1.2) */
+      if ((err = usb_DefaultControlTransfer(eth.device, &ntb_config_request, &ntb_in_new_size, NCM_USB_MAXRETRIES, &transferred)))
+        printf("error setting ntb size.\n");
+
+      // if an error, break out without configuring netif
+      if (err)
         break;
-      }
-      /* Set NTB Max Input Size to 4 * ETHERNET_MTU */
-      // if bit 5 of bm_capabilities set, function supports changing max datagram count
-      ntb_config_request.wLength = ((eth.bm_capabilities >> 5) & 1) ? 8 : 4;
-      if (usb_DefaultControlTransfer(eth.device, &ntb_config_request, &ntb_config_request_data, NCM_USB_MAXRETRIES, &transferred))
-      {
-        printf("error making ntb max size not turn the calculator into a fusion reactor.\n");
-        break;
-      }
+
+      // enqueue TX timer
       sys_timeout(NCM_TIMEO_MS, ncm_tx_timeout, NULL);
     }
     else if (init_ethernet_usb_device(USB_ECM_SUBCLASS))
