@@ -102,14 +102,9 @@ usb_error_t bulk_receive_callback(usb_endpoint_t endpoint,
 {
   if ((status == USB_TRANSFER_COMPLETED) && transferred)
   {
-    struct pbuf *p = pbuf_alloc(PBUF_RAW, transferred, PBUF_POOL);
-    if (p != NULL)
-    {
-      LINK_STATS_INC(link.recv);
-      MIB2_STATS_NETIF_ADD(&eth_netif, ifinoctets, transferred);
-      pbuf_take(p, eth_rx_buf, transferred);
-      eth.process(p);
-    }
+    LINK_STATS_INC(link.recv);
+    MIB2_STATS_NETIF_ADD(&eth_netif, ifinoctets, transferred);
+    eth.process(eth_rx_buf, transferred);
     usb_ScheduleBulkTransfer(eth.endpoint.in, eth_rx_buf, ETHERNET_MTU, bulk_receive_callback, NULL);
   }
   return USB_SUCCESS;
@@ -258,15 +253,32 @@ struct ncm_ndp ncm_ndp_default = {
 
 // ---------------------------------------
 // NCM Receive (process NCM_NDPs for datagrams)
-void ncm_process(struct pbuf *p)
+#define NCM_MAX_OUT_DATAGRAMS 16
+struct ndp_resv
 {
-  pbuf_coalesce(p, PBUF_RAW);
+  uint16_t ndp_idx;
+}
 
-  struct ncm_nth *nth = (struct ncm_nth *)p->payload;
+void
+ncm_process(uint8_t *buf, size_t len)
+{
+  static uint8_t frame_count = 0; // this tells the input func if we're still working on an NTB (ignore header checks)
 
-  // validate header signature
-  if (memcmp(nth->dwSignature, "NCMH", 4))
-    return;
+  // static buffers to dump ndp and datagram indexes if they are beyond the current mtu boundary
+  // setting 16 as max for both because we hard limit to 16 datagrams per RX (see ControlTransfer)
+  static uint16_t ndp_idx[NCM_MAX_OUT_DATAGRAMS] = {0};
+  static uint16_t datagram_idx[NCM_MAX_OUT_DATAGRAMS] = {0};
+
+  // cast to NTH and then check header sig
+  struct ncm_nth *nth = (struct ncm_nth *)buf;
+  if (frame_count == 0)
+    if (memcmp(nth->dwSignature, "NCMH", 4))
+      return; // header sig should be present if start of NTB
+
+  if ((nth->wNdpIndex < (frame_count + 1) * ETHERNET_MTU) &&
+      (nth->wNdpIndex >= frame_count * ETHERNET_MTU))
+    struct ncm_ndp *ndp = (struct ncm_ndp *)buf + (nth->wNdpIndex);
+
   // get ptr to first ndp
   struct ncm_ndp *ndp = (struct ncm_ndp *)(p->payload + nth->wNdpIndex);
   struct ncm_ndp_idx *ndp_idx;
@@ -320,7 +332,7 @@ bool ncm_send(void)
   memcpy(&tx_buf[0], &ncm_nth_default, NCM_NTH_LEN);
 
   // cast to NCM Transfer Header and then set fields
-  struct ncm_nth *nth = (struct ncm_ndp *)&tx_buf[0];
+  struct ncm_nth *nth = (struct ncm_nth *)&tx_buf[0];
   nth->wSequence = sequence;
   nth->wBlockLength = NCM_TX_SEGMENT_SIZE * NCM_TX_SEGMENTS;
   nth->wNdpIndex = NCM_TX_SEGMENT_SIZE;
@@ -349,7 +361,8 @@ bool ncm_send(void)
 void ncm_tx_timeout(void *arg)
 {
   LWIP_UNUSED_ARG(arg);
-  ncm_send();
+  if (datagrams)
+    ncm_send();
   sys_timeout(NCM_TIMEO_MS, ncm_tx_timeout, NULL);
 }
 
@@ -359,10 +372,8 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
   struct ncm_ndp_idx *ndp_idx = (struct ncm_ndp_idx *)(((struct ncm_ndp *)&tx_buf[1])->idx);
   uint8_t datagram_seg_size = (p->tot_len / NCM_TX_SEGMENT_SIZE) + 1;
   if ((datagram_idx_current + datagram_seg_size) > 127)
-  {
     if (!ncm_send())
       return ERR_IF;
-  }
 
   pbuf_copy_partial(p, &tx_buf[datagram_idx_current], p->tot_len, 0);
   LINK_STATS_INC(link.xmit);
@@ -371,6 +382,9 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
   ndp_idx[datagrams].wDatagramLen = p->tot_len;
   datagrams++;
   datagram_idx_current += datagram_seg_size;
+  if (datagrams == NCM_MAX_TX_DATAGRAMS)
+    if (!ncm_send())
+      return ERR_IF;
 
   return ERR_OK;
 }
@@ -380,10 +394,15 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
 // Defines ECM RX/TX functions
 
 // process ECM frame
-void ecm_process(struct pbuf *p)
+void ecm_process(uint8_t *buf, size_t len)
 {
-  if (eth_netif.input(p, &eth_netif) != ERR_OK)
-    pbuf_free(p);
+  struct pbuf *p = pbuf_alloc(PBUF_RAW, len, PBUF_POOL);
+  if (p != NULL)
+  {
+    pbuf_take(p, buf, len);
+    if (eth_netif.input(p, &eth_netif) != ERR_OK)
+      pbuf_free(p);
+  }
 }
 
 // bulk tx ECM
