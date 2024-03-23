@@ -287,7 +287,7 @@ void ncm_process(uint8_t *buf, size_t len)
   do
   {
     if (memcmp(ndp->dwSignature, "NCM0", 4)) // if invalid sig
-      continue;                              // skip this NDP ?
+      goto exit;                             // error ?
 
     // set datagram number to 0 and set datagram index pointer
     uint16_t dg_num = 0;
@@ -312,6 +312,8 @@ void ncm_process(uint8_t *buf, size_t len)
     // if next NDP is 0, NTB is done and so is my sanity
     if (ndp->wNextNdpIndex == 0)
       break;
+    // set next NDP
+    ndp = (struct ncm_ndp *)&rx_buf[ndp->wNextNdpIndex];
   } while (1);
 exit:
   // delete the shadow of my own regret and prepare for more regret
