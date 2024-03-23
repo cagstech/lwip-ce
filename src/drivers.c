@@ -111,7 +111,9 @@ usb_error_t bulk_receive_callback(usb_endpoint_t endpoint,
 }
 
 /* CDC Comm Class Revision 1.2 */
-#define INTERRUPT_REQUEST_TYPE 0b10100001
+#define BM_REQUEST_TYPE_TO_HOST (USB_DEVICE_TO_HOST | USB_CONTROL_TRANSFER | USB_RECIPIENT_INTERFACE)   // 0b10100001
+#define BM_REQUEST_TYPE_TO_DEVICE (USB_HOST_TO_DEVICE | USB_CONTROL_TRANSFER | USB_RECIPIENT_INTERFACE) // 0b00100001
+
 enum _cdc_request_codes // request types for CDC-ECM and CDC-NCM
 {
   REQUEST_SEND_ENCAPSULATED_COMMAND = 0,
@@ -152,7 +154,7 @@ interrupt_receive_callback(usb_endpoint_t endpoint,
   do
   {
     notify = (usb_control_setup_t *)&interrupt_buf[bytes_parsed];
-    if (notify->bmRequestType == INTERRUPT_REQUEST_TYPE)
+    if (notify->bmRequestType == BM_REQUEST_TYPE_TO_HOST)
     {
       switch (notify->bRequest)
       {
@@ -253,53 +255,69 @@ struct ncm_ndp ncm_ndp_default = {
 
 // ---------------------------------------
 // NCM Receive (process NCM_NDPs for datagrams)
-#define NCM_MAX_OUT_DATAGRAMS 16
-
 void ncm_process(uint8_t *buf, size_t len)
 {
-  static uint8_t frame_count = 0;
-  static struct ncm_ndp *ndp;
-  if (!frame_count)
-  {
-    // if frame count == 0 (first frame) check for NCM header
-    struct ncm_nth *nth = (struct ncm_nth *)buf;
-    if (memcmp(nth->dwSignature, "NCMH", 4))
-      return;
-    // set pointer to NDP to buf + index
-    ndp = buf + (nth->wNdpIndex);
-  }
+  // allocate 2048 bytes for NCM RX buffer
+  static uint8_t rx_buf[2048] = {0};
 
-  // repeat while wNextNdpIndex != 0
+  // set if we need to wait for the next frame before processing the NTB
+  // since NTB max is set to 2048, we should need only one more frame
+  static bool frame_await = false;
+  // place to write RX into NCM buffer
+  static size_t rx_offset = 0;
+
+  // copy buf into rx_buf
+  memcpy(&rx_buf[rx_offset], buf, len);
+  rx_offset += len;
+
+  // cast start of buffer to NTH pointer
+  struct ncm_nth *nth = (struct ncm_nth *)&rx_buf[0];
+  if (nth->wBlockLength > rx_offset)
+  {                     // if block length is greater than collected transfer length,
+    frame_await = true; // set await flag
+    return;             // then return
+  }
+  // verify that NTH sig is valid
+  if (memcmp(nth->dwSignature, "NCMH", 4))
+    goto exit;
+
+  // cast rx_buf + nth->wNdpIndex (offset to first NDP) to NDP pointer
+  struct ncm_ndp *ndp = (struct ncm_ndp *)&rx_buf[nth->wNdpIndex];
+  // repeat while ndp->wNextNdpIndex is non-zero
   do
   {
-    if ((ndp->wNextNdpIndex >= ETHERNET_MTU * frame_count) &&
-        (ndp->wNextNdpIndex < ETHERNET_MTU * (frame_count + 1)))
+    if (memcmp(ndp->dwSignature, "NCM0", 4)) // if invalid sig
+      continue;                              // skip this NDP ?
+
+    // set datagram number to 0 and set datagram index pointer
+    uint16_t dg_num = 0;
+    struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)ndp->idx;
+
+    // a null datagram index structure indicates end of NDP
+    do
     {
-      if (!ndp->wNextNdpIndex)
-        break;
-      struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)ndp->idx;
-      if (memcmp(ndp->dwSignature, "NCM0", 4))
-        continue; // skip malformed NDP??
-      uint8_t dg_idx = 0;
-      do
+      // attempt to allocate pbuf
+      struct pbuf *p = pbuf_alloc(PBUF_RAW, idx[dg_num].wDatagramLen, PBUF_POOL);
+      if (p != NULL)
       {
-        struct pbuf *p = pbuf_alloc(PBUF_RAW, idx[dg_idx].wDatagramLen, PBUF_POOL);
-        if (p == NULL)
-          continue;
-        pbuf_take(p, buf + idx[dg_idx].wDatagramIndex, idx[dg_idx].wDatagramLen);
+        // copy datagram into pbuf
+        pbuf_take(p, &rx_buf[idx[dg_num].wDatagramIndex], idx[dg_num].wDatagramLen);
+        // hand pbuf to lwIP (should we enqueue these and defer the handoffs till later?)
+        // i'll leave it for now, and if my calculator explodes I'll fix it
         if (eth_netif.input(p, &eth_netif) != ERR_OK)
           pbuf_free(p);
-        dg_idx++;
-      } while (idx[dg_idx].wDatagramIndex && idx[dg_idx].wDatagramLen);
-    }
-    else
+      }
+      dg_num++;
+    } while ((idx[dg_num].wDatagramIndex) && (idx[dg_num].wDatagramLen));
+    // if next NDP is 0, NTB is done and so is my sanity
+    if (ndp->wNextNdpIndex == 0)
       break;
-
-    ndp = buf + ndp->wNextNdpIndex;
   } while (1);
-  frame_count++;
-  if (!ndp->wNextNdpIndex)
-    frame_count = 0;
+exit:
+  // delete the shadow of my own regret and prepare for more regret
+  frame_await = false;
+  rx_offset = 0;
+  memset(rx_buf, 0, 2048);
 }
 
 // ---------------------------------------
@@ -663,8 +681,8 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
     if (init_ethernet_usb_device(USB_NCM_SUBCLASS))
     {
       // NCM control setup packets/data for device configuration
-      usb_control_setup_t get_ntb_params = {INTERRUPT_REQUEST_TYPE, REQUEST_GET_NTB_PARAMETERS, 0, 0, 0x1c};
-      usb_control_setup_t ntb_config_request = {INTERRUPT_REQUEST_TYPE, REQUEST_SET_NTB_INPUT_SIZE, 0, 0, 4};
+      usb_control_setup_t get_ntb_params = {BM_REQUEST_TYPE_TO_HOST, REQUEST_GET_NTB_PARAMETERS, 0, eth_ifnum, 0x1c};
+      usb_control_setup_t ntb_config_request = {BM_REQUEST_TYPE_TO_DEVICE, REQUEST_SET_NTB_INPUT_SIZE, 0, eth_ifnum, 4};
       uint32_t ntb_in_new_size = 2048;
 
       eth.process = ncm_process;
