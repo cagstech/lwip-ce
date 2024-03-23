@@ -599,6 +599,7 @@ bool init_ethernet_usb_device(uint8_t device_class)
           case USB_ETHERNET_FUNCTIONAL_DESCRIPTOR:
           {
             usb_ethernet_functional_descriptor_t *ethdesc = (usb_ethernet_functional_descriptor_t *)cs;
+            usb_control_setup_t get_mac_addr = {0b10100001, REQUEST_GET_NET_ADDRESS, 0, 0, 6};
             size_t xferd_tmp;
             uint8_t string_descriptor_buf[DESCRIPTOR_MAX_LEN];
             usb_string_descriptor_t *macaddr = (usb_string_descriptor_t *)string_descriptor_buf;
@@ -612,6 +613,8 @@ bool init_ethernet_usb_device(uint8_t device_class)
 
               parse_state |= PARSE_HAS_MAC_ADDR;
             }
+            else if (usb_DefaultControlTransfer(eth.device, &get_mac_addr, eth.hwaddr, NCM_USB_MAXRETRIES, &xferd_tmp))
+              parse_state |= PARSE_HAS_MAC_ADDR;
             else
             {
               // generate random MAC addr
@@ -624,7 +627,10 @@ bool init_ethernet_usb_device(uint8_t device_class)
               parse_state |= PARSE_HAS_MAC_ADDR;
             }
           }
-          break;
+            for (int i = 0; i < NETIF_MAX_HWADDR_LEN; i++)
+              printf("%02X ", eth.hwaddr[i]);
+            printf("\n");
+            break;
           case USB_UNION_FUNCTIONAL_DESCRIPTOR:
           {
             // if union functional type, this contains interface number for bulk transfer
@@ -648,21 +654,20 @@ bool init_ethernet_usb_device(uint8_t device_class)
   }
   return false;
 init_success:
-  // if (usb_SetConfiguration(eth.device, configdata.addr, configdata.len))
-  //   return USB_ERROR_FAILED;
   if (usb_SetInterface(eth.device, if_bulk.addr, if_bulk.len))
     return USB_ERROR_FAILED;
   eth.endpoint.in = usb_GetDeviceEndpoint(eth.device, endpoint_addr.in);
   eth.endpoint.out = usb_GetDeviceEndpoint(eth.device, endpoint_addr.out);
   eth.endpoint.interrupt = usb_GetDeviceEndpoint(eth.device, endpoint_addr.interrupt);
   eth.type = device_class;
-  if (eth.type == DEVICE_NCM)
-  {
-  }
   usb_RefDevice(eth.device);
   return true;
 }
 
+// NCM control setup packets/data for device configuration
+usb_control_setup_t get_ntb_params = {0b10100001, REQUEST_GET_NTB_PARAMETERS, 0, 0, 0x1c};
+usb_control_setup_t ntb_config_request = {0b00100001, REQUEST_SET_NTB_INPUT_SIZE, 0, 0, 4};
+uint32_t ntb_in_new_size = 2048;
 usb_error_t
 eth_handle_usb_event(usb_event_t event, void *event_data,
                      usb_callback_data_t *callback_data)
@@ -682,17 +687,12 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
     eth.device = event_data;
     if (init_ethernet_usb_device(USB_NCM_SUBCLASS))
     {
-      // NCM control setup packets/data for device configuration
-      usb_control_setup_t get_ntb_params = {BM_REQUEST_TYPE_TO_HOST, REQUEST_GET_NTB_PARAMETERS, 0, eth_ifnum, 0x1c};
-      usb_control_setup_t ntb_config_request = {BM_REQUEST_TYPE_TO_DEVICE, REQUEST_SET_NTB_INPUT_SIZE, 0, eth_ifnum, 4};
-      uint32_t ntb_in_new_size = 2048;
-
       eth.process = ncm_process;
       eth.emit = ncm_bulk_transmit;
 
       // unlike ECM, NCM requires some initialization work
       size_t transferred;
-      usb_error_t err;
+      usb_error_t err = 0;
 
       /* Query NTB Parameters for device (NCM devices) */
       if ((err = usb_DefaultControlTransfer(eth.device, &get_ntb_params, &ntb_info, NCM_USB_MAXRETRIES, &transferred)))
