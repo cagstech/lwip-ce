@@ -215,7 +215,7 @@ struct ntb_params ntb_info; // allocate one
 // NCM Transfer Header Definition
 struct ncm_nth
 {
-  uint8_t dwSignature[4]; // "NCMH"
+  uint32_t dwSignature;   // "NCMH"
   uint16_t wHeaderLength; // size of this header structure (should be 12 for NTB-16)
   uint16_t wSequence;     // counter for NTB's sent
   uint16_t wBlockLength;  // size of the NTB
@@ -225,7 +225,7 @@ struct ncm_nth
 // NCM NDP Definition
 struct ncm_ndp
 {
-  uint8_t dwSignature[4]; // "NCM0"
+  uint32_t dwSignature;   // "NCM0"
   uint16_t wLength;       // size of NDP16
   uint16_t wNextNdpIndex; // offset to next NDP16
   uint8_t idx[];          // datagram array
@@ -238,17 +238,20 @@ struct ncm_ndp_idx
   uint16_t wDatagramLen;   // length of datagram, if 0, then is end of datagram list
 };
 
+#define NCM_NTH_SIG 0x484D434E
+#define NCM_NDP_SIG 0x304D434E
+
 struct ncm_nth ncm_nth_default = {
-    {'N', 'C', 'M', 'H'}, // this should never be edited
-    12,                   // this is the length of the header (always 12?)
-    0,                    // increment by 1 per transfer?
-    0,                    // length of transfer
+    NCM_NTH_SIG, // this should never be edited
+    12,          // this is the length of the header (always 12?)
+    0,           // increment by 1 per transfer?
+    0,           // length of transfer
     12};
 // Define base NDP
 struct ncm_ndp ncm_ndp_default = {
-    {'N', 'C', 'M', '0'}, // this should never be edited
-    0,                    // this is the size of the NDP16
-    0};                   // this is the index (offset) of next NDP16
+    NCM_NDP_SIG, // this should never be edited
+    0,           // this is the size of the NDP16
+    0};          // this is the index (offset) of next NDP16
 
 #define NCM_NTH_LEN sizeof(struct ncm_nth)
 #define NCM_NDP_LEN sizeof(struct ncm_ndp)
@@ -278,7 +281,7 @@ void ncm_process(uint8_t *buf, size_t len)
     return;             // then return
   }
   // verify that NTH sig is valid
-  if (memcmp(nth->dwSignature, "NCMH", 4))
+  if (nth->dwSignature != NCM_NTH_SIG)
     goto exit;
 
   // cast rx_buf + nth->wNdpIndex (offset to first NDP) to NDP pointer
@@ -286,8 +289,8 @@ void ncm_process(uint8_t *buf, size_t len)
   // repeat while ndp->wNextNdpIndex is non-zero
   do
   {
-    if (memcmp(ndp->dwSignature, "NCM0", 4)) // if invalid sig
-      goto exit;                             // error ?
+    if (ndp->dwSignature != NCM_NDP_SIG) // if invalid sig
+      goto exit;                         // error ?
 
     // set datagram number to 0 and set datagram index pointer
     uint16_t dg_num = 0;
