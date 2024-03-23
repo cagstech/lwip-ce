@@ -616,20 +616,25 @@ bool init_ethernet_usb_device(uint8_t device_class)
 
               parse_state |= PARSE_HAS_MAC_ADDR;
             }
-            else if (usb_DefaultControlTransfer(eth.device, &get_mac_addr, eth.hwaddr, NCM_USB_MAXRETRIES, &xferd_tmp))
+            else if (!usb_DefaultControlTransfer(eth.device, &get_mac_addr, eth.hwaddr, NCM_USB_MAXRETRIES, &xferd_tmp))
               parse_state |= PARSE_HAS_MAC_ADDR;
             else
             {
               // generate random MAC addr
-              uint32_t rmac[2];
-              rmac[0] = random();
-              rmac[1] = random();
-              memcpy(eth.hwaddr, &rmac, 6);
-              eth.hwaddr[0] &= 0b11110000;
-              eth.hwaddr[0] |= 0b10;
-              parse_state |= PARSE_HAS_MAC_ADDR;
+#define RMAC_RANDOM_MAX = 0xFFFFFF
+              usb_control_setup_t set_mac_addr = {0b00100001, REQUEST_SET_NET_ADDRESS, 0, 0, 6};
+              uint24_t rmac[2];
+              rmac[0] = (uint24_t)random() & RMAC_RANDOM_MAX;
+              rmac[1] = (uint24_t)random() & RMAC_RANDOM_MAX;
+              memcpy(eth.hwaddr, rmac, 6);
+              eth.hwaddr[0] &= 0xFE;
+              eth.hwaddr[0] |= 0x02;
+              // inform function of randomly generated mac address (this may be optional but best practice?)
+              if (!usb_DefaultControlTransfer(eth.device, &set_mac_addr, eth.hwaddr, NCM_USB_MAXRETRIES, &xferd_tmp))
+                parse_state |= PARSE_HAS_MAC_ADDR;
             }
           }
+            // this is there for testing purposes, we'll remove in production release
             for (int i = 0; i < NETIF_MAX_HWADDR_LEN; i++)
               printf("%02X ", eth.hwaddr[i]);
             printf("\n");
