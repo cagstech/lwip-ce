@@ -308,7 +308,7 @@ err_t ncm_process(uint8_t *buf, size_t len)
       if (p != NULL)
       {
         // copy datagram into pbuf
-        pbuf_take(p, &rx_buf[idx[dg_num].wDatagramIndex], idx[dg_num].wDatagramLen);
+        pbuf_take(p, &ntb[idx[dg_num].wDatagramIndex], idx[dg_num].wDatagramLen);
         // hand pbuf to lwIP (should we enqueue these and defer the handoffs till later?)
         // i'll leave it for now, and if my calculator explodes I'll fix it
         if (eth_netif.input(p, &eth_netif) != ERR_OK)
@@ -320,14 +320,13 @@ err_t ncm_process(uint8_t *buf, size_t len)
     if (ndp->wNextNdpIndex == 0)
       break;
     // set next NDP
-    ndp = (struct ncm_ndp *)&rx_buf[ndp->wNextNdpIndex];
+    ndp = (struct ncm_ndp *)&ntb[ndp->wNextNdpIndex];
   } while (1);
 exit:
   // delete the shadow of my own regret and prepare for more regret
   pbuf_free(rx_buf);
   rx_buf = NULL;
   rx_offset = 0;
-  memset(rx_buf, 0, NCM_BUF_MAX_SIZE);
 }
 
 /*-----------------------------------------------
