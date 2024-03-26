@@ -12,7 +12,85 @@
 
 #include "drivers.h"
 
-/** CLASS-SPECIFIC DESCRIPTOR DEFINITIONS */
+/** DESCRIPTOR PARSER AWAIT STATES */
+enum _descriptor_parser_await_states
+{
+  PARSE_HAS_CONTROL_IF = 1,
+  PARSE_HAS_MAC_ADDR = (1 << 1),
+  PARSE_HAS_BULK_IF_NUM = (1 << 2),
+  PARSE_HAS_BULK_IF = (1 << 3),
+  PARSE_HAS_ENDPOINT_INT = (1 << 4),
+  PARSE_HAS_ENDPOINT_IN = (1 << 5),
+  PARSE_HAS_ENDPOINT_OUT = (1 << 6)
+};
+
+/** GLOBAL/BUFFERS DECLARATIONS */
+eth_device_t eth = {0};
+struct netif eth_netif = {0};
+const char *hostname = "ti84pce";
+uint8_t ifnum = 0;
+
+/** UTF-16 -> HEX CONVERSION */
+uint8_t nibble(uint16_t c)
+{
+  c -= '0';
+  if (c < 10)
+    return c;
+  c -= 'A' - '0';
+  if (c < 6)
+    return c + 10;
+  c -= 'a' - 'A';
+  if (c < 6)
+    return c + 10;
+  return 0xff;
+}
+
+/** ETHERNET CALLBACK FUNCTIONS */
+void eth_link_callback(struct netif *netif)
+{
+  if (netif_is_link_up(netif) && (!dhcp_supplied_address(netif)))
+    dhcp_start(netif);
+}
+
+/*******************************************************************************************
+ * Communications Data Class Revision 1.2
+ * BM Request Types
+ * CDC Control Request Codes
+ * CDC Notification Codes
+ * Class-Specific Descriptor Definitions
+ */
+#define BM_REQUEST_TYPE_TO_HOST (USB_DEVICE_TO_HOST | USB_CONTROL_TRANSFER | USB_RECIPIENT_INTERFACE)   // 0b10100001
+#define BM_REQUEST_TYPE_TO_DEVICE (USB_HOST_TO_DEVICE | USB_CONTROL_TRANSFER | USB_RECIPIENT_INTERFACE) // 0b00100001
+
+enum _cdc_request_codes // request types for CDC-ECM and CDC-NCM
+{
+  REQUEST_SEND_ENCAPSULATED_COMMAND = 0,
+  REQUEST_GET_ENCAPSULATED_RESPONSE,
+  REQUEST_SET_ETHERNET_MULTICAST_FILTERS = 0x40,
+  REQUEST_SET_ETHERNET_POWER_MANAGEMENT_PATTERN_FILTER,
+  REQUEST_GET_ETHERNET_POWER_MANAGEMENT_PATTERN_FILTER,
+  REQUEST_SET_ETHERNET_PACKET_FILTER,
+  REQUEST_GET_ETHERNET_STATISTIC,
+  REQUEST_GET_NTB_PARAMETERS = 0x80,
+  REQUEST_GET_NET_ADDRESS,
+  REQUEST_SET_NET_ADDRESS,
+  REQUEST_GET_NTB_FORMAT,
+  REQUEST_SET_NTB_FORMAT,
+  REQUEST_GET_NTB_INPUT_SIZE,
+  REQUEST_SET_NTB_INPUT_SIZE,
+  REQUEST_GET_MAX_DATAGRAM_SIZE,
+  REQUEST_SET_MAX_DATAGRAM_SIZE,
+  REQUEST_GET_CRC_MODE,
+  REQUEST_SET_CRC_MODE,
+};
+
+enum _cdc_notification_codes
+{
+  NOTIFY_NETWORK_CONNECTION,
+  NOTIFY_RESPONSE_AVAILABLE,
+  NOTIFY_CONNECTION_SPEED_CHANGE = 0x2A
+};
+
 typedef struct
 {
   uint8_t bLength;
@@ -52,46 +130,45 @@ typedef struct
   uint8_t bmNetworkCapabilities;
 } usb_ncm_functional_descriptor_t;
 
-/** DESCRIPTOR PARSER AWAIT STATES */
-enum _descriptor_parser_await_states
-{
-  PARSE_HAS_CONTROL_IF = 1,
-  PARSE_HAS_MAC_ADDR = (1 << 1),
-  PARSE_HAS_BULK_IF_NUM = (1 << 2),
-  PARSE_HAS_BULK_IF = (1 << 3),
-  PARSE_HAS_ENDPOINT_INT = (1 << 4),
-  PARSE_HAS_ENDPOINT_IN = (1 << 5),
-  PARSE_HAS_ENDPOINT_OUT = (1 << 6)
-};
-
-/** GLOBAL/BUFFERS DECLARATIONS */
-eth_device_t eth = {0};
-struct netif eth_netif = {0};
-const char *hostname = "ti84pce";
+/***********************************************************
+ * Callbacks for USB Activity (CDC-ECM and CDC-NCM)
+ * interrupt receive, TX, RX
+ */
 uint8_t interrupt_buf[64];
 uint8_t eth_rx_buf[ETHERNET_MTU];
-uint8_t ifnum = 0;
 
-/** UTF-16 -> HEX CONVERSION */
-uint8_t nibble(uint16_t c)
+usb_error_t interrupt_receive_callback(usb_endpoint_t endpoint,
+                                       usb_transfer_status_t status,
+                                       size_t transferred,
+                                       usb_transfer_data_t *data)
 {
-  c -= '0';
-  if (c < 10)
-    return c;
-  c -= 'A' - '0';
-  if (c < 6)
-    return c + 10;
-  c -= 'a' - 'A';
-  if (c < 6)
-    return c + 10;
-  return 0xff;
-}
-
-/** ETHERNET CALLBACK FUNCTIONS */
-void eth_link_callback(struct netif *netif)
-{
-  if (netif_is_link_up(netif) && (!dhcp_supplied_address(netif)))
-    dhcp_start(netif);
+  if ((status == USB_TRANSFER_COMPLETED) && transferred)
+  {
+    usb_control_setup_t *notify;
+    size_t bytes_parsed = 0;
+    do
+    {
+      notify = (usb_control_setup_t *)&interrupt_buf[bytes_parsed];
+      if (notify->bmRequestType == 0b10100001)
+      {
+        switch (notify->bRequest)
+        {
+        case NOTIFY_NETWORK_CONNECTION:
+          if (notify->wValue)
+            netif_set_link_up(&eth_netif);
+          else
+            netif_set_link_down(&eth_netif);
+          break;
+        case NOTIFY_CONNECTION_SPEED_CHANGE:
+          // this will have no effect - calc too slow
+          break;
+        }
+      }
+      bytes_parsed += sizeof(usb_control_setup_t) + notify->wLength;
+    } while (bytes_parsed < transferred);
+  }
+  usb_ScheduleInterruptTransfer(eth.endpoint.interrupt, interrupt_buf, 64, interrupt_receive_callback, NULL);
+  return USB_SUCCESS;
 }
 
 // bulk RX callback (general)
@@ -112,71 +189,6 @@ usb_error_t bulk_receive_callback(usb_endpoint_t endpoint,
   return USB_SUCCESS;
 }
 
-/* CDC Comm Class Revision 1.2 */
-#define BM_REQUEST_TYPE_TO_HOST (USB_DEVICE_TO_HOST | USB_CONTROL_TRANSFER | USB_RECIPIENT_INTERFACE)   // 0b10100001
-#define BM_REQUEST_TYPE_TO_DEVICE (USB_HOST_TO_DEVICE | USB_CONTROL_TRANSFER | USB_RECIPIENT_INTERFACE) // 0b00100001
-
-enum _cdc_request_codes // request types for CDC-ECM and CDC-NCM
-{
-  REQUEST_SEND_ENCAPSULATED_COMMAND = 0,
-  REQUEST_GET_ENCAPSULATED_RESPONSE,
-  REQUEST_SET_ETHERNET_MULTICAST_FILTERS = 0x40,
-  REQUEST_SET_ETHERNET_POWER_MANAGEMENT_PATTERN_FILTER,
-  REQUEST_GET_ETHERNET_POWER_MANAGEMENT_PATTERN_FILTER,
-  REQUEST_SET_ETHERNET_PACKET_FILTER,
-  REQUEST_GET_ETHERNET_STATISTIC,
-  REQUEST_GET_NTB_PARAMETERS = 0x80,
-  REQUEST_GET_NET_ADDRESS,
-  REQUEST_SET_NET_ADDRESS,
-  REQUEST_GET_NTB_FORMAT,
-  REQUEST_SET_NTB_FORMAT,
-  REQUEST_GET_NTB_INPUT_SIZE,
-  REQUEST_SET_NTB_INPUT_SIZE,
-  REQUEST_GET_MAX_DATAGRAM_SIZE,
-  REQUEST_SET_MAX_DATAGRAM_SIZE,
-  REQUEST_GET_CRC_MODE,
-  REQUEST_SET_CRC_MODE,
-};
-
-enum _cdc_notification_codes
-{
-  NOTIFY_NETWORK_CONNECTION,
-  NOTIFY_RESPONSE_AVAILABLE,
-  NOTIFY_CONNECTION_SPEED_CHANGE = 0x2A
-};
-
-usb_error_t
-interrupt_receive_callback(usb_endpoint_t endpoint,
-                           usb_transfer_status_t status,
-                           size_t transferred,
-                           usb_transfer_data_t *data)
-{
-  usb_control_setup_t *notify;
-  size_t bytes_parsed = 0;
-  do
-  {
-    notify = (usb_control_setup_t *)&interrupt_buf[bytes_parsed];
-    if (notify->bmRequestType == BM_REQUEST_TYPE_TO_HOST)
-    {
-      switch (notify->bRequest)
-      {
-      case NOTIFY_NETWORK_CONNECTION:
-        if (notify->wValue)
-          netif_set_link_up(&eth_netif);
-        else
-          netif_set_link_down(&eth_netif);
-        break;
-      case NOTIFY_CONNECTION_SPEED_CHANGE:
-        // this will have no effect - calc too slow
-        break;
-      }
-    }
-    bytes_parsed += sizeof(usb_control_setup_t) + notify->wLength;
-  } while (bytes_parsed < transferred);
-  usb_ScheduleInterruptTransfer(eth.endpoint.interrupt, interrupt_buf, 64, interrupt_receive_callback, NULL);
-  return USB_SUCCESS;
-}
-
 // bulk tx callback (this should work for both since it's just a free)
 usb_error_t bulk_transmit_callback(usb_endpoint_t endpoint,
                                    usb_transfer_status_t status,
@@ -184,8 +196,11 @@ usb_error_t bulk_transmit_callback(usb_endpoint_t endpoint,
                                    usb_transfer_data_t *data)
 {
   // Handle completion or error of the transfer, if needed
-  if (data)
-    pbuf_free(data);
+  if ((status == USB_TRANSFER_COMPLETED) && transferred)
+  {
+    if (data)
+      pbuf_free(data);
+  }
   return USB_SUCCESS;
 }
 
@@ -366,6 +381,9 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
 
   // copy the datagram to the pbuf
   pbuf_take_at(obuf, p->payload, p->tot_len, NCM_HBUF_SIZE + ntb_info.wNdpInPayloadRemainder);
+  LINK_STATS_INC(link.xmit);
+  // Update SNMP stats(only if you use SNMP)
+  MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
 
   // queue the TX
   if (usb_ScheduleBulkTransfer(eth.endpoint.out, obuf->payload, ETHERNET_MTU + NCM_HBUF_SIZE, bulk_transmit_callback, obuf))
@@ -579,11 +597,13 @@ bool init_ethernet_usb_device(uint8_t device_class)
             size_t xferd_tmp;
             uint8_t string_descriptor_buf[DESCRIPTOR_MAX_LEN];
             usb_string_descriptor_t *macaddr = (usb_string_descriptor_t *)string_descriptor_buf;
+            // Get MAC address and save for lwIP use (ETHARP header)
+            // if index for iMacAddress valid and GetStringDescriptor success, save MAC address
+            // else attempt control transfer to get mac address and save it
+            // else generate random compliant local MAC address and send control request to set the hwaddr, then save it
             if (ethdesc->iMacAddress &&
                 (!usb_GetStringDescriptor(eth.device, ethdesc->iMacAddress, 0, macaddr, DESCRIPTOR_MAX_LEN, &xferd_tmp)))
             {
-              // if mac address index is valid (non-zero), return string descriptor
-              // string is a UTF-16 nibble-encoded mac address
               for (int i = 0; i < NETIF_MAX_HWADDR_LEN; i++)
                 eth.hwaddr[i] = (nibble(macaddr->bString[2 * i]) << 4) | nibble(macaddr->bString[2 * i + 1]);
 
@@ -593,7 +613,6 @@ bool init_ethernet_usb_device(uint8_t device_class)
               parse_state |= PARSE_HAS_MAC_ADDR;
             else
             {
-              // generate random MAC addr
 #define RMAC_RANDOM_MAX 0xFFFFFF
               usb_control_setup_t set_mac_addr = {0b00100001, REQUEST_SET_NET_ADDRESS, 0, 0, 6};
               uint24_t rmac[2];
@@ -602,16 +621,11 @@ bool init_ethernet_usb_device(uint8_t device_class)
               memcpy(eth.hwaddr, rmac, 6);
               eth.hwaddr[0] &= 0xFE;
               eth.hwaddr[0] |= 0x02;
-              // inform function of randomly generated mac address (this may be optional but best practice?)
               if (!usb_DefaultControlTransfer(eth.device, &set_mac_addr, eth.hwaddr, NCM_USB_MAXRETRIES, &xferd_tmp))
                 parse_state |= PARSE_HAS_MAC_ADDR;
             }
           }
-            // this is there for testing purposes, we'll remove in production release
-            for (int i = 0; i < NETIF_MAX_HWADDR_LEN; i++)
-              printf("%02X ", eth.hwaddr[i]);
-            printf("\n");
-            break;
+          break;
           case USB_UNION_FUNCTIONAL_DESCRIPTOR:
           {
             // if union functional type, this contains interface number for bulk transfer
