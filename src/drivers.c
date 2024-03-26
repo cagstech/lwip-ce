@@ -268,9 +268,6 @@ void ncm_process(uint8_t *buf, size_t len)
   // allocate 2048 bytes for NCM RX buffer
   static uint8_t rx_buf[NCM_BUF_MAX_SIZE] = {0};
 
-  // set if we need to wait for the next frame before processing the NTB
-  // since NTB max is set to 2048, we should need only one more frame
-  static bool frame_await = false;
   // place to write RX into NCM buffer
   static size_t rx_offset = 0;
 
@@ -281,10 +278,8 @@ void ncm_process(uint8_t *buf, size_t len)
   // cast start of buffer to NTH pointer
   struct ncm_nth *nth = (struct ncm_nth *)&rx_buf[0];
   if (nth->wBlockLength > rx_offset)
-  {                     // if block length is greater than collected transfer length,
-    frame_await = true; // set await flag
-    return;             // then return
-  }
+    return; // do nothing until we have the full NTB
+
   // verify that NTH sig is valid
   if (nth->dwSignature != NCM_NTH_SIG)
     goto exit;
@@ -299,7 +294,7 @@ void ncm_process(uint8_t *buf, size_t len)
 
     // set datagram number to 0 and set datagram index pointer
     uint16_t dg_num = 0;
-    struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)ndp->wDatagramIdx;
+    struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)&ndp->wDatagramIdx;
 
     // a null datagram index structure indicates end of NDP
     do
@@ -325,7 +320,6 @@ void ncm_process(uint8_t *buf, size_t len)
   } while (1);
 exit:
   // delete the shadow of my own regret and prepare for more regret
-  frame_await = false;
   rx_offset = 0;
   memset(rx_buf, 0, NCM_BUF_MAX_SIZE);
 }
@@ -358,7 +352,7 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
   uint8_t hdr_buf[NCM_HBUF_SIZE];
   struct ncm_nth *nth = (struct ncm_nth *)hdr_buf;
   struct ncm_ndp *ndp = (struct ncm_ndp *)&hdr_buf[offset_ndp];
-  struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)ndp->wDatagramIdx;
+  struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)&ndp->wDatagramIdx;
 
   // populate structs
   nth->dwSignature = NCM_NTH_SIG;
@@ -368,7 +362,7 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
   nth->wNdpIndex = offset_ndp;
 
   ndp->dwSignature = NCM_NDP_SIG0;
-  ndp->wLength = (ETHERNET_MTU + NCM_HBUF_SIZE) - offset_ndp;
+  ndp->wLength = NCM_NDP_LEN + 8;
   ndp->wNextNdpIndex = 0;
 
   idx[0].wDatagramIndex = NCM_HBUF_SIZE + ntb_info.wNdpInPayloadRemainder;
