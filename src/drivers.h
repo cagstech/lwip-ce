@@ -37,7 +37,7 @@ typedef struct _eth_device_t
   {
     usb_endpoint_t in, out, interrupt;
   } endpoint;
-  void (*process)(uint8_t *buf, size_t len);
+  err_t (*process)(uint8_t *buf, size_t len);
   err_t (*emit)(struct netif *netif, struct pbuf *p);
 } eth_device_t;
 extern eth_device_t eth;
