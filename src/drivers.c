@@ -224,33 +224,21 @@ struct ncm_nth
   uint16_t wBlockLength;  // size of the NTB
   uint16_t wNdpIndex;     // offset to first NDP
 };
-struct ncm_nth ncm_nth_default = {
-    NCM_NTH_SIG, // this should never be edited
-    12,          // this is the length of the header (always 12?)
-    0,           // increment by 1 per transfer?
-    0,           // length of transfer
-    0};
 
 /* NCM Datagram Pointers (NDP) Definition*/
-#define NCM_NDP_SIG0 0x304D434E
-#define NCM_NDP_SIG1 0x314D434E
-struct ncm_ndp
-{
-  uint32_t dwSignature;   // "NCM0"
-  uint16_t wLength;       // size of NDP16
-  uint16_t wNextNdpIndex; // offset to next NDP16
-  uint8_t idx[];          // pointer to end of NDP
-};
-struct ncm_ndp ncm_ndp_default = {
-    NCM_NDP_SIG0, // this should never be edited
-    0,            // this is the size of the NDP16
-    0};
-
-/* NCM Datagram Payload Indexes */
 struct ncm_ndp_idx
 {
   uint16_t wDatagramIndex; // offset of datagram, if 0, then is end of datagram list
   uint16_t wDatagramLen;   // length of datagram, if 0, then is end of datagram list
+};
+#define NCM_NDP_SIG0 0x304D434E
+#define NCM_NDP_SIG1 0x314D434E
+struct ncm_ndp
+{
+  uint32_t dwSignature;              // "NCM0"
+  uint16_t wLength;                  // size of NDP16
+  uint16_t wNextNdpIndex;            // offset to next NDP16
+  struct ncm_ndp_idx wDatagramIdx[]; // pointer to end of NDP
 };
 
 #define NCM_NTH_LEN sizeof(struct ncm_nth)
@@ -296,7 +284,7 @@ void ncm_process(uint8_t *buf, size_t len)
 
     // set datagram number to 0 and set datagram index pointer
     uint16_t dg_num = 0;
-    struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)ndp->idx;
+    struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)ndp->wDatagramIdx;
 
     // a null datagram index structure indicates end of NDP
     do
@@ -329,104 +317,62 @@ exit:
 
 /*-----------------------------------------------
  * NCM TX
- * contains 3 functions:
- *    ncm_bulk_transmit => performs actual TX
- *    ncm_try_send => send queued datagrams at semi-constant intervals (see NCM_TIMEO_MS) (lwIP timers)
- *    ncm_enqueue => copies payloads to TX buf, updates NDP indexes, sends if buffer full
+ * send a single datagram in a single frame just like ECM
+ * the calc is too slow for it to make a difference
  */
-#define NCM_MAX_TX_PER_SEC 20 // lower this to send run ncm_try_send() less frequently
-#define NCM_TIMEO_MS (1000 / NCM_MAX_TX_PER_SEC)
-#define NCM_MAX_TX_DATAGRAMS 8
-uint8_t tx_buf[NCM_BUF_MAX_SIZE] = {0};
+#define NCM_HBUF_SIZE 64
+#define get_next_offset(offset, divisor, remainder) \
+  (offset) + (divisor) - ((offset) % (divisor)) + (remainder)
 
-// hardcode payload start to offset 64 + remainder
-#define NCM_PAYLOAD_START 64
-uint16_t offset_payload = NCM_PAYLOAD_START;
-uint8_t datagrams_queued = 0;
-
-bool ncm_bulk_transmit(void)
+err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
 {
-  // set nth and ndp details before send
-  static uint16_t sequence = 0;
+  static uint16_t sequence = 0; /* set sequence counter */
+  uint16_t offset_ndp = get_next_offset(NCM_NTH_LEN, ntb_info.wNdpInAlignment, 0);
+  if (p->tot_len > ETHERNET_MTU)
+  {
+    printf("pbuf payload exceeds mtu\n");
+    return ERR_MEM;
+  }
 
-  // copy NTH to outgoing buffer
-  memcpy(tx_buf, &ncm_nth_default, NCM_NTH_LEN);
-  struct ncm_nth *nth = (struct ncm_nth *)tx_buf;
+  // allocate TX packet buffer
+  struct pbuf *obuf = pbuf_alloc(PBUF_RAW, ETHERNET_MTU + NCM_HBUF_SIZE, PBUF_RAM);
+  if (obuf == NULL)
+    return ERR_MEM;
 
-  // wNdpInAlignment specifies the boundary on which NDPs are aligned
-  // because im not a psycho, there's only one NDP
-  // (some might argue working on this in the first place makes me a psycho)
-  uint16_t offset_ndp = ((NCM_NTH_LEN / ntb_info.wNdpInAlignment) + 1) * ntb_info.wNdpInAlignment;
-  struct ncm_ndp *ndp = (struct ncm_ndp *)&tx_buf[offset_ndp];
-  memcpy(ndp, &ncm_ndp_default, NCM_NDP_LEN);
+  // declare NTH, NDP, and NDP_IDX structures
+  uint8_t hdr_buf[NCM_HBUF_SIZE];
+  struct ncm_nth *nth = (struct ncm_nth *)hdr_buf;
+  struct ncm_ndp *ndp = (struct ncm_ndp *)&hdr_buf[offset_ndp];
+  struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)ndp->wDatagramIdx;
 
-  // cast to NCM Transfer Header and then set fields
+  // populate structs
+  nth->dwSignature = NCM_NTH_SIG;
+  nth->wHeaderLength = NCM_NTH_LEN;
   nth->wSequence = sequence;
-  nth->wBlockLength = NCM_BUF_MAX_SIZE;
-  nth->wNdpIndex = (uint16_t)((uint24_t)ndp) - ((uint24_t)tx_buf);
+  nth->wBlockLength = NCM_HBUF_SIZE + ETHERNET_MTU;
+  nth->wNdpIndex = offset_ndp;
 
-  // set NDP fields
-  ndp->wLength = NCM_BUF_MAX_SIZE - nth->wNdpIndex;
+  ndp->dwSignature = NCM_NDP_SIG0;
+  ndp->wLength = (ETHERNET_MTU + NCM_HBUF_SIZE) - offset_ndp;
   ndp->wNextNdpIndex = 0;
 
-  // transfer USB frame
-  struct pbuf *tbuf = pbuf_alloc(PBUF_RAW, NCM_BUF_MAX_SIZE, PBUF_RAM);
-  if (tbuf == NULL)
-    return false;
-  pbuf_take(tbuf, tx_buf, NCM_BUF_MAX_SIZE);
-  if (usb_ScheduleBulkTransfer(eth.endpoint.out, tbuf->payload, tbuf->tot_len, bulk_transmit_callback, tbuf))
-    return false;
+  idx[0].wDatagramIndex = NCM_HBUF_SIZE + ntb_info.wNdpInPayloadRemainder;
+  idx[0].wDatagramLen = p->tot_len;
+  idx[1].wDatagramIndex = 0;
+  idx[1].wDatagramLen = 0;
+
+  // absorb the populated structs into the obuf
+  pbuf_take(obuf, hdr_buf, NCM_HBUF_SIZE);
+
+  // copy the datagram to the pbuf
+  pbuf_take_at(obuf, p->payload, p->tot_len, NCM_HBUF_SIZE + ntb_info.wNdpInPayloadRemainder);
+
+  // queue the TX
+  if (usb_ScheduleBulkTransfer(eth.endpoint.out, obuf->payload, ETHERNET_MTU + NCM_HBUF_SIZE, bulk_transmit_callback, obuf))
+    return ERR_IF;
 
   // increment sequence, decrement my will to live
-  // reset the payload offset and datagrams queued
   sequence++;
-  offset_payload = NCM_PAYLOAD_START;
-  datagrams_queued = 0;
-  memset(tx_buf, 0, NCM_BUF_MAX_SIZE);
-  return true;
-}
-
-// sends tx buffer in its current state
-void ncm_try_send(void *arg)
-{
-  LWIP_UNUSED_ARG(arg);
-  if (datagrams_queued)
-    ncm_bulk_transmit();
-  sys_timeout(NCM_TIMEO_MS, ncm_tx_timeout, NULL);
-}
-
-err_t ncm_enqueue(struct netif *netif, struct pbuf *p)
-{
-  // wNdpInAlignment specifies the boundary on which NDPs are aligned
-  uint16_t offset_ndp = ((NCM_NTH_LEN / ntb_info.wNdpInAlignment) + 1) * ntb_info.wNdpInAlignment;
-  struct ncm_ndp *ndp = (struct ncm_ndp *)&tx_buf[offset_ndp];
-  struct ncm_ndp_idx *payload_idx = (struct ncm_ndp_idx *)ndp->idx;
-
-  // this whole system is stupid
-  // $ offset % wNdpInDivisor = wNdpInPayloadRemainder $
-  // Why do I need to solve for X to send a damn usb transfer?????
-  if ((offset_payload + ntb_info.wNdpInPayloadRemainder + p->tot_len) > NCM_BUF_MAX_SIZE)
-    if (!ncm_bulk_transmit())
-      return ERR_IF;
-
-  // copy the payload into the buffer, but not before we waste a few bytes
-  pbuf_copy_partial(p, &tx_buf[offset_payload + ntb_info.wNdpInPayloadRemainder], p->tot_len, 0);
-  LINK_STATS_INC(link.xmit);
-  MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
-
-  // save offset to payload into NDP index
-  payload_idx[datagrams_queued].wDatagramIndex = offset_payload + ntb_info.wNdpInPayloadRemainder;
-  payload_idx[datagrams_queued].wDatagramLen = p->tot_len;
-  datagrams_queued++;
-
-  // sigh....
-  offset_payload = (((offset_payload + ntb_info.wNdpInPayloadRemainder + p->tot_len) / ntb_info.wNdpInDivisor) + 1) * ntb_info.wNdpInDivisor;
-
-  // if datagrams == max
-  if (datagrams_queued == NCM_MAX_TX_DATAGRAMS)
-    if (!ncm_bulk_transmit())
-      return ERR_IF;
-
   return ERR_OK;
 }
 
@@ -596,7 +542,6 @@ bool init_ethernet_usb_device(uint8_t device_class)
             {
               if_bulk.addr = iface;
               if_bulk.len = desc_len - parsed_len;
-              eth_ifnum = ifnum;
               parse_state |= PARSE_HAS_BULK_IF;
             }
           }
@@ -724,7 +669,7 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
     if (init_ethernet_usb_device(USB_NCM_SUBCLASS))
     {
       eth.process = ncm_process;
-      eth.emit = ncm_enqueue;
+      eth.emit = ncm_bulk_transmit;
 
       // unlike ECM, NCM requires some initialization work
       size_t transferred;
@@ -741,9 +686,6 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
       // if an error, break out without configuring netif
       if (err)
         break;
-
-      // enqueue TX timer
-      sys_timeout(NCM_TIMEO_MS, ncm_try_send, NULL);
     }
     else if (init_ethernet_usb_device(USB_ECM_SUBCLASS))
     {
