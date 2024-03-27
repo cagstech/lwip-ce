@@ -52,6 +52,12 @@ void eth_link_callback(struct netif *netif)
     dhcp_start(netif);
 }
 
+void eth_status_callback(struct netif *netif)
+{
+  if (dhcp_supplied_address(netif))
+    printf("ipaddr changed: %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
+}
+
 /*******************************************************************************************
  * Communications Data Class Revision 1.2
  * BM Request Types
@@ -342,14 +348,16 @@ err_t ncm_process(uint8_t *buf, size_t len)
     ndp = (struct ncm_ndp *)&ntb[ndp->wNextNdpIndex];
   } while (1);
   for (int i = 0; i < enqueued; i++)
-    if (eth_netif.input(rx_queue[i], &eth_netif) != ERR_OK)
-      pbuf_free(rx_queue[i]);
+    if (rx_queue[i])
+      if (eth_netif.input(rx_queue[i], &eth_netif) != ERR_OK)
+        pbuf_free(rx_queue[i]);
 
 exit:
   // delete the shadow of my own regret and prepare for more regret
   pbuf_free(rx_buf);
   rx_buf = NULL;
   rx_offset = 0;
+  return ERR_OK;
 }
 
 /*-----------------------------------------------
@@ -381,7 +389,6 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
   uint8_t hdr_buf[NCM_HBUF_SIZE] = {0};
   struct ncm_nth *nth = (struct ncm_nth *)hdr_buf;
   struct ncm_ndp *ndp = (struct ncm_ndp *)&hdr_buf[offset_ndp];
-  struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)&ndp->wDatagramIdx[0];
 
   // populate structs
   nth->dwSignature = NCM_NTH_SIG;
@@ -407,14 +414,6 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
   LINK_STATS_INC(link.xmit);
   // Update SNMP stats(only if you use SNMP)
   MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
-
-  // hexdump for debug purposes
-  uint8_t fp = ti_Open("ncmdump", "a+");
-  if (fp)
-  {
-    ti_Write(obuf->payload, ETHERNET_MTU + NCM_HBUF_SIZE, 1, fp);
-    ti_Close(fp);
-  }
 
   // queue the TX
   if (usb_ScheduleBulkTransfer(eth.endpoint.out, obuf->payload, ETHERNET_MTU + NCM_HBUF_SIZE, bulk_transmit_callback, obuf))
@@ -488,6 +487,7 @@ err_t eth_netif_init(struct netif *netif)
   netif_set_hostname(netif, hostname);
   netif->ip6_autoconfig_enabled = 1;
   netif_set_link_callback(netif, eth_link_callback);
+  netif_set_status_callback(netif, eth_status_callback);
   netif_set_default(netif);
   return ERR_OK;
 }
@@ -691,14 +691,21 @@ init_success:
     size_t transferred;
     usb_control_setup_t get_ntb_params = {0b10100001, REQUEST_GET_NTB_PARAMETERS, 0, 0, 0x1c};
     usb_control_setup_t ntb_config_request = {0b00100001, REQUEST_SET_NTB_INPUT_SIZE, 0, 0, ncm_device_supports(CAPABLE_NTB_INPUT_SIZE_8BYTE) ? 8 : 4};
+    usb_control_setup_t multicast_filter_request = {0b00100001, REQUEST_SET_ETHERNET_MULTICAST_FILTERS, 0, 0, 0};
+    usb_control_setup_t packet_filter_request = {0b00100001, REQUEST_SET_ETHERNET_PACKET_FILTER, 0b0000000000011111, 0, 0};
     struct _ntb_config_data ntb_config_data = {NCM_RX_NTB_MAX_SIZE, NCM_RX_MAX_DATAGRAMS, 0};
 
     /* Query NTB Parameters for device (NCM devices) */
     if (usb_DefaultControlTransfer(eth.device, &get_ntb_params, &ntb_info, NCM_USB_MAXRETRIES, &transferred))
       return false;
-
     /* Set NTB Max Input Size to 2048 (recd minimum NCM spec v 1.2) */
     if (usb_DefaultControlTransfer(eth.device, &ntb_config_request, &ntb_config_data, NCM_USB_MAXRETRIES, &transferred))
+      return false;
+    /* Reset all multicast filters */
+    if (usb_DefaultControlTransfer(eth.device, &multicast_filter_request, NULL, NCM_USB_MAXRETRIES, &transferred))
+      return false;
+    /* Reset packet filters */
+    if (usb_DefaultControlTransfer(eth.device, &packet_filter_request, NULL, NCM_USB_MAXRETRIES, &transferred))
       return false;
   }
   if (usb_SetInterface(eth.device, if_bulk.addr, if_bulk.len))
