@@ -91,6 +91,16 @@ enum _cdc_notification_codes
   NOTIFY_CONNECTION_SPEED_CHANGE = 0x2A
 };
 
+enum _cdc_ncm_bm_networkcapabilities
+{
+  CAPABLE_ETHERNET_PACKET_FILTER,
+  CAPABLE_NET_ADDRESS,
+  CAPABLE_ENCAPSULATED_RESPONSE,
+  CAPABLE_MAX_DATAGRAM,
+  CAPABLE_NTB_INPUT_SIZE_8BYTE
+};
+#define ncm_device_supports(bm) ((eth.bm_capabilities >> (bm)) & 1)
+
 typedef struct
 {
   uint8_t bLength;
@@ -129,6 +139,13 @@ typedef struct
   uint16_t bcdNcmVersion;
   uint8_t bmNetworkCapabilities;
 } usb_ncm_functional_descriptor_t;
+
+struct _ntb_config_data
+{
+  uint32_t dwNtbInMaxSize;
+  uint16_t wNtbInMaxDatagrams;
+  uint16_t reserved;
+};
 
 /***********************************************************
  * Callbacks for USB Activity (CDC-ECM and CDC-NCM)
@@ -250,15 +267,16 @@ struct ncm_ndp_idx
 #define NCM_NDP_SIG1 0x314D434E
 struct ncm_ndp
 {
-  uint32_t dwSignature;              // "NCM0"
-  uint16_t wLength;                  // size of NDP16
-  uint16_t wNextNdpIndex;            // offset to next NDP16
-  struct ncm_ndp_idx wDatagramIdx[]; // pointer to end of NDP
+  uint32_t dwSignature;               // "NCM0"
+  uint16_t wLength;                   // size of NDP16
+  uint16_t wNextNdpIndex;             // offset to next NDP16
+  struct ncm_ndp_idx wDatagramIdx[1]; // pointer to end of NDP
 };
 
 #define NCM_NTH_LEN sizeof(struct ncm_nth)
 #define NCM_NDP_LEN sizeof(struct ncm_ndp)
 #define NCM_RX_NTB_MAX_SIZE 2048
+#define NCM_RX_MAX_DATAGRAMS 16
 
 /*-----------------------------------------------
  * NCM RX
@@ -274,7 +292,7 @@ err_t ncm_process(uint8_t *buf, size_t len)
     if (nth->dwSignature != NCM_NTH_SIG) // if the SIG is invalid, something is wrong
       return ERR_IF;
     ntb_total = nth->wBlockLength;
-    static struct pbuf *rx_buf = pbuf_alloc(PBUF_RAW, ntb_total, PBUF_RAM);
+    rx_buf = pbuf_alloc(PBUF_RAW, ntb_total, PBUF_RAM);
     if (!rx_buf)
       return ERR_MEM;
   }
@@ -284,12 +302,14 @@ err_t ncm_process(uint8_t *buf, size_t len)
   rx_offset += len;
 
   if (ntb_total > rx_offset)
-    return; // do nothing until we have the full NTB
+    return ERR_OK; // do nothing until we have the full NTB
 
   // get header and first NDP pointers
   uint8_t *ntb = (uint8_t *)rx_buf->payload;
   struct ncm_nth *nth = (struct ncm_nth *)ntb;
   struct ncm_ndp *ndp = (struct ncm_ndp *)&ntb[nth->wNdpIndex];
+  struct pbuf *rx_queue[NCM_RX_MAX_DATAGRAMS];
+  uint16_t enqueued = 0;
   // repeat while ndp->wNextNdpIndex is non-zero
   do
   {
@@ -311,8 +331,7 @@ err_t ncm_process(uint8_t *buf, size_t len)
         pbuf_take(p, &ntb[idx[dg_num].wDatagramIndex], idx[dg_num].wDatagramLen);
         // hand pbuf to lwIP (should we enqueue these and defer the handoffs till later?)
         // i'll leave it for now, and if my calculator explodes I'll fix it
-        if (eth_netif.input(p, &eth_netif) != ERR_OK)
-          pbuf_free(p);
+        rx_queue[enqueued++] = p;
       }
       dg_num++;
     } while ((idx[dg_num].wDatagramIndex) && (idx[dg_num].wDatagramLen));
@@ -322,6 +341,10 @@ err_t ncm_process(uint8_t *buf, size_t len)
     // set next NDP
     ndp = (struct ncm_ndp *)&ntb[ndp->wNextNdpIndex];
   } while (1);
+  for (int i = 0; i < enqueued; i++)
+    if (eth_netif.input(rx_queue[i], &eth_netif) != ERR_OK)
+      pbuf_free(rx_queue[i]);
+
 exit:
   // delete the shadow of my own regret and prepare for more regret
   pbuf_free(rx_buf);
@@ -358,7 +381,7 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
   uint8_t hdr_buf[NCM_HBUF_SIZE] = {0};
   struct ncm_nth *nth = (struct ncm_nth *)hdr_buf;
   struct ncm_ndp *ndp = (struct ncm_ndp *)&hdr_buf[offset_ndp];
-  struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)&ndp->wDatagramIdx;
+  struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)&ndp->wDatagramIdx[0];
 
   // populate structs
   nth->dwSignature = NCM_NTH_SIG;
@@ -368,19 +391,19 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
   nth->wNdpIndex = offset_ndp;
 
   ndp->dwSignature = NCM_NDP_SIG0;
-  ndp->wLength = NCM_NDP_LEN + 8;
+  ndp->wLength = NCM_NDP_LEN + 4;
   ndp->wNextNdpIndex = 0;
 
-  idx[0].wDatagramIndex = NCM_HBUF_SIZE + ntb_info.wNdpInPayloadRemainder;
-  idx[0].wDatagramLen = p->tot_len;
-  idx[1].wDatagramIndex = 0;
-  idx[1].wDatagramLen = 0;
+  ndp->wDatagramIdx[0].wDatagramIndex = NCM_HBUF_SIZE;
+  ndp->wDatagramIdx[0].wDatagramLen = p->tot_len;
+  ndp->wDatagramIdx[1].wDatagramIndex = 0;
+  ndp->wDatagramIdx[1].wDatagramLen = 0;
 
   // absorb the populated structs into the obuf
   pbuf_take(obuf, hdr_buf, NCM_HBUF_SIZE);
 
   // copy the datagram to the pbuf
-  pbuf_take_at(obuf, p->payload, p->tot_len, NCM_HBUF_SIZE + ntb_info.wNdpInPayloadRemainder);
+  pbuf_take_at(obuf, p->payload, p->tot_len, NCM_HBUF_SIZE);
   LINK_STATS_INC(link.xmit);
   // Update SNMP stats(only if you use SNMP)
   MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
@@ -590,8 +613,6 @@ bool init_ethernet_usb_device(uint8_t device_class)
               // use this to set configuration
               configdata.addr = &descriptor.conf;
               configdata.len = desc_len;
-              if (usb_SetConfiguration(eth.device, configdata.addr, configdata.len))
-                return USB_ERROR_FAILED;
               parse_state |= PARSE_HAS_CONTROL_IF;
             }
           }
@@ -662,8 +683,26 @@ bool init_ethernet_usb_device(uint8_t device_class)
   }
   return false;
 init_success:
+  if (usb_SetConfiguration(eth.device, configdata.addr, configdata.len))
+    return false;
+  if (device_class == USB_NCM_SUBCLASS)
+  {
+    // unlike ECM, NCM requires some initialization work
+    size_t transferred;
+    usb_control_setup_t get_ntb_params = {0b10100001, REQUEST_GET_NTB_PARAMETERS, 0, 0, 0x1c};
+    usb_control_setup_t ntb_config_request = {0b00100001, REQUEST_SET_NTB_INPUT_SIZE, 0, 0, ncm_device_supports(CAPABLE_NTB_INPUT_SIZE_8BYTE) ? 8 : 4};
+    struct _ntb_config_data ntb_config_data = {NCM_RX_NTB_MAX_SIZE, NCM_RX_MAX_DATAGRAMS, 0};
+
+    /* Query NTB Parameters for device (NCM devices) */
+    if (usb_DefaultControlTransfer(eth.device, &get_ntb_params, &ntb_info, NCM_USB_MAXRETRIES, &transferred))
+      return false;
+
+    /* Set NTB Max Input Size to 2048 (recd minimum NCM spec v 1.2) */
+    if (usb_DefaultControlTransfer(eth.device, &ntb_config_request, &ntb_config_data, NCM_USB_MAXRETRIES, &transferred))
+      return false;
+  }
   if (usb_SetInterface(eth.device, if_bulk.addr, if_bulk.len))
-    return USB_ERROR_FAILED;
+    return false;
   eth.endpoint.in = usb_GetDeviceEndpoint(eth.device, endpoint_addr.in);
   eth.endpoint.out = usb_GetDeviceEndpoint(eth.device, endpoint_addr.out);
   eth.endpoint.interrupt = usb_GetDeviceEndpoint(eth.device, endpoint_addr.interrupt);
@@ -672,10 +711,6 @@ init_success:
   return true;
 }
 
-// NCM control setup packets/data for device configuration
-usb_control_setup_t get_ntb_params = {0b10100001, REQUEST_GET_NTB_PARAMETERS, 0, 0, 0x1c};
-usb_control_setup_t ntb_config_request = {0b00100001, REQUEST_SET_NTB_INPUT_SIZE, 0, 0, 4};
-uint32_t ntb_in_new_size = NCM_RX_NTB_MAX_SIZE;
 usb_error_t
 eth_handle_usb_event(usb_event_t event, void *event_data,
                      usb_callback_data_t *callback_data)
@@ -697,22 +732,6 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
     {
       eth.process = ncm_process;
       eth.emit = ncm_bulk_transmit;
-
-      // unlike ECM, NCM requires some initialization work
-      size_t transferred;
-      usb_error_t err = 0;
-
-      /* Query NTB Parameters for device (NCM devices) */
-      if ((err = usb_DefaultControlTransfer(eth.device, &get_ntb_params, &ntb_info, NCM_USB_MAXRETRIES, &transferred)))
-        printf("error getting ntb params.\n");
-
-      /* Set NTB Max Input Size to 2048 (recd minimum NCM spec v 1.2) */
-      if ((err = usb_DefaultControlTransfer(eth.device, &ntb_config_request, &ntb_in_new_size, NCM_USB_MAXRETRIES, &transferred)))
-        printf("error setting ntb size.\n");
-
-      // if an error, break out without configuring netif
-      if (err)
-        break;
     }
     else if (init_ethernet_usb_device(USB_ECM_SUBCLASS))
     {
