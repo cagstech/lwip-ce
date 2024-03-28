@@ -19,6 +19,7 @@ class Server:
             global SERVER_UP
             # Create a socket object
             self.running = False
+
             self.sock_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             # self.sock_tcp.settimeout(300)
@@ -87,6 +88,8 @@ class Server:
             try:
                 conn, addr = self.sock_tcp.accept()
                 self.broadcast(f"new client from tcp:{addr}")
+                self.sock_udp.sendto(
+                    bytes(f"udp test ping\0", 'utf-8'), addr)
                 self.clients_tcp[conn] = client = Client(conn, addr)
                 thread = threading.Thread(target=client.handle_connection)
                 self.threads.append(thread)
@@ -104,8 +107,8 @@ class Server:
                 data, addr = self.sock_udp.recvfrom(
                     PACKET_MTU)  # buffer size is 1024 bytes
                 if not addr[0] in self.clients_udp:
-                    self.broadcast(f"new client from udp:{addr}")
                     self.clients_udp[addr[0]] = addr
+                    self.broadcast(f"new client from udp:{addr}")
                 self.broadcast(data.decode('utf-8'))
             except:
                 print(traceback.format_exc(limit=None, chain=True))

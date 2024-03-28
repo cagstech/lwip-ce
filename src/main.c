@@ -97,8 +97,8 @@ void udp_recv_func(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr
     LWIP_UNUSED_ARG(port);
 
     // Data received successfully
-    if (protomode == MODE_UDP)
-        printf("%s\n", p->payload);
+
+    printf("%s\n", p->payload);
 
     pbuf_free(p);
 }
@@ -332,7 +332,7 @@ int main(void)
             }
             else if (string_length > 0)
             {
-                uint8_t tbuf[MAX_CHAT_LEN + 20] = {0};
+                char tbuf[MAX_CHAT_LEN + 20] = {0};
                 sprintf(tbuf, "[%s] %s", username, chat_string);
                 if (protomode == MODE_TCP)
                 {
@@ -344,15 +344,20 @@ int main(void)
                         }
                     }
                 }
-                if (protomode == MODE_UDP)
+                else if (protomode == MODE_UDP)
                 {
                     struct pbuf *tpbuf = pbuf_alloc(PBUF_RAW, strlen(tbuf), PBUF_RAM);
                     if (tpbuf)
                     {
                         pbuf_take(tpbuf, tbuf, strlen(tbuf));
-                        udp_sendto(udp_pcb, tpbuf, &remote_ip, 8881);
+                        if (udp_sendto(udp_pcb, tpbuf, &remote_ip, 8881))
+                            printf("udp send error\n");
                     }
+                    else
+                        printf("udp pbuf alloc error\n");
                 }
+                else
+                    printf("invalid protocol mode\n");
                 memset(chat_string, 0, string_length);
                 string_length = 0;
                 string_changed = true;
