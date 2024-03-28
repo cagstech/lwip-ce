@@ -692,8 +692,7 @@ bool init_ethernet_usb_device(uint8_t device_class)
                 parse_state |= PARSE_HAS_MAC_ADDR;
             }
           }
-            printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", eth.hwaddr[0], eth.hwaddr[1], eth.hwaddr[2], eth.hwaddr[3], eth.hwaddr[4], eth.hwaddr[5]);
-            break;
+          break;
           case USB_UNION_FUNCTIONAL_DESCRIPTOR:
           {
             // if union functional type, this contains interface number for bulk transfer
