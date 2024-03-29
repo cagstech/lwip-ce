@@ -27,12 +27,12 @@ enum _descriptor_parser_await_states
   PARSE_HAS_ENDPOINT_OUT = (1 << 6)
 };
 
-/** GLOBAL/BUFFERS DECLARATIONS */
+/* GLOBAL/BUFFERS DECLARATIONS */
 eth_device_t eth = {0};
 struct netif eth_netif = {0};
 const char hostname[] = "ti84plusce";
 
-/** UTF-16 -> HEX CONVERSION */
+/* UTF-16 -> HEX CONVERSION */
 uint8_t nibble(uint16_t c)
 {
   c -= '0';
@@ -47,19 +47,6 @@ uint8_t nibble(uint16_t c)
   return 0xff;
 }
 
-/** ETHERNET CALLBACK FUNCTIONS */
-void eth_link_callback(struct netif *netif)
-{
-  if (netif_is_link_up(netif) && (!dhcp_supplied_address(netif)))
-    dhcp_start(netif);
-}
-
-void eth_status_callback(struct netif *netif)
-{
-  if (dhcp_supplied_address(netif))
-    printf("ipaddr changed: %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
-}
-
 /*******************************************************************************************
  * Communications Data Class Revision 1.2
  * BM Request Types
@@ -67,8 +54,6 @@ void eth_status_callback(struct netif *netif)
  * CDC Notification Codes
  * Class-Specific Descriptor Definitions
  */
-#define BM_REQUEST_TYPE_TO_HOST (USB_DEVICE_TO_HOST | USB_CONTROL_TRANSFER | USB_RECIPIENT_INTERFACE)   // 0b10100001
-#define BM_REQUEST_TYPE_TO_DEVICE (USB_HOST_TO_DEVICE | USB_CONTROL_TRANSFER | USB_RECIPIENT_INTERFACE) // 0b00100001
 
 enum _cdc_request_codes // request types for CDC-ECM and CDC-NCM
 {
@@ -155,9 +140,9 @@ struct _ntb_config_data
   uint16_t reserved;
 };
 
-/***********************************************************
- * Callbacks for USB Activity (CDC-ECM and CDC-NCM)
- * interrupt receive, TX, RX
+/*******************************************************************************************
+ * General Ethernet Callback Functions
+ * Link Change/Status Change Callback functions
  */
 uint8_t interrupt_buf[64];
 uint8_t eth_rx_buf[ETHERNET_MTU];
@@ -295,7 +280,7 @@ usb_error_t ncm_control_setup(void)
   usb_error_t error = 0;
   usb_control_setup_t get_ntb_params = {0b10100001, REQUEST_GET_NTB_PARAMETERS, 0, 0, 0x1c};
   usb_control_setup_t ntb_config_request = {0b00100001, REQUEST_SET_NTB_INPUT_SIZE, 0, 0, ncm_device_supports(CAPABLE_NTB_INPUT_SIZE_8BYTE) ? 8 : 4};
-  usb_control_setup_t multicast_filter_request = {0b00100001, REQUEST_SET_ETHERNET_MULTICAST_FILTERS, 0, 0, 0};
+  // usb_control_setup_t multicast_filter_request = {0b00100001, REQUEST_SET_ETHERNET_MULTICAST_FILTERS, 0, 0, 0};
   usb_control_setup_t packet_filter_request = {0b00100001, REQUEST_SET_ETHERNET_PACKET_FILTER, 0x01, 0, 0};
   struct _ntb_config_data ntb_config_data = {NCM_RX_NTB_MAX_SIZE, NCM_RX_MAX_DATAGRAMS, 0};
 
@@ -306,7 +291,8 @@ usb_error_t ncm_control_setup(void)
   error |= usb_DefaultControlTransfer(eth.device, &ntb_config_request, &ntb_config_data, NCM_USB_MAXRETRIES, &transferred);
 
   /* Reset packet filters */
-  error |= usb_DefaultControlTransfer(eth.device, &packet_filter_request, NULL, NCM_USB_MAXRETRIES, &transferred);
+  if (ncm_device_supports(CAPABLE_ETHERNET_PACKET_FILTER))
+    error |= usb_DefaultControlTransfer(eth.device, &packet_filter_request, NULL, NCM_USB_MAXRETRIES, &transferred);
 
   return error;
 }
@@ -509,15 +495,20 @@ err_t eth_netif_init(struct netif *netif)
   MIB2_INIT_NETIF(netif, snmp_ifType_ethernet_csmacd, 100000000);
   memcpy(netif->hwaddr, eth.hwaddr, NETIF_MAX_HWADDR_LEN);
   netif->hwaddr_len = NETIF_MAX_HWADDR_LEN;
-  netif->name[0] = 'e';
+  netif->name[0] = '\e';
   netif->name[1] = 'n';
   netif->num = 0;
   netif_set_hostname(netif, hostname);
   netif_create_ip6_linklocal_address(netif, 1);
   netif->ip6_autoconfig_enabled = 1;
-  netif_set_link_callback(netif, eth_link_callback);
-  netif_set_status_callback(netif, eth_status_callback);
+  // netif_set_link_callback(netif, eth_link_callback);
+  // netif_set_status_callback(netif, eth_status_callback);
   netif_set_default(netif);
+  netif_set_up(netif);
+  usb_ScheduleInterruptTransfer(eth.endpoint.interrupt, interrupt_buf, 64, interrupt_receive_callback, NULL);
+  usb_ScheduleBulkTransfer(eth.endpoint.in, eth_rx_buf, ETHERNET_MTU, bulk_receive_callback, NULL);
+  netif_set_link_up(netif);
+  printf("netif add successful\n");
   return ERR_OK;
 }
 
@@ -733,7 +724,7 @@ usb_error_t
 eth_handle_usb_event(usb_event_t event, void *event_data,
                      usb_callback_data_t *callback_data)
 {
-
+  static bool has_device = false;
   /* Enable newly connected devices */
   switch (event)
   {
@@ -746,6 +737,8 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
     break;
   case USB_DEVICE_ENABLED_EVENT:
     eth.device = event_data;
+    if (has_device)
+      break;
     if (init_ethernet_usb_device(USB_NCM_SUBCLASS))
     {
       eth.process = ncm_process;
@@ -762,16 +755,14 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
       break;
     }
     netif_add_noaddr(&eth_netif, NULL, eth_netif_init, netif_input);
-    netif_set_default(&eth_netif);
-    netif_set_up(&eth_netif);
-    usb_ScheduleBulkTransfer(eth.endpoint.in, eth_rx_buf, ETHERNET_MTU, bulk_receive_callback, NULL);
-    usb_ScheduleInterruptTransfer(eth.endpoint.interrupt, interrupt_buf, 64, interrupt_receive_callback, NULL);
-    break;
-
-  case USB_DEVICE_DISABLED_EVENT:
-    netif_remove(&eth_netif);
+    has_device = true;
     break;
   case USB_DEVICE_DISCONNECTED_EVENT:
+  case USB_DEVICE_DISABLED_EVENT:
+    netif_set_down(&eth_netif);
+    netif_remove(&eth_netif);
+    has_device = false;
+    break;
   case USB_HOST_PORT_CONNECT_STATUS_CHANGE_INTERRUPT:
     return USB_ERROR_NO_DEVICE;
     break;

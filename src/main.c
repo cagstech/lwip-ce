@@ -107,7 +107,6 @@ void exit_funcs(void)
 {
     if (spcb->state != CLOSED)
         altcp_close(spcb);
-    dhcp_stop(&eth_netif);
     usb_Cleanup();
     gfx_End();
 }
@@ -253,7 +252,7 @@ int main(void)
     printf("lwIP private beta test\n");
     printf("Simple TCP Text Chat\n");
     lwip_init();
-    if (usb_Init(eth_handle_usb_event, NULL, USB_CDC_ETHERNET_DESCRIPTORS, USB_DEFAULT_INIT_FLAGS))
+    if (usb_Init(eth_handle_usb_event, NULL, NULL, USB_DEFAULT_INIT_FLAGS))
         return 1;
 
     // wait for ecm device to be ready
@@ -265,116 +264,128 @@ int main(void)
     char username[16] = {0};
     bool string_changed = true;
     char *active_string = username;
+    struct netif *active_netif = NULL;
     loopit = true;
     do
     {
         key = os_GetCSC();
-        if (key == sk_Alpha)
+        if (active_netif == NULL)
         {
-            input_mode++;
-            if (input_mode > INPUT_NUMBER)
-                input_mode = INPUT_LOWER;
-            ref_str = (input_mode == INPUT_LOWER) ? chars_lower : (input_mode == INPUT_UPPER) ? chars_upper
-                                                                                              : chars_num;
-            string_changed = true;
-        }
-        else if (key == sk_Mode)
-        {
-            protomode = (protomode == MODE_TCP);
-            if (protomode == MODE_TCP)
-                printf("tcp mode enabled\n");
-            else if (protomode == MODE_UDP)
-                printf("udp mode enabled\n");
-        }
-        else if (key == sk_Del)
-        {
-            if (string_length > 0)
+            active_netif = netif_find("en0");
+            if (active_netif)
             {
-                active_string[--string_length] = 0;
-                string_changed = true;
+                dhcp_start(active_netif);
+                printf("interface up\n");
             }
         }
-        else if (key == sk_Enter)
+        else
         {
-            if (active_string == username)
+
+            if (key == sk_Alpha)
             {
-                err_t dns_resp;
-                if (dhcp_supplied_address(&eth_netif))
+                input_mode++;
+                if (input_mode > INPUT_NUMBER)
+                    input_mode = INPUT_LOWER;
+                ref_str = (input_mode == INPUT_LOWER) ? chars_lower : (input_mode == INPUT_UPPER) ? chars_upper
+                                                                                                  : chars_num;
+                string_changed = true;
+            }
+            else if (key == sk_Mode)
+            {
+                protomode = (protomode == MODE_TCP);
+                if (protomode == MODE_TCP)
+                    printf("tcp mode enabled\n");
+                else if (protomode == MODE_UDP)
+                    printf("udp mode enabled\n");
+            }
+            else if (key == sk_Del)
+            {
+                if (string_length > 0)
                 {
-                    tcp_pcb = altcp_new(&tcp_allocator);
-                    udp_pcb = udp_new();
-                    if (tcp_pcb == NULL)
-                        return 2;
-                    // spcb = altcp_tls_wrap(tls_conf, pcb);
-                    spcb = tcp_pcb;
-                    udp_recv(udp_pcb, udp_recv_func, NULL);
-                    altcp_arg(spcb, spcb);
-                    dns_resp = dns_gethostbyname(remote_host, &remote_ip, dns_lookup_callback, NULL);
-                    printf("dns lookup for: %s\n", remote_host);
-                    if (dns_resp == ERR_OK)
+                    active_string[--string_length] = 0;
+                    string_changed = true;
+                }
+            }
+            else if (key == sk_Enter)
+            {
+                if (active_string == username)
+                {
+                    err_t dns_resp;
+                    if (dhcp_supplied_address(&eth_netif))
                     {
-                        printf("host in dns cache\n");
-                        if (altcp_connect(spcb, &remote_ip, 8881, tcp_connect_callback) != ERR_OK)
+                        tcp_pcb = altcp_new(&tcp_allocator);
+                        udp_pcb = udp_new();
+                        if (tcp_pcb == NULL)
+                            return 2;
+                        // spcb = altcp_tls_wrap(tls_conf, pcb);
+                        spcb = tcp_pcb;
+                        udp_recv(udp_pcb, udp_recv_func, NULL);
+                        altcp_arg(spcb, spcb);
+                        dns_resp = dns_gethostbyname(remote_host, &remote_ip, dns_lookup_callback, NULL);
+                        printf("dns lookup for: %s\n", remote_host);
+                        if (dns_resp == ERR_OK)
                         {
-                            printf("tcp connect err\n");
+                            printf("host in dns cache\n");
+                            if (altcp_connect(spcb, &remote_ip, 8881, tcp_connect_callback) != ERR_OK)
+                            {
+                                printf("tcp connect err\n");
+                                break;
+                            }
+                        }
+                        else if (dns_resp != ERR_INPROGRESS)
+                        {
+                            printf("hostname lookup err");
                             break;
                         }
+                        active_string = chat_string;
+                        string_length = 0;
                     }
-                    else if (dns_resp != ERR_INPROGRESS)
-                    {
-                        printf("hostname lookup err");
-                        break;
-                    }
-                    active_string = chat_string;
-                    string_length = 0;
+                    string_changed = true;
                 }
-                string_changed = true;
-            }
-            else if (string_length > 0)
-            {
-                char tbuf[MAX_CHAT_LEN + 20] = {0};
-                sprintf(tbuf, "[%s] %s", username, chat_string);
-                if (protomode == MODE_TCP)
+                else if (string_length > 0)
                 {
-                    if (altcp_sndbuf(spcb) >= string_length)
+                    char tbuf[MAX_CHAT_LEN + 20] = {0};
+                    sprintf(tbuf, "[%s] %s", username, chat_string);
+                    if (protomode == MODE_TCP)
                     {
-                        if (altcp_write(spcb, tbuf, strlen(tbuf), TCP_WRITE_FLAG_COPY) == ERR_OK)
+                        if (altcp_sndbuf(spcb) >= string_length)
                         {
-                            altcp_output(spcb);
+                            if (altcp_write(spcb, tbuf, strlen(tbuf), TCP_WRITE_FLAG_COPY) == ERR_OK)
+                            {
+                                altcp_output(spcb);
+                            }
                         }
                     }
-                }
-                else if (protomode == MODE_UDP)
-                {
-                    struct pbuf *tpbuf = pbuf_alloc(PBUF_RAW, strlen(tbuf), PBUF_RAM);
-                    if (tpbuf)
+                    else if (protomode == MODE_UDP)
                     {
-                        pbuf_take(tpbuf, tbuf, strlen(tbuf));
-                        if (udp_sendto(udp_pcb, tpbuf, &remote_ip, 8881))
-                            printf("udp send error\n");
+                        struct pbuf *tpbuf = pbuf_alloc(PBUF_RAW, strlen(tbuf), PBUF_RAM);
+                        if (tpbuf)
+                        {
+                            pbuf_take(tpbuf, tbuf, strlen(tbuf));
+                            if (udp_sendto(udp_pcb, tpbuf, &remote_ip, 8881))
+                                printf("udp send error\n");
+                        }
+                        else
+                            printf("udp pbuf alloc error\n");
                     }
                     else
-                        printf("udp pbuf alloc error\n");
+                        printf("invalid protocol mode\n");
+                    memset(chat_string, 0, string_length);
+                    string_length = 0;
+                    string_changed = true;
                 }
-                else
-                    printf("invalid protocol mode\n");
-                memset(chat_string, 0, string_length);
-                string_length = 0;
-                string_changed = true;
             }
         }
-        else if (key == sk_Clear)
+        if (key == sk_Clear)
         {
             altcp_close(spcb);
             break;
         }
-        else if (ref_str[key] && (string_length < MAX_CHAT_LEN))
+        if (ref_str[key] && (string_length < MAX_CHAT_LEN))
         {
             active_string[string_length++] = ref_str[key];
             string_changed = true;
         }
-        usb_HandleEvents();
-        sys_check_timeouts();
         if (string_changed)
         {
             outchar_scroll_up = false;
@@ -393,6 +404,8 @@ int main(void)
             string_changed = false;
             outchar_scroll_up = true;
         }
+        usb_HandleEvents();
+        sys_check_timeouts();
     } while (loopit == true);
     exit_funcs();
 }

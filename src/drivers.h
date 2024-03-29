@@ -16,8 +16,6 @@
 #define USB_ETHERNET_FUNCTIONAL_DESCRIPTOR 0x0F
 #define USB_NCM_FUNCTIONAL_DESCRIPTOR 0x1A
 
-#define USB_CDC_ETHERNET_DESCRIPTORS NULL
-
 // supported devices
 enum eth_usb_devices
 {
