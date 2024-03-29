@@ -29,8 +29,35 @@ typedef struct _eth_device_t
 {
   usb_device_t device;
   uint8_t type;
-  uint8_t bm_capabilities;
   uint8_t hwaddr[6];
+  union
+  {
+    struct _ncm
+    {
+      uint8_t bm_capabilities;
+      uint16_t sequence; /* per NCM device - transfer sequence counter */
+      struct _ntb_params
+      {
+        /* NTB Parameters (Returned from Control Request) */
+        uint16_t wLength;
+        uint16_t bmNtbFormatsSupported;
+        uint32_t dwNtbInMaxSize;
+        uint16_t wNdpInDivisor;
+        uint16_t wNdpInPayloadRemainder;
+        uint16_t wNdpInAlignment;
+        uint16_t reserved;
+        uint32_t dwNtbOutMaxSize;
+        uint16_t wNdpOutDivisor;
+        uint16_t wNdpOutPayloadRemainder;
+        uint16_t wNdpOutAlignment;
+        uint16_t wNtbOutMaxDatagrams;
+      } ntb_params;
+    } ncm;
+    struct _ecm
+    {
+      uint8_t dummy;
+    } ecm;
+  } class;
   struct
   {
     usb_endpoint_t in, out, interrupt;

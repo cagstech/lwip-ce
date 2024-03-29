@@ -92,7 +92,7 @@ enum _cdc_ncm_bm_networkcapabilities
   CAPABLE_MAX_DATAGRAM,
   CAPABLE_NTB_INPUT_SIZE_8BYTE
 };
-#define ncm_device_supports(dev, bm) (((dev)->bm_capabilities >> (bm)) & 1)
+#define ncm_device_supports(dev, bm) (((dev)->class.ncm.bm_capabilities >> (bm)) & 1)
 
 typedef struct
 {
@@ -222,24 +222,6 @@ usb_error_t bulk_transmit_callback(usb_endpoint_t endpoint,
  */
 #define NCM_USB_MAXRETRIES 3
 
-/* NTB Parameters (Returned from Control Request) */
-struct ntb_params
-{
-  uint16_t wLength;
-  uint16_t bmNtbFormatsSupported;
-  uint32_t dwNtbInMaxSize;
-  uint16_t wNdpInDivisor;
-  uint16_t wNdpInPayloadRemainder;
-  uint16_t wNdpInAlignment;
-  uint16_t reserved;
-  uint32_t dwNtbOutMaxSize;
-  uint16_t wNdpOutDivisor;
-  uint16_t wNdpOutPayloadRemainder;
-  uint16_t wNdpOutAlignment;
-  uint16_t wNtbOutMaxDatagrams;
-};
-struct ntb_params ntb_info; /* allocate one */
-
 /* NCM Transfer Header (NTH) Defintion */
 #define NCM_NTH_SIG 0x484D434E
 struct ncm_nth
@@ -287,7 +269,7 @@ usb_error_t ncm_control_setup(eth_device_t *eth)
   struct _ntb_config_data ntb_config_data = {NCM_RX_NTB_MAX_SIZE, NCM_RX_MAX_DATAGRAMS, 0};
 
   /* Query NTB Parameters for device (NCM devices) */
-  error |= usb_DefaultControlTransfer(eth->device, &get_ntb_params, &ntb_info, NCM_USB_MAXRETRIES, &transferred);
+  error |= usb_DefaultControlTransfer(eth->device, &get_ntb_params, &eth->class.ncm.ntb_params, NCM_USB_MAXRETRIES, &transferred);
 
   /* Set NTB Max Input Size to 2048 (recd minimum NCM spec v 1.2) */
   error |= usb_DefaultControlTransfer(eth->device, &ntb_config_request, &ntb_config_data, NCM_USB_MAXRETRIES, &transferred);
@@ -387,8 +369,7 @@ exit:
 err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
 {
   eth_device_t *dev = (eth_device_t *)netif->state;
-  static uint16_t sequence = 0; /* set sequence counter */
-  uint16_t offset_ndp = get_next_offset(NCM_NTH_LEN, ntb_info.wNdpInAlignment, 0);
+  uint16_t offset_ndp = get_next_offset(NCM_NTH_LEN, dev->class.ncm.ntb_params.wNdpInAlignment, 0);
   if (p->tot_len > ETHERNET_MTU)
   {
     printf("pbuf payload exceeds mtu\n");
@@ -409,7 +390,7 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
   // populate structs
   nth->dwSignature = NCM_NTH_SIG;
   nth->wHeaderLength = NCM_NTH_LEN;
-  nth->wSequence = sequence;
+  nth->wSequence = dev->class.ncm.sequence++;
   nth->wBlockLength = NCM_HBUF_SIZE + ETHERNET_MTU;
   nth->wNdpIndex = offset_ndp;
 
@@ -438,9 +419,6 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
     pbuf_free(obuf);
     return ERR_IF;
   }
-
-  // increment sequence, decrement my will to live
-  sequence++;
   return ERR_OK;
 }
 
@@ -502,7 +480,6 @@ err_t eth_netif_init(struct netif *netif)
   netif->hwaddr_len = NETIF_MAX_HWADDR_LEN;
   // netif_set_link_callback(netif, eth_link_callback);
   // netif_set_status_callback(netif, eth_status_callback);
-  printf("netif add successful\n");
   return ERR_OK;
 }
 
@@ -689,7 +666,7 @@ bool init_ethernet_usb_device(eth_device_t *eth, uint8_t device_class)
           case USB_NCM_FUNCTIONAL_DESCRIPTOR:
           {
             usb_ncm_functional_descriptor_t *ncm = (usb_ncm_functional_descriptor_t *)cs;
-            eth->bm_capabilities = ncm->bmNetworkCapabilities;
+            eth->class.ncm.bm_capabilities = ncm->bmNetworkCapabilities;
           }
           break;
           }
