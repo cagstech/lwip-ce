@@ -495,7 +495,7 @@ err_t eth_netif_init(struct netif *netif)
   MIB2_INIT_NETIF(netif, snmp_ifType_ethernet_csmacd, 100000000);
   memcpy(netif->hwaddr, eth.hwaddr, NETIF_MAX_HWADDR_LEN);
   netif->hwaddr_len = NETIF_MAX_HWADDR_LEN;
-  netif->name[0] = '\e';
+  netif->name[0] = 'e';
   netif->name[1] = 'n';
   netif->num = 0;
   netif_set_hostname(netif, hostname);
