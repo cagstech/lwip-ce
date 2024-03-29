@@ -35,11 +35,12 @@ typedef struct _eth_device_t
   {
     usb_endpoint_t in, out, interrupt;
   } endpoint;
-  err_t (*process)(uint8_t *buf, size_t len);
+  err_t (*process)(struct netif *netif, uint8_t *buf, size_t len);
   err_t (*emit)(struct netif *netif, struct pbuf *p);
+  struct netif iface;
 } eth_device_t;
 extern eth_device_t eth;
-extern struct netif eth_netif;
+// extern struct netif eth_netif;
 // extern uint8_t eth_rx_buf[ETHERNET_MTU];
 
 usb_error_t eth_handle_usb_event(usb_event_t event, void *event_data,

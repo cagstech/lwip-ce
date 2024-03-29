@@ -311,7 +311,7 @@ int main(void)
                 if (active_string == username)
                 {
                     err_t dns_resp;
-                    if (dhcp_supplied_address(&eth_netif))
+                    if (dhcp_supplied_address(active_netif))
                     {
                         tcp_pcb = altcp_new(&tcp_allocator);
                         udp_pcb = udp_new();

@@ -92,7 +92,7 @@ enum _cdc_ncm_bm_networkcapabilities
   CAPABLE_MAX_DATAGRAM,
   CAPABLE_NTB_INPUT_SIZE_8BYTE
 };
-#define ncm_device_supports(bm) ((eth.bm_capabilities >> (bm)) & 1)
+#define ncm_device_supports(dev, bm) (((dev)->bm_capabilities >> (bm)) & 1)
 
 typedef struct
 {
@@ -152,6 +152,7 @@ usb_error_t interrupt_receive_callback(usb_endpoint_t endpoint,
                                        size_t transferred,
                                        usb_transfer_data_t *data)
 {
+  eth_device_t *dev = (eth_device_t *)data;
   if ((status == USB_TRANSFER_COMPLETED) && transferred)
   {
     usb_control_setup_t *notify;
@@ -177,7 +178,7 @@ usb_error_t interrupt_receive_callback(usb_endpoint_t endpoint,
       bytes_parsed += sizeof(usb_control_setup_t) + notify->wLength;
     } while (bytes_parsed < transferred);
   }
-  usb_ScheduleInterruptTransfer(eth.endpoint.interrupt, interrupt_buf, 64, interrupt_receive_callback, NULL);
+  usb_ScheduleInterruptTransfer(dev->endpoint.interrupt, interrupt_buf, 64, interrupt_receive_callback, data);
   return USB_SUCCESS;
 }
 
@@ -187,15 +188,16 @@ usb_error_t bulk_receive_callback(usb_endpoint_t endpoint,
                                   size_t transferred,
                                   usb_transfer_data_t *data)
 {
+  eth_device_t *dev = (eth_device_t *)data;
   if ((status == USB_TRANSFER_COMPLETED) && transferred)
   {
     LINK_STATS_INC(link.recv);
-    MIB2_STATS_NETIF_ADD(&eth_netif, ifinoctets, transferred);
-    eth.process(eth_rx_buf, transferred);
+    MIB2_STATS_NETIF_ADD(&dev->iface, ifinoctets, transferred);
+    dev->process(&dev->iface, eth_rx_buf, transferred);
   }
   else
     printf("usb transfer status code: %u\n", status);
-  usb_ScheduleBulkTransfer(eth.endpoint.in, eth_rx_buf, ETHERNET_MTU, bulk_receive_callback, NULL);
+  usb_ScheduleBulkTransfer(dev->endpoint.in, eth_rx_buf, ETHERNET_MTU, bulk_receive_callback, data);
   return USB_SUCCESS;
 }
 
@@ -274,25 +276,25 @@ struct ncm_ndp
  * NCM Control Setup
  */
 
-usb_error_t ncm_control_setup(void)
+usb_error_t ncm_control_setup(eth_device_t *eth)
 {
   size_t transferred;
   usb_error_t error = 0;
   usb_control_setup_t get_ntb_params = {0b10100001, REQUEST_GET_NTB_PARAMETERS, 0, 0, 0x1c};
-  usb_control_setup_t ntb_config_request = {0b00100001, REQUEST_SET_NTB_INPUT_SIZE, 0, 0, ncm_device_supports(CAPABLE_NTB_INPUT_SIZE_8BYTE) ? 8 : 4};
+  usb_control_setup_t ntb_config_request = {0b00100001, REQUEST_SET_NTB_INPUT_SIZE, 0, 0, ncm_device_supports(eth, CAPABLE_NTB_INPUT_SIZE_8BYTE) ? 8 : 4};
   // usb_control_setup_t multicast_filter_request = {0b00100001, REQUEST_SET_ETHERNET_MULTICAST_FILTERS, 0, 0, 0};
   usb_control_setup_t packet_filter_request = {0b00100001, REQUEST_SET_ETHERNET_PACKET_FILTER, 0x01, 0, 0};
   struct _ntb_config_data ntb_config_data = {NCM_RX_NTB_MAX_SIZE, NCM_RX_MAX_DATAGRAMS, 0};
 
   /* Query NTB Parameters for device (NCM devices) */
-  error |= usb_DefaultControlTransfer(eth.device, &get_ntb_params, &ntb_info, NCM_USB_MAXRETRIES, &transferred);
+  error |= usb_DefaultControlTransfer(eth->device, &get_ntb_params, &ntb_info, NCM_USB_MAXRETRIES, &transferred);
 
   /* Set NTB Max Input Size to 2048 (recd minimum NCM spec v 1.2) */
-  error |= usb_DefaultControlTransfer(eth.device, &ntb_config_request, &ntb_config_data, NCM_USB_MAXRETRIES, &transferred);
+  error |= usb_DefaultControlTransfer(eth->device, &ntb_config_request, &ntb_config_data, NCM_USB_MAXRETRIES, &transferred);
 
   /* Reset packet filters */
-  if (ncm_device_supports(CAPABLE_ETHERNET_PACKET_FILTER))
-    error |= usb_DefaultControlTransfer(eth.device, &packet_filter_request, NULL, NCM_USB_MAXRETRIES, &transferred);
+  if (ncm_device_supports(eth, CAPABLE_ETHERNET_PACKET_FILTER))
+    error |= usb_DefaultControlTransfer(eth->device, &packet_filter_request, NULL, NCM_USB_MAXRETRIES, &transferred);
 
   return error;
 }
@@ -300,7 +302,7 @@ usb_error_t ncm_control_setup(void)
 /*-----------------------------------------------
  * NCM RX
  */
-err_t ncm_process(uint8_t *buf, size_t len)
+err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
 {
   static struct pbuf *rx_buf = NULL; // pointer to pbuf for RX
   static size_t rx_offset = 0;       // start RX offset at 0
@@ -362,7 +364,7 @@ err_t ncm_process(uint8_t *buf, size_t len)
   } while (1);
   for (int i = 0; i < enqueued; i++)
     if (rx_queue[i])
-      if (eth_netif.input(rx_queue[i], &eth_netif) != ERR_OK)
+      if (netif->input(rx_queue[i], netif) != ERR_OK)
         pbuf_free(rx_queue[i]);
 
 exit:
@@ -384,6 +386,7 @@ exit:
 
 err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
 {
+  eth_device_t *dev = (eth_device_t *)netif->state;
   static uint16_t sequence = 0; /* set sequence counter */
   uint16_t offset_ndp = get_next_offset(NCM_NTH_LEN, ntb_info.wNdpInAlignment, 0);
   if (p->tot_len > ETHERNET_MTU)
@@ -430,7 +433,7 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
 
   // queue the TX
   // printf("sent packet %u at time %lu\n", sequence, sys_now());
-  if (usb_ScheduleBulkTransfer(eth.endpoint.out, obuf->payload, ETHERNET_MTU + NCM_HBUF_SIZE, bulk_transmit_callback, obuf))
+  if (usb_ScheduleBulkTransfer(dev->endpoint.out, obuf->payload, ETHERNET_MTU + NCM_HBUF_SIZE, bulk_transmit_callback, obuf))
   {
     pbuf_free(obuf);
     return ERR_IF;
@@ -448,13 +451,13 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
  */
 
 // process ECM frame
-err_t ecm_process(uint8_t *buf, size_t len)
+err_t ecm_process(struct netif *netif, uint8_t *buf, size_t len)
 {
   struct pbuf *p = pbuf_alloc(PBUF_RAW, len, PBUF_POOL);
   if (p != NULL)
   {
     pbuf_take(p, buf, len);
-    if (eth_netif.input(p, &eth_netif) != ERR_OK)
+    if (netif->input(p, netif) != ERR_OK)
       pbuf_free(p);
     return ERR_OK;
   }
@@ -464,6 +467,7 @@ err_t ecm_process(uint8_t *buf, size_t len)
 // bulk tx ECM
 err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p)
 {
+  eth_device_t *dev = (eth_device_t *)netif->state;
   if (p->tot_len > ETHERNET_MTU)
   {
     printf("pbuf payload exceeds mtu\n");
@@ -475,7 +479,7 @@ err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p)
   MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
   if (pbuf_copy(tbuf, p))
     return ERR_MEM;
-  if (usb_ScheduleBulkTransfer(eth.endpoint.out, tbuf->payload, p->tot_len, bulk_transmit_callback, tbuf) == USB_SUCCESS)
+  if (usb_ScheduleBulkTransfer(dev->endpoint.out, tbuf->payload, p->tot_len, bulk_transmit_callback, tbuf) == USB_SUCCESS)
     return ERR_OK;
   else
     return ERR_IF;
@@ -486,34 +490,24 @@ err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p)
  */
 err_t eth_netif_init(struct netif *netif)
 {
-  netif->linkoutput = eth.emit;
+  eth_device_t *dev = (eth_device_t *)netif->state;
+  netif->linkoutput = dev->emit;
   netif->output = etharp_output;
   netif->output_ip6 = ethip6_output;
   netif->mtu = ETHERNET_MTU;
   netif->mtu6 = ETHERNET_MTU;
   netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6;
   MIB2_INIT_NETIF(netif, snmp_ifType_ethernet_csmacd, 100000000);
-  memcpy(netif->hwaddr, eth.hwaddr, NETIF_MAX_HWADDR_LEN);
+  memcpy(netif->hwaddr, dev->hwaddr, NETIF_MAX_HWADDR_LEN);
   netif->hwaddr_len = NETIF_MAX_HWADDR_LEN;
-  netif->name[0] = 'e';
-  netif->name[1] = 'n';
-  netif->num = 0;
-  netif_set_hostname(netif, hostname);
-  netif_create_ip6_linklocal_address(netif, 1);
-  netif->ip6_autoconfig_enabled = 1;
   // netif_set_link_callback(netif, eth_link_callback);
   // netif_set_status_callback(netif, eth_status_callback);
-  netif_set_default(netif);
-  netif_set_up(netif);
-  usb_ScheduleInterruptTransfer(eth.endpoint.interrupt, interrupt_buf, 64, interrupt_receive_callback, NULL);
-  usb_ScheduleBulkTransfer(eth.endpoint.in, eth_rx_buf, ETHERNET_MTU, bulk_receive_callback, NULL);
-  netif_set_link_up(netif);
   printf("netif add successful\n");
   return ERR_OK;
 }
 
 #define DESCRIPTOR_MAX_LEN 256
-bool init_ethernet_usb_device(uint8_t device_class)
+bool init_ethernet_usb_device(eth_device_t *eth, uint8_t device_class)
 {
   size_t xferd, parsed_len, desc_len;
   usb_error_t err;
@@ -538,7 +532,7 @@ bool init_ethernet_usb_device(uint8_t device_class)
     usb_device_descriptor_t dev;         // .. device descriptor alias
     usb_configuration_descriptor_t conf; // .. config descriptor alias
   } descriptor;
-  err = usb_GetDeviceDescriptor(eth.device, &descriptor.dev, sizeof(usb_device_descriptor_t), &xferd);
+  err = usb_GetDeviceDescriptor(eth->device, &descriptor.dev, sizeof(usb_device_descriptor_t), &xferd);
   if (err || (xferd != sizeof(usb_device_descriptor_t)))
     return false;
 
@@ -552,13 +546,13 @@ bool init_ethernet_usb_device(uint8_t device_class)
   {
     uint8_t ifnum = 0;
     uint8_t parse_state = 0;
-    desc_len = usb_GetConfigurationDescriptorTotalLength(eth.device, config);
+    desc_len = usb_GetConfigurationDescriptorTotalLength(eth->device, config);
     parsed_len = 0;
     if (desc_len > 256)
       // if we overflow buffer, skip descriptor
       continue;
     // fetch config descriptor
-    err = usb_GetConfigurationDescriptor(eth.device, config, &descriptor.conf, desc_len, &xferd);
+    err = usb_GetConfigurationDescriptor(eth->device, config, &descriptor.conf, desc_len, &xferd);
     if (err || (xferd != desc_len))
       // if error or not full descriptor, skip
       continue;
@@ -633,7 +627,7 @@ bool init_ethernet_usb_device(uint8_t device_class)
               // use this to set configuration
               configdata.addr = &descriptor.conf;
               configdata.len = desc_len;
-              if (usb_SetConfiguration(eth.device, configdata.addr, configdata.len))
+              if (usb_SetConfiguration(eth->device, configdata.addr, configdata.len))
                 return false;
               parse_state |= PARSE_HAS_CONTROL_IF;
             }
@@ -658,14 +652,14 @@ bool init_ethernet_usb_device(uint8_t device_class)
             // else attempt control transfer to get mac address and save it
             // else generate random compliant local MAC address and send control request to set the hwaddr, then save it
             if (ethdesc->iMacAddress &&
-                (!usb_GetStringDescriptor(eth.device, ethdesc->iMacAddress, 0, macaddr, DESCRIPTOR_MAX_LEN, &xferd_tmp)))
+                (!usb_GetStringDescriptor(eth->device, ethdesc->iMacAddress, 0, macaddr, DESCRIPTOR_MAX_LEN, &xferd_tmp)))
             {
               for (uint24_t i = 0; i < NETIF_MAX_HWADDR_LEN; i++)
-                eth.hwaddr[i] = (nibble(macaddr->bString[2 * i]) << 4) | nibble(macaddr->bString[2 * i + 1]);
+                eth->hwaddr[i] = (nibble(macaddr->bString[2 * i]) << 4) | nibble(macaddr->bString[2 * i + 1]);
 
               parse_state |= PARSE_HAS_MAC_ADDR;
             }
-            else if (!usb_DefaultControlTransfer(eth.device, &get_mac_addr, eth.hwaddr, NCM_USB_MAXRETRIES, &xferd_tmp))
+            else if (!usb_DefaultControlTransfer(eth->device, &get_mac_addr, eth->hwaddr, NCM_USB_MAXRETRIES, &xferd_tmp))
             {
               parse_state |= PARSE_HAS_MAC_ADDR;
             }
@@ -676,10 +670,10 @@ bool init_ethernet_usb_device(uint8_t device_class)
               uint24_t rmac[2];
               rmac[0] = (uint24_t)(random() & RMAC_RANDOM_MAX);
               rmac[1] = (uint24_t)(random() & RMAC_RANDOM_MAX);
-              memcpy(eth.hwaddr, rmac, 6);
-              eth.hwaddr[0] &= 0xFE;
-              eth.hwaddr[0] |= 0x02;
-              if (!usb_DefaultControlTransfer(eth.device, &set_mac_addr, eth.hwaddr, NCM_USB_MAXRETRIES, &xferd_tmp))
+              memcpy(eth->hwaddr, rmac, 6);
+              eth->hwaddr[0] &= 0xFE;
+              eth->hwaddr[0] |= 0x02;
+              if (!usb_DefaultControlTransfer(eth->device, &set_mac_addr, eth->hwaddr, NCM_USB_MAXRETRIES, &xferd_tmp))
                 parse_state |= PARSE_HAS_MAC_ADDR;
             }
           }
@@ -695,7 +689,7 @@ bool init_ethernet_usb_device(uint8_t device_class)
           case USB_NCM_FUNCTIONAL_DESCRIPTOR:
           {
             usb_ncm_functional_descriptor_t *ncm = (usb_ncm_functional_descriptor_t *)cs;
-            eth.bm_capabilities = ncm->bmNetworkCapabilities;
+            eth->bm_capabilities = ncm->bmNetworkCapabilities;
           }
           break;
           }
@@ -708,15 +702,14 @@ bool init_ethernet_usb_device(uint8_t device_class)
   return false;
 init_success:
   if (device_class == USB_NCM_SUBCLASS)
-    if (ncm_control_setup())
+    if (ncm_control_setup(eth))
       return false;
-  if (usb_SetInterface(eth.device, if_bulk.addr, if_bulk.len))
+  if (usb_SetInterface(eth->device, if_bulk.addr, if_bulk.len))
     return false;
-  eth.endpoint.in = usb_GetDeviceEndpoint(eth.device, endpoint_addr.in);
-  eth.endpoint.out = usb_GetDeviceEndpoint(eth.device, endpoint_addr.out);
-  eth.endpoint.interrupt = usb_GetDeviceEndpoint(eth.device, endpoint_addr.interrupt);
-  eth.type = device_class;
-  usb_RefDevice(eth.device);
+  eth->endpoint.in = usb_GetDeviceEndpoint(eth->device, endpoint_addr.in);
+  eth->endpoint.out = usb_GetDeviceEndpoint(eth->device, endpoint_addr.out);
+  eth->endpoint.interrupt = usb_GetDeviceEndpoint(eth->device, endpoint_addr.interrupt);
+  eth->type = device_class;
   return true;
 }
 
@@ -725,44 +718,64 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
                      usb_callback_data_t *callback_data)
 {
   static bool has_device = false;
+  usb_device_t usb_device = event_data;
   /* Enable newly connected devices */
   switch (event)
   {
   case USB_DEVICE_CONNECTED_EVENT:
     if (!(usb_GetRole() & USB_ROLE_DEVICE))
-    {
-      usb_device_t usb_device = event_data;
       usb_ResetDevice(usb_device);
-    }
     break;
   case USB_DEVICE_ENABLED_EVENT:
-    eth.device = event_data;
-    if (has_device)
-      break;
-    if (init_ethernet_usb_device(USB_NCM_SUBCLASS))
+  {
+    eth_device_t tdev;
+    tdev.device = usb_device;
+    if (init_ethernet_usb_device(&tdev, USB_NCM_SUBCLASS))
     {
-      eth.process = ncm_process;
-      eth.emit = ncm_bulk_transmit;
+      tdev.process = ncm_process;
+      tdev.emit = ncm_bulk_transmit;
     }
-    else if (init_ethernet_usb_device(USB_ECM_SUBCLASS))
+    else if (init_ethernet_usb_device(&tdev, USB_ECM_SUBCLASS))
     {
-      eth.process = ecm_process;
-      eth.emit = ecm_bulk_transmit;
+      tdev.process = ecm_process;
+      tdev.emit = ecm_bulk_transmit;
     }
     else
     {
       printf("no supported configurations\n");
       break;
     }
-    netif_add_noaddr(&eth_netif, NULL, eth_netif_init, netif_input);
-    has_device = true;
-    break;
+    eth_device_t *new_device = malloc(sizeof(eth_device_t));
+    if (new_device == NULL)
+      return USB_ERROR_NO_MEMORY;
+    memcpy(new_device, &tdev, sizeof(eth_device_t));
+    struct netif *iface = &new_device->iface;
+    netif_add_noaddr(iface, new_device, eth_netif_init, netif_input);
+    usb_SetDeviceData(new_device->device, new_device);
+    iface->name[0] = 'e';
+    iface->name[1] = 'n';
+    static uint8_t ifnum = 0;
+    iface->num = ifnum++;
+    netif_create_ip6_linklocal_address(iface, 1);
+    iface->ip6_autoconfig_enabled = 1;
+    netif_set_default(iface);
+    netif_set_up(iface);
+    usb_ScheduleInterruptTransfer(new_device->endpoint.interrupt, interrupt_buf, 64, interrupt_receive_callback, new_device);
+    usb_ScheduleBulkTransfer(new_device->endpoint.in, eth_rx_buf, ETHERNET_MTU, bulk_receive_callback, new_device);
+    netif_set_link_up(iface);
+    netif_set_hostname(iface, hostname);
+  }
+  break;
   case USB_DEVICE_DISCONNECTED_EVENT:
   case USB_DEVICE_DISABLED_EVENT:
-    netif_set_down(&eth_netif);
-    netif_remove(&eth_netif);
-    has_device = false;
-    break;
+  {
+    eth_device_t *eth_device = (eth_device_t *)usb_GetDeviceData(usb_device);
+    netif_set_link_down(&eth_device->iface);
+    netif_set_down(&eth_device->iface);
+    netif_remove(&eth_device->iface);
+    free(eth_device);
+  }
+  break;
   case USB_HOST_PORT_CONNECT_STATUS_CHANGE_INTERRUPT:
     return USB_ERROR_NO_DEVICE;
     break;
