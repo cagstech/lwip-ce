@@ -15,18 +15,6 @@
 
 #include "drivers.h"
 
-/** DESCRIPTOR PARSER AWAIT STATES */
-enum _descriptor_parser_await_states
-{
-  PARSE_HAS_CONTROL_IF = 1,
-  PARSE_HAS_MAC_ADDR = (1 << 1),
-  PARSE_HAS_BULK_IF_NUM = (1 << 2),
-  PARSE_HAS_BULK_IF = (1 << 3),
-  PARSE_HAS_ENDPOINT_INT = (1 << 4),
-  PARSE_HAS_ENDPOINT_IN = (1 << 5),
-  PARSE_HAS_ENDPOINT_OUT = (1 << 6)
-};
-
 /* GLOBAL/BUFFERS DECLARATIONS */
 eth_device_t eth = {0};
 struct netif eth_netif = {0};
@@ -371,10 +359,7 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
   eth_device_t *dev = (eth_device_t *)netif->state;
   uint16_t offset_ndp = get_next_offset(NCM_NTH_LEN, dev->class.ncm.ntb_params.wNdpInAlignment, 0);
   if (p->tot_len > ETHERNET_MTU)
-  {
-    printf("pbuf payload exceeds mtu\n");
     return ERR_MEM;
-  }
 
   // allocate TX packet buffer
   struct pbuf *obuf = pbuf_alloc(PBUF_RAW, ETHERNET_MTU + NCM_HBUF_SIZE, PBUF_RAM);
@@ -447,10 +432,7 @@ err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p)
 {
   eth_device_t *dev = (eth_device_t *)netif->state;
   if (p->tot_len > ETHERNET_MTU)
-  {
-    printf("pbuf payload exceeds mtu\n");
     return ERR_MEM;
-  }
   struct pbuf *tbuf = pbuf_alloc(PBUF_RAW, p->tot_len, PBUF_RAM);
   LINK_STATS_INC(link.xmit);
   // Update SNMP stats(only if you use SNMP)
@@ -483,7 +465,20 @@ err_t eth_netif_init(struct netif *netif)
   return ERR_OK;
 }
 
+/** DESCRIPTOR PARSER AWAIT STATES */
+enum _descriptor_parser_await_states
+{
+  PARSE_HAS_CONTROL_IF = 1,
+  PARSE_HAS_MAC_ADDR = (1 << 1),
+  PARSE_HAS_BULK_IF_NUM = (1 << 2),
+  PARSE_HAS_BULK_IF = (1 << 3),
+  PARSE_HAS_ENDPOINT_INT = (1 << 4),
+  PARSE_HAS_ENDPOINT_IN = (1 << 5),
+  PARSE_HAS_ENDPOINT_OUT = (1 << 6)
+};
+
 #define DESCRIPTOR_MAX_LEN 256
+/** Parses the descriptors of the new device to see if it's a compatible Ethernet adapter. */
 bool init_ethernet_usb_device(eth_device_t *eth, uint8_t device_class)
 {
   size_t xferd, parsed_len, desc_len;
