@@ -1,5 +1,7 @@
 #include "lwip/arch.h"
 #include <sys/timers.h>
+#include <sys/util.h>
+#include <sys/rtc.h>
 #include <time.h>
 #include <usbdrvce.h>
 
@@ -15,5 +17,6 @@ u32_t sys_now(void)
 
 void sys_init(void)
 {
+    srandom(rtc_Time());
     timer_Enable(1, TIMER_32K, TIMER_NOINT, TIMER_UP);
 }
