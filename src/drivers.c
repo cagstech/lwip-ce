@@ -1,3 +1,9 @@
+/**
+ * @file drivers.c
+ * @author acagliano
+ * @brief Extends USBDRVCE for Communications Data Class for Ethernet devices
+ */
+
 #include "lwip/opt.h"
 
 #include <usbdrvce.h>
