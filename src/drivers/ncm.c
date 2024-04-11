@@ -1,10 +1,66 @@
-#include <usbdrvce>
+/****************************************************************************
+ * Code for Network Control Model (NCM)
+ * for USB-Ethernet devices
+ */
+
+#include <usbdrvce.h>
 #include "cdc.h"
-#include "ncm.h"
 
 #include "lwip/pbuf.h"
 #include "lwip/netif.h"
+#include "lwip/stats.h"
+#include "lwip/snmp.h"
 
+enum _cdc_ncm_bm_networkcapabilities
+{
+  CAPABLE_ETHERNET_PACKET_FILTER,
+  CAPABLE_NET_ADDRESS,
+  CAPABLE_ENCAPSULATED_RESPONSE,
+  CAPABLE_MAX_DATAGRAM,
+  CAPABLE_NTB_INPUT_SIZE_8BYTE
+};
+#define ncm_device_supports(dev, bm) (((dev)->class.ncm.bm_capabilities >> (bm)) & 1)
+
+struct _ntb_config_data
+{
+  uint32_t dwNtbInMaxSize;
+  uint16_t wNtbInMaxDatagrams;
+  uint16_t reserved;
+};
+
+/* NCM Transfer Header (NTH) Defintion */
+#define NCM_NTH_SIG 0x484D434E
+struct ncm_nth
+{
+  uint32_t dwSignature;   // "NCMH"
+  uint16_t wHeaderLength; // size of this header structure (should be 12 for NTB-16)
+  uint16_t wSequence;     // counter for NTB's sent
+  uint16_t wBlockLength;  // size of the NTB
+  uint16_t wNdpIndex;     // offset to first NDP
+};
+
+/* NCM Datagram Pointers (NDP) Definition*/
+struct ncm_ndp_idx
+{
+  uint16_t wDatagramIndex; // offset of datagram, if 0, then is end of datagram list
+  uint16_t wDatagramLen;   // length of datagram, if 0, then is end of datagram list
+};
+#define NCM_NDP_SIG0 0x304D434E
+#define NCM_NDP_SIG1 0x314D434E
+struct ncm_ndp
+{
+  uint32_t dwSignature;               // "NCM0"
+  uint16_t wLength;                   // size of NDP16
+  uint16_t wNextNdpIndex;             // offset to next NDP16
+  struct ncm_ndp_idx wDatagramIdx[1]; // pointer to end of NDP
+};
+
+#define NCM_NTH_LEN sizeof(struct ncm_nth)
+#define NCM_NDP_LEN sizeof(struct ncm_ndp)
+#define NCM_RX_NTB_MAX_SIZE 2048
+#define NCM_RX_MAX_DATAGRAMS 16
+
+/* This runs during NCM device configuration before switching to alt interface. */
 usb_error_t ncm_control_setup(eth_device_t *eth)
 {
   size_t transferred;
@@ -16,21 +72,19 @@ usb_error_t ncm_control_setup(eth_device_t *eth)
   struct _ntb_config_data ntb_config_data = {NCM_RX_NTB_MAX_SIZE, NCM_RX_MAX_DATAGRAMS, 0};
 
   /* Query NTB Parameters for device (NCM devices) */
-  error |= usb_DefaultControlTransfer(eth->device, &get_ntb_params, &eth->class.ncm.ntb_params, NCM_USB_MAXRETRIES, &transferred);
+  error |= usb_DefaultControlTransfer(eth->device, &get_ntb_params, &eth->class.ncm.ntb_params, CDC_USB_MAXRETRIES, &transferred);
 
   /* Set NTB Max Input Size to 2048 (recd minimum NCM spec v 1.2) */
-  error |= usb_DefaultControlTransfer(eth->device, &ntb_config_request, &ntb_config_data, NCM_USB_MAXRETRIES, &transferred);
+  error |= usb_DefaultControlTransfer(eth->device, &ntb_config_request, &ntb_config_data, CDC_USB_MAXRETRIES, &transferred);
 
   /* Reset packet filters */
   if (ncm_device_supports(eth, CAPABLE_ETHERNET_PACKET_FILTER))
-    error |= usb_DefaultControlTransfer(eth->device, &packet_filter_request, NULL, NCM_USB_MAXRETRIES, &transferred);
+    error |= usb_DefaultControlTransfer(eth->device, &packet_filter_request, NULL, CDC_USB_MAXRETRIES, &transferred);
 
   return error;
 }
 
-/*-----------------------------------------------
- * NCM RX
- */
+/* This processes an incoming NCM datagram queue. */
 err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
 {
   static struct pbuf *rx_buf = NULL; // pointer to pbuf for RX
@@ -104,11 +158,7 @@ exit:
   return ERR_OK;
 }
 
-/*-----------------------------------------------
- * NCM TX
- * send a single datagram in a single frame just like ECM
- * the calc is too slow for it to make a difference
- */
+/* This code packs a single TX Ethernet frame into an NCM transfer. */
 #define NCM_HBUF_SIZE 64
 #define get_next_offset(offset, divisor, remainder) \
   (offset) + (divisor) - ((offset) % (divisor)) + (remainder)

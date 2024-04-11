@@ -1,11 +1,17 @@
+/****************************************************************************
+ * Code for Ethernet Control Model (ECM)
+ * for USB-Ethernet devices
+ */
+
 #include <stdint.h>
 #include "cdc.h"
-#include "ecm.h"
 
 #include "lwip/pbuf.h"
 #include "lwip/netif.h"
+#include "lwip/stats.h"
+#include "lwip/snmp.h"
 
-// process ECM frame
+/* This code processes an incoming ECM Ethernet frame */
 err_t ecm_process(struct netif *netif, uint8_t *buf, size_t len)
 {
   struct pbuf *p = pbuf_alloc(PBUF_RAW, len, PBUF_POOL);
@@ -19,7 +25,7 @@ err_t ecm_process(struct netif *netif, uint8_t *buf, size_t len)
   return ERR_MEM;
 }
 
-// bulk tx ECM
+/* This code sends an ECM Ethernet frame */
 err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p)
 {
   eth_device_t *dev = (eth_device_t *)netif->state;
