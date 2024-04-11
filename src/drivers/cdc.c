@@ -1,3 +1,8 @@
+/****************************************************************************
+ * Code for Communications Data Class (CDC)
+ * for USB-Ethernet devices
+ * Includes Callbacks, USB Event handlers, and netif initialization
+ */
 
 #include <sys/util.h>
 #include <usbdrvce.h>
@@ -12,7 +17,6 @@
 
 /* GLOBAL/BUFFERS DECLARATIONS */
 eth_device_t eth = {0};
-struct netif eth_netif = {0};
 const char hostname[] = "ti84plusce";
 
 /* UTF-16 -> HEX CONVERSION */
@@ -56,9 +60,9 @@ usb_error_t interrupt_receive_callback(usb_endpoint_t endpoint,
         {
         case NOTIFY_NETWORK_CONNECTION:
           if (notify->wValue)
-            netif_set_link_up(&eth_netif);
+            netif_set_link_up(&dev->iface);
           else
-            netif_set_link_down(&eth_netif);
+            netif_set_link_down(&dev->iface);
           break;
         case NOTIFY_CONNECTION_SPEED_CHANGE:
           // this will have no effect - calc too slow
@@ -79,14 +83,17 @@ usb_error_t bulk_receive_callback(usb_endpoint_t endpoint,
                                   usb_transfer_data_t *data)
 {
   eth_device_t *dev = (eth_device_t *)data;
-  if ((status == USB_TRANSFER_COMPLETED) && transferred)
+  if (transferred)
   {
-    LINK_STATS_INC(link.recv);
-    MIB2_STATS_NETIF_ADD(&dev->iface, ifinoctets, transferred);
-    dev->process(&dev->iface, eth_rx_buf, transferred);
+    if (status == USB_TRANSFER_COMPLETED)
+    {
+      LINK_STATS_INC(link.recv);
+      MIB2_STATS_NETIF_ADD(&dev->iface, ifinoctets, transferred);
+      dev->process(&dev->iface, eth_rx_buf, transferred);
+    }
+    else
+      printf("usb transfer status code: %u\n", status);
   }
-  else
-    printf("usb transfer status code: %u\n", status);
   usb_ScheduleBulkTransfer(dev->endpoint.in, eth_rx_buf, ETHERNET_MTU, bulk_receive_callback, data);
   return USB_SUCCESS;
 }
@@ -293,7 +300,7 @@ bool init_ethernet_usb_device(usb_device_t device)
 
               parse_state |= PARSE_HAS_MAC_ADDR;
             }
-            else if (!usb_DefaultControlTransfer(device, &get_mac_addr, &tmp.hwaddr[0], NCM_USB_MAXRETRIES, &xferd_tmp))
+            else if (!usb_DefaultControlTransfer(device, &get_mac_addr, &tmp.hwaddr[0], CDC_USB_MAXRETRIES, &xferd_tmp))
             {
               parse_state |= PARSE_HAS_MAC_ADDR;
             }
@@ -307,7 +314,7 @@ bool init_ethernet_usb_device(usb_device_t device)
               memcpy(&tmp.hwaddr[0], rmac, 6);
               tmp.hwaddr[0] &= 0xFE;
               tmp.hwaddr[0] |= 0x02;
-              if (!usb_DefaultControlTransfer(eth->device, &set_mac_addr, &tmp.hwaddr[0], NCM_USB_MAXRETRIES, &xferd_tmp))
+              if (!usb_DefaultControlTransfer(eth->device, &set_mac_addr, &tmp.hwaddr[0], CDC_USB_MAXRETRIES, &xferd_tmp))
                 parse_state |= PARSE_HAS_MAC_ADDR;
             }
           }
@@ -390,14 +397,8 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
       usb_ResetDevice(usb_device);
     break;
   case USB_DEVICE_ENABLED_EVENT:
-  {
-    if (!init_ethernet_usb_device(usb_device))
-    {
-      printf("no supported configurations\n");
-      break;
-    }
-  }
-  break;
+    init_ethernet_usb_device(usb_device);
+    break;
   case USB_DEVICE_DISCONNECTED_EVENT:
   case USB_DEVICE_DISABLED_EVENT:
   {
