@@ -2,7 +2,8 @@
 #include <usbdrvce.h>
 
 #include "lwip/init.h"
-#include "lwip/timeouts.h"
+#include "lwip/sys.h"
+// #include "lwip/timeouts.h"
 #include "lwip/netif.h"
 
 /* These commented out, but may be headers you might wish to enable. */
