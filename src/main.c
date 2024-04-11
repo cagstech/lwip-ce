@@ -24,7 +24,7 @@
 #include "include/lwip/dhcp.h"
 #include "include/lwip/dns.h"
 
-#include "drivers.h"
+#include "drivers/cdc.h"
 
 enum
 {
