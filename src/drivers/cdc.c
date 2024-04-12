@@ -6,20 +6,25 @@
 
 #include <sys/util.h>
 #include <usbdrvce.h>
-#include "cdc.h"
 
+/**
+ * LWIP headers for handing link layer to stack,
+ * managing NETIF in USB callbacks,
+ * managing packet buffers,
+ * and tracking link stats
+ */
 #include "lwip/netif.h"
 #include "lwip/ethip6.h"
 #include "lwip/etharp.h"
 #include "lwip/stats.h"
 #include "lwip/snmp.h"
 #include "lwip/pbuf.h"
+#include "cdc.h" /*Communications Data Class header file */
 
-/* GLOBAL/BUFFERS DECLARATIONS */
-eth_device_t eth = {0};
+/* Define Default Hostname for NETIFs */
 const char hostname[] = "ti84plusce";
 
-/* UTF-16 -> HEX CONVERSION */
+/* UTF-16 -> hex conversion */
 uint8_t nibble(uint16_t c)
 {
   c -= '0';
@@ -34,26 +39,24 @@ uint8_t nibble(uint16_t c)
   return 0xff;
 }
 
-/*******************************************************************************************
- * General Ethernet Callback Functions
- * Link Change/Status Change Callback functions
+/**********************************************************
+ * @brief Processes interrupt requests from device.
+ * @note Only \b NetworkConnection actually handled. Others have no effect.
  */
-uint8_t interrupt_buf[64];
-uint8_t eth_rx_buf[ETHERNET_MTU];
-
-usb_error_t interrupt_receive_callback(usb_endpoint_t endpoint,
+usb_error_t interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
                                        usb_transfer_status_t status,
                                        size_t transferred,
                                        usb_transfer_data_t *data)
 {
   eth_device_t *dev = (eth_device_t *)data;
+  uint8_t *ibuf = dev->interrupt_rx_buf;
   if ((status == USB_TRANSFER_COMPLETED) && transferred)
   {
     usb_control_setup_t *notify;
     size_t bytes_parsed = 0;
     do
     {
-      notify = (usb_control_setup_t *)&interrupt_buf[bytes_parsed];
+      notify = (usb_control_setup_t *)&ibuf[bytes_parsed];
       if (notify->bmRequestType == 0b10100001)
       {
         switch (notify->bRequest)
@@ -72,36 +75,43 @@ usb_error_t interrupt_receive_callback(usb_endpoint_t endpoint,
       bytes_parsed += sizeof(usb_control_setup_t) + notify->wLength;
     } while (bytes_parsed < transferred);
   }
-  usb_ScheduleInterruptTransfer(dev->endpoint.interrupt, interrupt_buf, 64, interrupt_receive_callback, data);
+  usb_ScheduleInterruptTransfer(dev->endpoint.interrupt, ibuf, INTERRUPT_RX_MAX, interrupt_receive_callback, data);
   return USB_SUCCESS;
 }
 
-// bulk RX callback (general)
-usb_error_t bulk_receive_callback(usb_endpoint_t endpoint,
+/**********************************************************
+ * @brief Processes bulk transfers from IN endpoint.
+ * @note @b dev->process is either \b ecm_process or \b ncm_process .
+ */
+usb_error_t bulk_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
                                   usb_transfer_status_t status,
                                   size_t transferred,
                                   usb_transfer_data_t *data)
 {
   eth_device_t *dev = (eth_device_t *)data;
+  uint8_t *recvbuf = dev->bulk_rx_buf;
   if (transferred)
   {
     if (status == USB_TRANSFER_COMPLETED)
     {
       LINK_STATS_INC(link.recv);
       MIB2_STATS_NETIF_ADD(&dev->iface, ifinoctets, transferred);
-      dev->process(&dev->iface, eth_rx_buf, transferred);
+      dev->process(&dev->iface, recvbuf, transferred);
     }
     else
       printf("usb transfer status code: %u\n", status);
   }
-  usb_ScheduleBulkTransfer(dev->endpoint.in, eth_rx_buf, ETHERNET_MTU, bulk_receive_callback, data);
+  usb_ScheduleBulkTransfer(dev->endpoint.in, recvbuf, ETHERNET_MTU, bulk_receive_callback, data);
   return USB_SUCCESS;
 }
 
-// bulk tx callback (this should work for both since it's just a free)
-usb_error_t bulk_transmit_callback(usb_endpoint_t endpoint,
-                                   usb_transfer_status_t status,
-                                   size_t transferred,
+/*****************************************************
+ * @brief Processes bulk transfers from OUT endpoint.
+ * @note This simply frees the TX pbuf passed in \b data .
+ */
+usb_error_t bulk_transmit_callback(__attribute__((unused)) usb_endpoint_t endpoint,
+                                   __attribute__((unused)) usb_transfer_status_t status,
+                                   __attribute__((unused)) size_t transferred,
                                    usb_transfer_data_t *data)
 {
   // Handle completion or error of the transfer, if needed
@@ -112,6 +122,9 @@ usb_error_t bulk_transmit_callback(usb_endpoint_t endpoint,
   return USB_SUCCESS;
 }
 
+/****************************************************************************
+ * @brief Initializes the NETWORK INTERFACE for the newly enabled USB device.
+ */
 err_t eth_netif_init(struct netif *netif)
 {
   eth_device_t *dev = (eth_device_t *)netif->state;
@@ -141,8 +154,11 @@ enum _descriptor_parser_await_states
   PARSE_HAS_ENDPOINT_OUT = (1 << 6)
 };
 
+/*****************************************************************************************
+ * @brief Parses descriptors for a USB device and checks for a valid CDC Ethernet device.
+ * @return \b True if success (with NETIF initialized), \b False if not CDC-ECM/NCM or error.
+ */
 #define DESCRIPTOR_MAX_LEN 256
-/** Parses the descriptors of the new device to see if it's a compatible Ethernet adapter. */
 bool init_ethernet_usb_device(usb_device_t device)
 {
   eth_device_t tmp = {0};
@@ -344,6 +360,7 @@ bool init_ethernet_usb_device(usb_device_t device)
 init_success:
   if (tmp.type == USB_NCM_SUBCLASS)
   {
+    // if device type is NCM, control setup
     if (ncm_control_setup(&tmp))
       return false;
     tmp.process = ncm_process;
@@ -354,39 +371,58 @@ init_success:
     tmp.process = ecm_process;
     tmp.emit = ecm_bulk_transmit;
   }
+  // switch to alternate interface
   if (usb_SetInterface(device, if_bulk.addr, if_bulk.len))
     return false;
+  // set endpoint data
   tmp.endpoint.in = usb_GetDeviceEndpoint(device, endpoint_addr.in);
   tmp.endpoint.out = usb_GetDeviceEndpoint(device, endpoint_addr.out);
   tmp.endpoint.interrupt = usb_GetDeviceEndpoint(device, endpoint_addr.interrupt);
-
+  // allocate eth_device_t => contains type, usb device, metadata, and INT/RX buffers
   eth = malloc(sizeof(eth_device_t));
   if (eth == NULL)
     return false;
   memcpy(eth, &tmp, sizeof(eth_device_t));
 
   struct netif *iface = &eth->iface;
+  // add to lwIP list of active netifs (save pointer to eth_device_t too)
   if (netif_add_noaddr(iface, eth, eth_netif_init, netif_input) == NULL)
     return false;
+  // set pointer to eth_device_t as associated data for usb device too
   usb_SetDeviceData(device, eth);
-  iface->name[0] = 'e';
-  iface->name[1] = 'n';
-  static uint8_t ifnum = 0;
-  iface->num = ifnum++;
+
+  // fetch next available device number to use
+  char temp_ifname[4] = {0};
+  uint8_t ifnum;
+  temp_ifname[0] = iface->name[0] = 'e';
+  temp_ifname[1] = iface->name[1] = 'n';
+  for (ifnum = 0; ifnum < 10; ifnum++)
+  {
+    temp_ifname[2] = '0' + ifnum;
+    if (netif_find(temp_ifname) == NULL) // if IF doesn't exist, use that number
+      break;
+  }
+  if (ifnum == 10) // IFnum 10 is an error
+    return false;
+  iface->num = ifnum; // use IFnum that triggered break
+  // continue to configure netif
   netif_create_ip6_linklocal_address(iface, 1);
   iface->ip6_autoconfig_enabled = 1;
   netif_set_default(iface);
   netif_set_up(iface);
-  usb_ScheduleInterruptTransfer(eth->endpoint.interrupt, interrupt_buf, 64, interrupt_receive_callback, eth);
-  usb_ScheduleBulkTransfer(eth->endpoint.in, eth_rx_buf, ETHERNET_MTU, bulk_receive_callback, eth);
+  // enqueue callbacks for receiving interrupt and RX transfers from this device.
+  usb_ScheduleInterruptTransfer(eth->endpoint.interrupt, eth->interrupt_rx_buf, INTERRUPT_RX_MAX, interrupt_receive_callback, eth);
+  usb_ScheduleBulkTransfer(eth->endpoint.in, eth->bulk_rx_buf, ETHERNET_MTU, bulk_receive_callback, eth);
+  // tell lwIP that the interface is ready to receive
   netif_set_link_up(iface);
+  // set default hostname
   netif_set_hostname(iface, hostname);
   return true;
 }
 
 usb_error_t
 eth_handle_usb_event(usb_event_t event, void *event_data,
-                     usb_callback_data_t *callback_data)
+                     __attribute__((unused)) usb_callback_data_t *callback_data)
 {
   usb_device_t usb_device = event_data;
   /* Enable newly connected devices */
@@ -403,14 +439,19 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
   case USB_DEVICE_DISABLED_EVENT:
   {
     eth_device_t *eth_device = (eth_device_t *)usb_GetDeviceData(usb_device);
-    netif_set_link_down(&eth_device->iface);
-    netif_set_down(&eth_device->iface);
-    netif_remove(&eth_device->iface);
-    free(eth_device);
+    if (eth_device)
+    {
+      netif_set_link_down(&eth_device->iface);
+      netif_set_down(&eth_device->iface);
+      netif_remove(&eth_device->iface);
+      free(eth_device);
+    }
   }
   break;
   case USB_HOST_PORT_CONNECT_STATUS_CHANGE_INTERRUPT:
     return USB_ERROR_NO_DEVICE;
+    break;
+  default:
     break;
   }
   return USB_SUCCESS;

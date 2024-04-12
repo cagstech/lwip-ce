@@ -3,7 +3,7 @@
 
 #include "lwip/init.h"
 #include "lwip/sys.h"
-// #include "lwip/timeouts.h"
+#include "lwip/timeouts.h"
 #include "lwip/netif.h"
 
 /* These commented out, but may be headers you might wish to enable. */
@@ -50,7 +50,7 @@ int main(void)
 
         usb_HandleEvents();   // usb events
         sys_check_timeouts(); // lwIP timers/event callbacks
-    } while (/* exit condition */);
+    } while (0);              // this should contain an actual loop-ending condition
     usb_Cleanup();
     exit(0);
 }

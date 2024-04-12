@@ -11,6 +11,7 @@
 #include "lwip/stats.h"
 #include "lwip/snmp.h"
 
+/* Flag Values for NCM Network Capabilities. */
 enum _cdc_ncm_bm_networkcapabilities
 {
   CAPABLE_ETHERNET_PACKET_FILTER,
@@ -19,8 +20,10 @@ enum _cdc_ncm_bm_networkcapabilities
   CAPABLE_MAX_DATAGRAM,
   CAPABLE_NTB_INPUT_SIZE_8BYTE
 };
+/* Helper Macro for Returning State of Network Capabilities Flag. */
 #define ncm_device_supports(dev, bm) (((dev)->class.ncm.bm_capabilities >> (bm)) & 1)
 
+/* Data Structure for NTB Config control request. */
 struct _ntb_config_data
 {
   uint32_t dwNtbInMaxSize;
@@ -39,7 +42,7 @@ struct ncm_nth
   uint16_t wNdpIndex;     // offset to first NDP
 };
 
-/* NCM Datagram Pointers (NDP) Definition*/
+/* NCM Datagram Pointers (NDP) Definition */
 struct ncm_ndp_idx
 {
   uint16_t wDatagramIndex; // offset of datagram, if 0, then is end of datagram list
