@@ -127,12 +127,14 @@ struct _ntb_params
 /* Defines struct for NCM instance data */
 struct _ncm
 {
-  uint8_t bm_capabilities;
-  uint16_t sequence; /* per NCM device - transfer sequence counter */
-  struct _ntb_params ntb_params;
+  uint8_t bm_capabilities;       // device capabilities
+  uint16_t sequence;             // per NCM device - transfer sequence counter
+  struct _ntb_params ntb_params; // NTB parameters for TX
 };
 
 // usb device metadata
+#define INTERRUPT_RX_MAX 64
+#define BULK_RX_MAX ETHERNET_MTU
 typedef struct _eth_device_t
 {
   usb_device_t device;
@@ -149,6 +151,8 @@ typedef struct _eth_device_t
   } endpoint;
   err_t (*process)(struct netif *netif, uint8_t *buf, size_t len);
   err_t (*emit)(struct netif *netif, struct pbuf *p);
+  uint8_t interrupt_rx_buf[INTERRUPT_RX_MAX];
+  uint8_t bulk_rx_buf[BULK_RX_MAX];
   struct netif iface;
 } eth_device_t;
 extern eth_device_t eth;
