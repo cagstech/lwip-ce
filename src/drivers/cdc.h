@@ -151,9 +151,9 @@ typedef struct _eth_device_t
   } endpoint;
   err_t (*process)(struct netif *netif, uint8_t *buf, size_t len);
   err_t (*emit)(struct netif *netif, struct pbuf *p);
+  struct netif iface;
   uint8_t interrupt_rx_buf[INTERRUPT_RX_MAX];
   uint8_t bulk_rx_buf[BULK_RX_MAX];
-  struct netif iface;
 } eth_device_t;
 extern eth_device_t eth;
 

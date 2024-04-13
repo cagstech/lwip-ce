@@ -393,7 +393,7 @@ init_success:
 
   // fetch next available device number to use
   char temp_ifname[4] = {0};
-  uint8_t ifnum;
+  uint8_t ifnum = 0;
   temp_ifname[0] = iface->name[0] = 'e';
   temp_ifname[1] = iface->name[1] = 'n';
   for (ifnum = 0; ifnum < 10; ifnum++)
