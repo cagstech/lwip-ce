@@ -17,7 +17,7 @@
 #include "lwip/apps/httpd.h"
 // due to the build structure of lwIP, "lwip/file.h" corresponds to "include/lwip/file.h"
 
-#include "drivers/cdc.h"
+#include "drivers/usb-ethernet.h"
 
 void ethif_status_callback_fn(struct netif *netif)
 {
