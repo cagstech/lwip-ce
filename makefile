@@ -2,11 +2,11 @@
 # Makefile Options
 # ----------------------------
 
-NAME = lwIP
+NAME = lwIPDEMO
 ICON = icon.png
-DESCRIPTION = lwIP Networking Stack
+DESCRIPTION = lwIP Networking Stack DEMO
 
-APP_NAME = lwIP
+APP_NAME = lwIPDEMO
 APP_VERSION = 0
 
 CFLAGS = -Wall -Wextra -Oz -I src/include -I src/apps/altcp_tls/mbedtls/include
