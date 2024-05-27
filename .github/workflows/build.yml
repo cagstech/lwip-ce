@@ -1,0 +1,55 @@
+name: Build lwIP-CE Project
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@main
+
+      - name: Fetch submodules
+        run: git submodule update --init --recursive
+
+      - name: Get repository information
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const repo = context.payload.repository.full_name;
+            console.log(`The repository is ${repo}`);
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y make tar
+
+      - name: Download and extract CEdev
+        run: |
+          curl -sL github.com/CE-Programming/toolchain/releases/download/v11.2/CEdev-Linux.tar.gz | tar xz
+
+      - name: Add CEdev to PATH
+        run: |
+          echo "CEdev/bin" >> $GITHUB_PATH
+          echo $GITHUB_PATH
+
+      - name: Make GFX
+        run: make gfx
+
+      - name: Build lwIP-CE Project
+        run: make
+
+      - name: Upload bin directory
+        uses: actions/upload-artifact@v3
+        with:
+          name: bin-directory
+          path: bin/
+
+      - name: Set final commit status
+        uses: myrotvorets/set-commit-status-action@master
+        if: always()
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ job.status }}
