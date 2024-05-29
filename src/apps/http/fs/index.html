@@ -1,51 +1,57 @@
-<html>
-
+<!DOCTYPE html>
+<html lang="en">
 <head>
-	<title>lwIP - A Lightweight TCP/IP Stack</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Welcome - lwIP-CE Demo</title>
+	<style>
+		body {
+				background-color: #e0f7fa;
+				color: #00796b;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				height: 100vh;
+				margin: 0;
+				font-family: Arial, sans-serif;
+		}
+		.message {
+				background-color: #ffffff;
+				border: 2px solid #00796b;
+				padding: 20px;
+				border-radius: 10px;
+				box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+				text-align: center;
+		}
+		.message h1 {
+				font-size: 3em;
+				margin: 0;
+		}
+		.message p {
+				font-size: 1.5em;
+				margin: 10px 0 0 0;
+		}
+		.message a {
+				display: inline-block;
+				margin-top: 20px;
+				padding: 10px 20px;
+				color: #ffffff;
+				background-color: #00796b;
+				text-decoration: none;
+				border-radius: 5px;
+				transition: background-color 0.3s;
+		}
+		.message a:hover {
+				background-color: #004d40;
+		}
+	</style>
 </head>
-
-<body bgcolor="white" text="black">
-
-	<table width="100%">
-		<tr valign="top">
-			<td width="80">
-				<a href="http://www.sics.se/"><img src="/img/sics.gif" border="0" alt="SICS logo" title="SICS logo"></a>
-			</td>
-			<td width="500">
-				<h1>lwIP - A Lightweight TCP/IP Stack</h1>
-				<p>
-					The web page you are watching was served by a simple web
-					server running on top of the lightweight TCP/IP stack <a href="http://www.sics.se/~adam/lwip/">lwIP</a> served
-					from a <span style="font-weight:900;">Texas Instruments TI-84+ CE graphing calculator</span>.
-				</p>
-				<p>
-					lwIP is an open source implementation of the TCP/IP
-					protocol suite that was originally written by <a href="http://www.sics.se/~adam/lwip/">Adam Dunkels
-						of the Swedish Institute of Computer Science</a> but now is
-					being actively developed by a team of developers
-					distributed world-wide. Since it's release, lwIP has
-					spurred a lot of interest and has been ported to several
-					platforms and operating systems. lwIP can be used either
-					with or without an underlying OS.
-				</p>
-				<p>
-					The focus of the lwIP TCP/IP implementation is to reduce
-					the RAM usage while still having a full scale TCP. This
-					makes lwIP suitable for use in embedded systems with tens
-					of kilobytes of free RAM and room for around 40 kilobytes
-					of code ROM.
-				</p>
-				<p>
-					More information about lwIP can be found at the lwIP
-					homepage at <a href="http://savannah.nongnu.org/projects/lwip/">http://savannah.nongnu.org/projects/lwip/</a>
-					or at the lwIP wiki at <a href="http://lwip.wikia.com/">http://lwip.wikia.com/</a>.
-				</p>
-			</td>
-			<td>
-				&nbsp;
-			</td>
-		</tr>
-	</table>
+<body>
+	<div class="message">
+		<a href="https://cagstech.com"><img src="https://cagstech.com/images/me.jpg" border="0" alt="Anthony Cagliano" title="Anthony Cagliano" width="100"></a>
+		<h1>Welcome!</h1>
+		<p>Welcome to the lwIP-CE Demo. This page is more exciting than finding a graphing calculator in your cereal box.</p>
+		<p>But if you're lost, you might want to check the <a href="404.html">404 page</a>.</p>
+	</div>
 </body>
-
 </html>
