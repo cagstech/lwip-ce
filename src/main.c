@@ -19,6 +19,8 @@
 
 #include "drivers/usb-ethernet.h"
 
+bool run_main = false;
+
 void ethif_status_callback_fn(struct netif *netif)
 {
     printf("%s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
@@ -26,6 +28,7 @@ void ethif_status_callback_fn(struct netif *netif)
 
 int main(void)
 {
+    uint8_t key;
     lwip_init();
     struct netif *ethif = NULL;
     os_ClrHomeFull();
@@ -34,12 +37,18 @@ int main(void)
     if (usb_Init(eth_handle_usb_event, NULL, NULL, USB_DEFAULT_INIT_FLAGS))
         goto exit;
 
+    run_main = true;
+
     do
     {
         // this is your code that runs in a loop
         // please note that much of the networking in lwIP is callback-style
         // please consult the lwIP documentation for the protocol you are using for instructions
 
+        key = os_GetCSC();
+        if (key == sk_Clear) {
+            run_main = false;
+        }
         if (ethif == NULL)
         {
             // because the netif initialization is done in the ECM/NCM driver, you will need to poll for the presence of
@@ -57,9 +66,9 @@ int main(void)
                 printf("httpd running\n");
             }
         }
-        usb_HandleEvents();            // usb events
-        sys_check_timeouts();          // lwIP timers/event callbacks
-    } while (os_GetCSC() != sk_Clear); // this should contain an actual loop-ending condition
+        usb_HandleEvents();       // usb events
+        sys_check_timeouts();     // lwIP timers/event callbacks
+    } while (run_main);
 exit:
     usb_Cleanup();
     exit(0);
