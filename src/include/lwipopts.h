@@ -290,7 +290,7 @@ a lot of data that needs to be copied, this should be set high. */
 #endif /* PPP_SUPPORT */
 
 /* miscellanous */
-#define HTTPD_SERVER_PORT 8888
+#define HTTPD_SERVER_PORT 80
 
 #define LWIP_RAND rand
 
