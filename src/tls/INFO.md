@@ -11,6 +11,7 @@ Mandatory (rfc8446)
 
 ** This means we must implement the following **
 - SHA256
+- AES-128 galois counter mode
 - RSA encrypt and decrypt
 - probabilistic signature scheme for RSA
 - elliptic curve digital signing algorithm using secp256r1
