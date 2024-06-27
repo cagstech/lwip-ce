@@ -1,6 +1,9 @@
 QUICKNOTES - Implementing TLS
 ==============================
 
+https://www.rfc-editor.org/rfc/pdfrfc/rfc8446.txt.pdf
+I think we should only implement TLS 1.3. It seems to be a shorter handshake.
+
 Mandatory (rfc8446)
 --------------------
 - TLS_AES_128_GCM_SHA256 (symmetric)
