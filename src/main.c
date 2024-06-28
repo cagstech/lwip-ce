@@ -20,10 +20,17 @@
 #include "drivers/usb-ethernet.h"
 
 bool run_main = false;
+bool httpd_running = false;
 
 void ethif_status_callback_fn(struct netif *netif)
 {
     printf("%s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
+    if (dhcp_supplied_address(netif) && (!httpd_running))
+    {
+        httpd_init();
+        printf("httpd running\n");
+        httpd_running = true;
+    }
 }
 
 int main(void)
@@ -46,7 +53,8 @@ int main(void)
         // please consult the lwIP documentation for the protocol you are using for instructions
 
         key = os_GetCSC();
-        if (key == sk_Clear) {
+        if (key == sk_Clear)
+        {
             run_main = false;
         }
         if (ethif == NULL)
@@ -62,12 +70,10 @@ int main(void)
                 printf("netif found\n");
                 netif_set_status_callback(ethif, ethif_status_callback_fn);
                 dhcp_start(ethif);
-                httpd_init();
-                printf("httpd running\n");
             }
         }
-        usb_HandleEvents();       // usb events
-        sys_check_timeouts();     // lwIP timers/event callbacks
+        usb_HandleEvents();   // usb events
+        sys_check_timeouts(); // lwIP timers/event callbacks
     } while (run_main);
 exit:
     usb_Cleanup();
