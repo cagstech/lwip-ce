@@ -13,6 +13,7 @@
  * managing packet buffers,
  * and tracking link stats
  */
+#include "lwip/debug.h"
 #include "lwip/netif.h"
 #include "lwip/ethip6.h"
 #include "lwip/etharp.h"
@@ -244,8 +245,10 @@ usb_error_t ncm_control_setup(eth_device_t *eth)
 err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
 {
   static struct pbuf *rx_buf = NULL; // pointer to pbuf for RX
+  struct pbuf *p = NULL;             // temp pbuf for datagrams
   static size_t rx_offset = 0;       // start RX offset at 0
   static size_t ntb_total = 0;
+
   if (rx_buf == NULL)
   {
     struct ncm_nth *nth = (struct ncm_nth *)buf;
@@ -254,7 +257,11 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
     ntb_total = nth->wBlockLength;
     rx_buf = pbuf_alloc(PBUF_RAW, ntb_total, PBUF_RAM);
     if (!rx_buf)
+    {
+      LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("[ncm] failed to allocate\n",
+                                                      ntb_total));
       return ERR_MEM;
+    }
   }
 
   // absorb received bytes into pbuf
@@ -263,6 +270,8 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
 
   if (ntb_total > rx_offset)
     return ERR_OK; // do nothing until we have the full NTB
+
+  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("[ncm] recv complete, processing %u bytes\n", rx_offset));
 
   // get header and first NDP pointers
   uint8_t *ntb = (uint8_t *)rx_buf->payload;
@@ -284,28 +293,34 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
     do
     {
       // attempt to allocate pbuf
-      struct pbuf *p = pbuf_alloc(PBUF_RAW, idx[dg_num].wDatagramLen, PBUF_RAM);
+      if (idx[dg_num].wDatagramIndex > NCM_RX_NTB_MAX_SIZE)
+      {
+        LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("[ncm] FATAL: DatagramIndex exceeds max NTB len\n"));
+        break;
+      }
+      p = pbuf_alloc(PBUF_RAW, idx[dg_num].wDatagramLen, PBUF_RAM);
       if (p != NULL)
       {
         // copy datagram into pbuf
         pbuf_take(p, &ntb[idx[dg_num].wDatagramIndex], idx[dg_num].wDatagramLen);
         // hand pbuf to lwIP (should we enqueue these and defer the handoffs till later?)
         // i'll leave it for now, and if my calculator explodes I'll fix it
-        rx_queue[enqueued++] = p;
+        if (netif->input(p, netif) != ERR_OK)
+          pbuf_free(p);
       }
       dg_num++;
     } while ((idx[dg_num].wDatagramIndex) && (idx[dg_num].wDatagramLen));
     // if next NDP is 0, NTB is done and so is my sanity
     if (ndp->wNextNdpIndex == 0)
       break;
+    if (ndp->wNextNdpIndex > NCM_RX_NTB_MAX_SIZE)
+    {
+      LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("[ncm] FATAL: NextNdpIndex exceeds max NTB len\n"));
+      break;
+    }
     // set next NDP
     ndp = (struct ncm_ndp *)&ntb[ndp->wNextNdpIndex];
   } while (1);
-  for (int i = 0; i < enqueued; i++)
-    if (rx_queue[i])
-      if (netif->input(rx_queue[i], netif) != ERR_OK)
-        pbuf_free(rx_queue[i]);
-
 exit:
   // delete the shadow of my own regret and prepare for more regret
   pbuf_free(rx_buf);
