@@ -40,7 +40,9 @@ This implementation differs from the ported lwIP in the following ways:
        struct netif* ethif = NULL;
        do {
            ethif = netif_find("en0");    // this will likely be the first netif returned, probably just use it
-       } (ethif == NULL);
+           usb_HandleEvents();
+           sys_check_timeouts(); 
+       } while(ethif == NULL);
        // ethif is now the netif you will bind when using networks in your application
               
 
@@ -53,9 +55,8 @@ This implementation differs from the ported lwIP in the following ways:
            sys_check_timeouts();   // polls/triggers all lwIP timer events/callbacks - allows IP stack to function
        } while(netif_is_up(ethif));
 
-6. **Use the Appropriate API for your Application from the lwIP Docs**: As I value my dwindling sanity, I will not be re-documenting the entire lwIP codebase in here. The documentation for lwIP is here: https://www.nongnu.org/lwip/2_1_x/group__callbackstyle__api.html. The callback-style "raw" API is the only thing that will work in a NOSYS implementation. Do not implement the threaded API and then wonder why it does not work on a device that doesn't know what the heck a thread is.
+6. **Use the Appropriate API for your Application from the lwIP Docs**: As I value my dwindling sanity, I will not be re-documenting the entire lwIP codebase in here. The documentation for lwIP is here: https://www.nongnu.org/lwip/2_1_x/group__callbackstyle__api.html. The callback-style "raw" API is the only thing that will work in a NOSYS implementation. Do not implement the threaded API and then wonder why it does not work on a device that doesn't know what the heck a thread is. If you require assistance with the API for lwIP, feel free to ask in the [Discord](https://discord.gg/kvcuygqU) or contact the lwIP authors directly using the link above.
 
-   If you require assistance with the API for lwIP, feel free to ask in the Discord: https://discord.gg/kvcuygqU
-
+7. Always end your code by performing the appropriate cleanup. This means that you call `usb_Cleanup();` at some point between the shutdown of network services and actual end of your program. Make sure you do this on ALL control paths that may lead to terminating the program, as failing to do this may cause USB issues within the OS requiring a reset. Also make sure that you properly close any sockets and protocols you are running. Failing to do so may cause memory leaks. The order is also important here. Remember that with certain network services, they need to cleanly disconnect from remotes and await success messages before the resource is destroyed and the memory is returned to the stack. For example, after calling `tcp_close()` you should ideally await the full TCP shutdown handshake before doing anything else like freeing the network interface or calling `usb_Cleanup()` (if you disable the Ethernet drivers, how are you going to actually receive the disconnect ACKS?). Use the callback system to your advantage; use the callbacks for (ex) altcp/tcp to trigger a flag upon receipt of a FIN/FIN-ACK that informs the application it is safe to set the link down. Use the `netif_is_link_down()` polling function to ensure that this action is complete and then set the interface down. Use `netif_is_down()` to inform that it is safe to unregister the netif interface. Once all this is complete, then call `usb_Cleanup()` and exit the application. If you do not handle the shutdown of the IP stack properly, behavior can be quite unpredictable.
 
 
