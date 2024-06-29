@@ -5,11 +5,11 @@
 **lwIP** is a full networking stack for low-resource device like embedded systems. It is maintained by non-GNU (https://github.com/lwip-tcpip/lwip).
 This makes it perfect for something as ridiclous as a graphing calculator.
 **lwIP-CE** is the name for the lwIP fork targetting the Texas Instruments TI-84+ CE graphing calculator.
-To view the original README, open README-ORIG.md.
+You can view the original readme [here](./README-ORIG.md)   README-ORIG.md.
 
 This implementation differs from the ported lwIP in the following ways:
 - reduced pbuf pool and tcp_sndbuf queue size
-- non "raw" API's will not work at due to NOSYS implementation
+- non "raw" API's will not work due to NOSYS implementation
 - hardware-specific USB CDC-ECM and NCM drivers
 
 ## Related Media ##
