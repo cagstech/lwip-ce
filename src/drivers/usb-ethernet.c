@@ -679,6 +679,7 @@ init_success:
   // enqueue callbacks for receiving interrupt and RX transfers from this device.
   usb_ScheduleInterruptTransfer(eth->endpoint.interrupt, eth->interrupt_rx_buf, INTERRUPT_RX_MAX, interrupt_receive_callback, eth);
   usb_ScheduleBulkTransfer(eth->endpoint.in, eth->bulk_rx_buf, ETHERNET_MTU, bulk_receive_callback, eth);
+  dhcp_start(iface);
   return true;
 }
 
