@@ -264,6 +264,11 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
     }
   }
 
+  if (rx_offset + len > ntb_total)
+  {
+    LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("[ncm] memory boundary overflow\n"));
+    return ERR_MEM;
+  }
   // absorb received bytes into pbuf
   pbuf_take_at(rx_buf, buf, len, rx_offset);
   rx_offset += len;
@@ -294,7 +299,7 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
         LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("[ncm] FATAL: DatagramIndex exceeds max NTB len\n"));
         break;
       }
-      p = pbuf_alloc(PBUF_RAW, idx[dg_num].wDatagramLen, PBUF_RAM);
+      struct pbuf *p = pbuf_alloc(PBUF_RAW, idx[dg_num].wDatagramLen, PBUF_RAM);
       if (p != NULL)
       {
         // copy datagram into pbuf

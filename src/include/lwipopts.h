@@ -127,7 +127,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define MEMP_NUM_TCP_SEG 10
 /* MEMP_NUM_SYS_TIMEOUT: the number of simulateously active
    timeouts. */
-#define MEMP_NUM_SYS_TIMEOUT 10
+#define MEMP_NUM_SYS_TIMEOUT 30
 
 /* The following four are used only with the sequential API and can be
    set to 0 if the application only will use the raw API. */
@@ -290,6 +290,7 @@ a lot of data that needs to be copied, this should be set high. */
 #endif /* PPP_SUPPORT */
 
 /* miscellanous */
+#define LWIP_NETIF_REMOVE_CALLBACK 1
 #define HTTPD_SERVER_PORT 80
 
 #define LWIP_RAND rand
