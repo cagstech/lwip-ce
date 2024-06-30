@@ -49,7 +49,7 @@ int main(void)
         // this is your code that runs in a loop
         // please note that much of the networking in lwIP is callback-style
         // please consult the lwIP documentation for the protocol you are using for instructions
-
+        os_ClrHomeFull();
         key = os_GetCSC();
         if (key == sk_Clear)
         {
@@ -67,9 +67,8 @@ int main(void)
         }
         printf("handling events\n");
         usb_HandleEvents(); // usb events
-        printf("checking timeouts\n");
-        sys_check_timeouts(); // lwIP timers/event callbacks
         printf("done\n");
+        sys_check_timeouts(); // lwIP timers/event callbacks
     } while (run_main);
 exit:
     usb_Cleanup();

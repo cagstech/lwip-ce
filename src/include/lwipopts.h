@@ -24,7 +24,7 @@
 #define LWIP_NETCONN 0
 #define LWIP_NETIF_API 0
 #define LWIP_NETIF_HOSTNAME 1
-#define LWIP_NETIF_REMOVE_CALLBACK 0
+#define LWIP_NETIF_REMOVE_CALLBACK 1
 
 #define LWIP_CHKSUM_ALGORITHM 1 // todo: does this do anything?
 
@@ -290,9 +290,7 @@ a lot of data that needs to be copied, this should be set high. */
 #endif /* PPP_SUPPORT */
 
 /* miscellanous */
-#define LWIP_NETIF_REMOVE_CALLBACK 1
 #define HTTPD_SERVER_PORT 80
-
 #define LWIP_RAND rand
 
 #endif // LWIP_LWIPOPTS_H
