@@ -20,6 +20,7 @@
 #include "lwip/stats.h"
 #include "lwip/snmp.h"
 #include "lwip/pbuf.h"
+#include "lwip/dhcp.h"
 #include "usb-ethernet.h" /*Communications Data Class header file */
 
 /* Define Default Hostname for NETIFs */
@@ -215,7 +216,7 @@ struct ncm_ndp
 #define NCM_NTH_LEN sizeof(struct ncm_nth)
 #define NCM_NDP_LEN sizeof(struct ncm_ndp)
 #define NCM_RX_NTB_MAX_SIZE 2048
-#define NCM_RX_MAX_DATAGRAMS 16
+#define NCM_RX_MAX_DATAGRAMS 4
 
 /* This runs during NCM device configuration before switching to alt interface. */
 usb_error_t ncm_control_setup(eth_device_t *eth)
@@ -258,8 +259,7 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
     rx_buf = pbuf_alloc(PBUF_RAW, ntb_total, PBUF_RAM);
     if (!rx_buf)
     {
-      LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("[ncm] failed to allocate\n",
-                                                      ntb_total));
+      LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("[ncm] failed to allocate\n"));
       return ERR_MEM;
     }
   }
@@ -271,14 +271,10 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
   if (ntb_total > rx_offset)
     return ERR_OK; // do nothing until we have the full NTB
 
-  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("[ncm] recv complete, processing %u bytes\n", rx_offset));
-
   // get header and first NDP pointers
   uint8_t *ntb = (uint8_t *)rx_buf->payload;
   struct ncm_nth *nth = (struct ncm_nth *)ntb;
   struct ncm_ndp *ndp = (struct ncm_ndp *)&ntb[nth->wNdpIndex];
-  struct pbuf *rx_queue[NCM_RX_MAX_DATAGRAMS];
-  uint16_t enqueued = 0;
   // repeat while ndp->wNextNdpIndex is non-zero
   do
   {
@@ -418,6 +414,18 @@ enum _descriptor_parser_await_states
   PARSE_HAS_ENDPOINT_IN = (1 << 5),
   PARSE_HAS_ENDPOINT_OUT = (1 << 6)
 };
+
+/****************************************************************************
+ * @brief Performs cleanup on netif prior to removal.
+ */
+
+void eth_netif_remove_callback(struct netif *netif)
+{
+  // cleanup active DHCP client
+  dhcp_release_and_stop(netif);
+
+  // anything else?
+}
 
 /*****************************************************************************************
  * @brief Parses descriptors for a USB device and checks for a valid CDC Ethernet device.
@@ -669,12 +677,16 @@ init_success:
   }
   if (ifnum == 10) // IFnum 10 is an error
     return false;
-  iface->num = ifnum; // use IFnum that triggered break
-  // continue to configure netif
+  iface->num = ifnum;                  // use IFnum that triggered break
+  netif_set_hostname(iface, hostname); // set default hostname
+
+  // set callbacks for netif activity
+  netif_set_remove_callback(iface, eth_netif_remove_callback); // stop processes bound to netif
+
+  // allow IPv4 and IPv6 on device
   netif_create_ip6_linklocal_address(iface, 1);
   iface->ip6_autoconfig_enabled = 1;
-  netif_set_hostname(iface, hostname); // set default hostname
-  netif_set_default(iface);
+
   netif_set_up(iface); // tell lwIP that the interface is ready to receive
   // enqueue callbacks for receiving interrupt and RX transfers from this device.
   usb_ScheduleInterruptTransfer(eth->endpoint.interrupt, eth->interrupt_rx_buf, INTERRUPT_RX_MAX, interrupt_receive_callback, eth);
