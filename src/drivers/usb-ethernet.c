@@ -247,9 +247,10 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
 {
   static struct pbuf *rx_buf = NULL; // pointer to pbuf for RX
   struct pbuf *p = NULL;             // temp pbuf for datagrams
-  static size_t rx_offset = 0;       // start RX offset at 0
+  // static size_t rx_offset = 0;       // start RX offset at 0
   static size_t ntb_total = 0;
 
+  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("ncm:processing payload\n"));
   if (rx_buf == NULL)
   {
     struct ncm_nth *nth = (struct ncm_nth *)buf;
@@ -259,21 +260,20 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
     rx_buf = pbuf_alloc(PBUF_RAW, ntb_total, PBUF_RAM);
     if (!rx_buf)
     {
-      LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("[ncm] failed to allocate\n"));
+      LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("ncm:ERROR: allocation\n"));
       return ERR_MEM;
     }
   }
 
-  if (rx_offset + len > ntb_total)
-  {
-    LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("[ncm] memory boundary overflow\n"));
-    return ERR_MEM;
-  }
-  // absorb received bytes into pbuf
-  pbuf_take_at(rx_buf, buf, len, rx_offset);
-  rx_offset += len;
+  // it this would overflow buffer, we need to destroy the frame
+  if (rx_buf->len + len > ntb_total)
+    goto exit;
 
-  if (ntb_total > rx_offset)
+  // absorb received bytes into pbuf
+  pbuf_take_at(rx_buf->len, buf, len, rx_buf->len);
+  // rx_offset += len;
+
+  if (ntb_total > rx_buf->len)
     return ERR_OK; // do nothing until we have the full NTB
 
   // get header and first NDP pointers
@@ -296,7 +296,7 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
       // attempt to allocate pbuf
       if (idx[dg_num].wDatagramIndex > NCM_RX_NTB_MAX_SIZE)
       {
-        LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("[ncm] FATAL: DatagramIndex exceeds max NTB len\n"));
+        LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("ncm:FATAL: DatagramIndex exceeds max NTB len\n"));
         break;
       }
       struct pbuf *p = pbuf_alloc(PBUF_RAW, idx[dg_num].wDatagramLen, PBUF_RAM);
@@ -316,7 +316,7 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
       break;
     if (ndp->wNextNdpIndex > NCM_RX_NTB_MAX_SIZE)
     {
-      LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("[ncm] FATAL: NextNdpIndex exceeds max NTB len\n"));
+      LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("ncm:FATAL: NextNdpIndex exceeds max NTB len\n"));
       break;
     }
     // set next NDP
@@ -326,7 +326,7 @@ exit:
   // delete the shadow of my own regret and prepare for more regret
   pbuf_free(rx_buf);
   rx_buf = NULL;
-  rx_offset = 0;
+  // rx_offset = 0;
   return ERR_OK;
 }
 
@@ -444,6 +444,7 @@ bool init_ethernet_usb_device(usb_device_t device)
   size_t xferd, parsed_len, desc_len;
   usb_error_t err;
   tmp.device = device;
+  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("eth:DBG: proc new device\n"));
   struct
   {
     usb_configuration_descriptor_t *addr;
@@ -705,6 +706,7 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
                      __attribute__((unused)) usb_callback_data_t *callback_data)
 {
   usb_device_t usb_device = event_data;
+  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("eth:DBG: eth callback\n"));
   /* Enable newly connected devices */
   switch (event)
   {
@@ -734,5 +736,6 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
   default:
     break;
   }
+  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("eth:DBG: eth callback done\n"));
   return USB_SUCCESS;
 }
