@@ -23,11 +23,10 @@ bool httpd_running = false;
 
 void ethif_status_callback_fn(struct netif *netif)
 {
-    printf("%s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
     if (dhcp_supplied_address(netif) && (!httpd_running))
     {
         httpd_init();
-        printf("httpd running\n");
+        printf("httpd listening on %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
         httpd_running = true;
     }
 }
@@ -58,17 +57,12 @@ int main(void)
         }
         if (ethif == NULL)
         {
-            // because the netif initialization is done in the ECM/NCM driver, you will need to poll for the presence of
-            // the desired netif.
-            // perhaps check for netif's by IF name in a loop from en0 to en9.
-            ethif = netif_find("en0");
-            if (ethif)
+            if (ethif = netif_find("en0"))
             {
                 // run this code if netif exists
                 // eg: dhcp_start(ethif);
-                printf("netif found\n");
+                printf("en0 registered\n");
                 netif_set_status_callback(ethif, ethif_status_callback_fn);
-                dhcp_start(ethif);
             }
         }
         usb_HandleEvents();   // usb events
