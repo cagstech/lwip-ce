@@ -26,7 +26,7 @@ void ethif_status_callback_fn(struct netif *netif)
     if (dhcp_supplied_address(netif) && (!httpd_running))
     {
         httpd_init();
-        printf("httpd listening on %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
+        printf("httpd listen on %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
         httpd_running = true;
     }
 }
@@ -57,7 +57,7 @@ int main(void)
         }
         if (ethif == NULL)
         {
-            if (ethif = netif_find("en0"))
+            if ((ethif = netif_find("en0")))
             {
                 // run this code if netif exists
                 // eg: dhcp_start(ethif);
@@ -65,8 +65,11 @@ int main(void)
                 netif_set_status_callback(ethif, ethif_status_callback_fn);
             }
         }
-        usb_HandleEvents();   // usb events
+        printf("handling events\n");
+        usb_HandleEvents(); // usb events
+        printf("checking timeouts\n");
         sys_check_timeouts(); // lwIP timers/event callbacks
+        printf("done\n");
     } while (run_main);
 exit:
     usb_Cleanup();
