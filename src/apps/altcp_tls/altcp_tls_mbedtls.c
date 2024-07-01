@@ -48,7 +48,7 @@
  *   GOOD custom entropy
  *
  * Missing things / @todo:
- * - some unhandled/untested things migh be caught by LWIP_ASSERTs...
+ * - some unhandled/untested things might be caught by LWIP_ASSERTs...
  */
 
 #include "lwip/opt.h"
@@ -603,7 +603,7 @@ altcp_mbedtls_lower_sent(void *arg, struct altcp_pcb *inner_conn, u16_t len)
     /* remove ACKed bytes from overhead adjust counter */
     state->overhead_bytes_adjust -= len;
     /* try to send more if we failed before (may increase overhead adjust counter) */
-    mbedtls_ssl_flush_output(&state->ssl_context);
+    altcp_mbedtls_flush_output(state);
     /* remove calculated overhead from ACKed bytes len */
     app_len = len - (u16_t)overhead;
     /* update application write counter and inform application */
