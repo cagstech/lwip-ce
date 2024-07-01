@@ -14,10 +14,6 @@ name: "CodeQL"
 on:
   push:
     branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
-  schedule:
-    - cron: '24 10 * * 1'
 
 jobs:
   analyze:
@@ -84,8 +80,8 @@ jobs:
       shell: bash
       run: |
         curl -sL github.com/CE-Programming/toolchain/releases/download/v11.2/CEdev-Linux.tar.gz | tar xz
-        export GITHUB_PATH = "CEdev/bin:$GITHUB_PATH"
-        make
+        echo "CEdev/bin" >> $GITHUB_PATH
+        ./CEdev/bin/make
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
