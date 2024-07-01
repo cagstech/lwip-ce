@@ -83,10 +83,8 @@ jobs:
     - if: matrix.build-mode == 'manual'
       shell: bash
       run: |
-        curl -sL github.com/CE-Programming/toolchain/releases/download/v11.2/CEdev-Linux.tar.gz
-        tar xz
-        echo "CEdev/bin" >> $GITHUB_PATH
-        echo $GITHUB_PATH
+        curl -sL github.com/CE-Programming/toolchain/releases/download/v11.2/CEdev-Linux.tar.gz | tar xz
+        export GITHUB_PATH = "CEdev/bin:$GITHUB_PATH"
         make
 
     - name: Perform CodeQL Analysis
