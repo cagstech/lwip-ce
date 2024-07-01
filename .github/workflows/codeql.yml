@@ -72,8 +72,15 @@ jobs:
     #   If the Autobuild fails above, remove it and uncomment the following three lines.
     #   modify them (or add more) to build your code if your project, please refer to the EXAMPLE below for guidance.
 
-    - run: |
-        ./.github/workflows/codeql-buildscript.sh
+    - name: Install CEdev
+      run: |
+        curl -sL github.com/CE-Programming/toolchain/releases/download/v11.2/CEdev-Linux.tar.gz | tar xz
+        echo "CEdev/bin" >> $GITHUB_PATH
+        echo $GITHUB_PATH
+
+    - name: Build Project
+      run: |
+        make
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
