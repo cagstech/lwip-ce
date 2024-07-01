@@ -35,11 +35,27 @@ jobs:
       - name: Make GFX
         run: make gfx
 
-      - name: Build lwIP-CE Project
-        run: make
+      - name: Download CodeQL
+        run: |
+          curl -sL https://github.com/github/codeql-cli-binaries/releases/download/v2.17.6/codeql-linux64.zip | tar xz
+          chmod u+x codeql/codeql
+
+      - name: Setting up CodeQL
+        run: codeql/codeql database create lwip-ce-codeql --command=make --language=c-cpp
+
+      - name: Scanning with CodeQL
+        run: codeql/codeql database analyze lwip-ce-codeql --format=sarif-latest --output=analysis.sarif
 
       - name: Upload bin directory
         uses: actions/upload-artifact@v3
         with:
           name: bin-directory
           path: bin/
+
+      - name: Upload CodeQL results as an artifact
+        if: success() || failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: analysis.sarif
+          path: .
+          retention-days: 7
