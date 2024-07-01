@@ -57,6 +57,11 @@ jobs:
     - name: Init App Tools
       run: git submodule update --init --recursive
 
+    - name: Download toolchain and add to path
+      run: |
+        curl -sL github.com/CE-Programming/toolchain/releases/download/v11.2/CEdev-Linux.tar.gz | tar xz
+        echo "CEdev/bin" >> $GITHUB_PATH
+
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
@@ -78,10 +83,7 @@ jobs:
     # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
     - if: matrix.build-mode == 'manual'
       shell: bash
-      run: |
-        curl -sL github.com/CE-Programming/toolchain/releases/download/v11.2/CEdev-Linux.tar.gz | tar xz
-        echo "CEdev/bin" >> $GITHUB_PATH
-        ./CEdev/bin/make
+      run: make
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
