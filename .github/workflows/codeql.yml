@@ -15,10 +15,6 @@ on:
   push:
     branches: [ "master" ]
 
-
-paths:
-  - src/drivers
-
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
