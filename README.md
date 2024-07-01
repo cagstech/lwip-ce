@@ -1,5 +1,7 @@
 # lwIP-CE #
 
+![AUTOBUILD](https://github.com/cagstech/lwip-ce/actions/workflows/build.yml/badge.svg)
+
 ## What are lwIP and lwIP-CE ##
 
 **lwIP** is a full networking stack for low-resource device like embedded systems. It is maintained by non-GNU (https://github.com/lwip-tcpip/lwip).
@@ -19,7 +21,7 @@ This implementation differs from the ported lwIP in the following ways:
 # Basic Usage Instructions #
 
 1. **Headers**: Users should include at minimum the following headers to use lwIP properly on this platform:
-   
+
        #include <usbdrvce.h>                // usb drivers
        #include "drivers/usb-ethernet.h"    // usb-ethernet drivers
        #include "lwip/init.h"               // initialize lwIP stack
@@ -41,10 +43,10 @@ This implementation differs from the ported lwIP in the following ways:
        do {
            ethif = netif_find("en0");    // this will likely be the first netif returned, probably just use it
            usb_HandleEvents();
-           sys_check_timeouts(); 
+           sys_check_timeouts();
        } while(ethif == NULL);
        // ethif is now the netif you will bind when using networks in your application
-              
+
 
 5. **Create a Do-While-Network-Up Loop**: The general flow of your application can be run in a do-while loop with the exit condition being the netif marked as up.
 
