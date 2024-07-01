@@ -1,7 +1,10 @@
 name: Build lwIP-CE Project
 
 on:
-  workflow_dispatch
+  push:
+    branches:
+      - master
+  workflow_dispatch:
 
 jobs:
   build:
