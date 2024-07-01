@@ -491,6 +491,32 @@ http_state_alloc(void)
   return ret;
 }
 
+/** Make sure the post code knows that the connection is closed */
+static void
+http_state_close_post(struct http_state* hs)
+{
+#if LWIP_HTTPD_SUPPORT_POST
+  if (hs != NULL) {
+    if ((hs->post_content_len_left != 0)
+#if LWIP_HTTPD_POST_MANUAL_WND
+      || ((hs->no_auto_wnd != 0) && (hs->unrecved_bytes != 0))
+#endif /* LWIP_HTTPD_POST_MANUAL_WND */
+      ) {
+      /* prevent calling httpd_post_finished twice */
+      hs->post_content_len_left = 0;
+#if LWIP_HTTPD_POST_MANUAL_WND
+      hs->unrecved_bytes = 0;
+#endif /* LWIP_HTTPD_POST_MANUAL_WND */
+      /* make sure the post code knows that the connection is closed */
+      http_uri_buf[0] = 0;
+      httpd_post_finished(hs, http_uri_buf, LWIP_HTTPD_URI_BUF_LEN);
+    }
+  }
+#else /* LWIP_HTTPD_SUPPORT_POST*/
+  LWIP_UNUSED_ARG(hs);
+#endif /* LWIP_HTTPD_SUPPORT_POST*/
+}
+
 /** Free a struct http_state.
  * Also frees the file data if dynamic.
  */
@@ -529,6 +555,7 @@ http_state_eof(struct http_state *hs)
     hs->req = NULL;
   }
 #endif /* LWIP_HTTPD_SUPPORT_REQUESTLIST */
+  http_state_close_post(hs);
 }
 
 /** Free a struct http_state.
