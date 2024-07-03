@@ -19,6 +19,7 @@
 #include "drivers/usb-ethernet.h"
 
 bool run_main = false;
+bool dhcp_started = false;
 bool httpd_running = false;
 
 void ethif_status_callback_fn(struct netif *netif)
@@ -49,7 +50,6 @@ int main(void)
         // this is your code that runs in a loop
         // please note that much of the networking in lwIP is callback-style
         // please consult the lwIP documentation for the protocol you are using for instructions
-        os_ClrHomeFull();
         key = os_GetCSC();
         if (key == sk_Clear)
         {
@@ -63,13 +63,13 @@ int main(void)
                 // eg: dhcp_start(ethif);
                 printf("en0 registered\n");
                 netif_set_status_callback(ethif, ethif_status_callback_fn);
+                dhcp_start(ethif);
             }
         }
-        printf("handling events\n");
-        usb_HandleEvents(); // usb events
-        printf("done\n");
+        usb_HandleEvents();   // usb events
         sys_check_timeouts(); // lwIP timers/event callbacks
     } while (run_main);
+    dhcp_release_and_stop(ethif);
 exit:
     usb_Cleanup();
     exit(0);

@@ -52,6 +52,7 @@ usb_error_t interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t en
 {
   eth_device_t *dev = (eth_device_t *)data;
   uint8_t *ibuf = dev->interrupt_rx_buf;
+  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("eth.dbg: interrupt_in\n"));
   if ((status == USB_TRANSFER_COMPLETED) && transferred)
   {
     usb_control_setup_t *notify;
@@ -249,8 +250,7 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
   struct pbuf *p = NULL;             // temp pbuf for datagrams
   // static size_t rx_offset = 0;       // start RX offset at 0
   static size_t ntb_total = 0;
-
-  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("ncm:processing payload\n"));
+  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("ncm.dbg: payload_in\n"));
   if (rx_buf == NULL)
   {
     struct ncm_nth *nth = (struct ncm_nth *)buf;
@@ -259,10 +259,7 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
     ntb_total = nth->wBlockLength;
     rx_buf = pbuf_alloc(PBUF_RAW, ntb_total, PBUF_RAM);
     if (!rx_buf)
-    {
-      LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("ncm:ERROR: allocation\n"));
       return ERR_MEM;
-    }
   }
 
   // it this would overflow buffer, we need to destroy the frame
@@ -295,10 +292,7 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
     {
       // attempt to allocate pbuf
       if (idx[dg_num].wDatagramIndex > NCM_RX_NTB_MAX_SIZE)
-      {
-        LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("ncm:FATAL: DatagramIndex exceeds max NTB len\n"));
         break;
-      }
       struct pbuf *p = pbuf_alloc(PBUF_RAW, idx[dg_num].wDatagramLen, PBUF_RAM);
       if (p != NULL)
       {
@@ -315,18 +309,15 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
     if (ndp->wNextNdpIndex == 0)
       break;
     if (ndp->wNextNdpIndex > NCM_RX_NTB_MAX_SIZE)
-    {
-      LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("ncm:FATAL: NextNdpIndex exceeds max NTB len\n"));
       break;
-    }
     // set next NDP
     ndp = (struct ncm_ndp *)&ntb[ndp->wNextNdpIndex];
   } while (1);
 exit:
   // delete the shadow of my own regret and prepare for more regret
+  rx_buf->len = 0;
   pbuf_free(rx_buf);
   rx_buf = NULL;
-  // rx_offset = 0;
   return ERR_OK;
 }
 
@@ -444,7 +435,6 @@ bool init_ethernet_usb_device(usb_device_t device)
   size_t xferd, parsed_len, desc_len;
   usb_error_t err;
   tmp.device = device;
-  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("eth:DBG: proc new device\n"));
   struct
   {
     usb_configuration_descriptor_t *addr;
@@ -686,9 +676,6 @@ init_success:
   iface->num = ifnum;                  // use IFnum that triggered break
   netif_set_hostname(iface, hostname); // set default hostname
 
-  // set callbacks for netif activity
-  netif_set_remove_callback(iface, eth_netif_remove_callback); // stop processes bound to netif
-
   // allow IPv4 and IPv6 on device
   netif_create_ip6_linklocal_address(iface, 1);
   iface->ip6_autoconfig_enabled = 1;
@@ -697,7 +684,6 @@ init_success:
   // enqueue callbacks for receiving interrupt and RX transfers from this device.
   usb_ScheduleInterruptTransfer(eth->endpoint.interrupt, eth->interrupt_rx_buf, INTERRUPT_RX_MAX, interrupt_receive_callback, eth);
   usb_ScheduleBulkTransfer(eth->endpoint.in, eth->bulk_rx_buf, ETHERNET_MTU, bulk_receive_callback, eth);
-  dhcp_start(iface);
   return true;
 }
 
@@ -706,7 +692,6 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
                      __attribute__((unused)) usb_callback_data_t *callback_data)
 {
   usb_device_t usb_device = event_data;
-  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("eth:DBG: eth callback\n"));
   /* Enable newly connected devices */
   switch (event)
   {
@@ -736,6 +721,6 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
   default:
     break;
   }
-  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("eth:DBG: eth callback done\n"));
+  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("eth.dbg: eth callback ev: %u\n", event));
   return USB_SUCCESS;
 }
