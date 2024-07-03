@@ -4,8 +4,8 @@
 
 ## What are lwIP and lwIP-CE ##
 
-**lwIP** is a full networking stack for low-resource device like embedded systems. It is maintained by non-GNU (https://github.com/lwip-tcpip/lwip).
-This makes it perfect for something as ridiclous as a graphing calculator.
+**lwIP** is a full networking stack for low-resource device like embedded systems. This makes it perfect for something as ridiclous as a graphing calculator.
+It is maintained by non-GNU (https://github.com/lwip-tcpip/lwip).
 **lwIP-CE** is the name for the lwIP fork targetting the Texas Instruments TI-84+ CE graphing calculator.
 You can view the original readme [here](./README-ORIG.md).
 
