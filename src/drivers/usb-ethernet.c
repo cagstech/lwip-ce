@@ -218,6 +218,8 @@ struct ncm_ndp
 #define NCM_NDP_LEN sizeof(struct ncm_ndp)
 #define NCM_RX_NTB_MAX_SIZE 2048
 #define NCM_RX_MAX_DATAGRAMS 4
+#define NCM_RX_DATAGRAMS_OVERFLOW_MUL 16 // this is here in the event that max datagrams is unsupported
+#define NCM_RX_QUEUE_LEN (NCM_RX_MAX_DATAGRAMS * NCM_RX_DATAGRAMS_OVERFLOW_MUL)
 
 /* This runs during NCM device configuration before switching to alt interface. */
 usb_error_t ncm_control_setup(eth_device_t *eth)
@@ -247,42 +249,48 @@ usb_error_t ncm_control_setup(eth_device_t *eth)
 err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
 {
   static struct pbuf *rx_buf = NULL; // pointer to pbuf for RX
-  struct pbuf *p = NULL;             // temp pbuf for datagrams
-  // static size_t rx_offset = 0;       // start RX offset at 0
+  err_t error = ERR_OK;
+  static size_t rx_offset = 0; // start RX offset at 0
   static size_t ntb_total = 0;
-  LWIP_DEBUGF(DRIVER_NCM_DEBUG | LWIP_DBG_TRACE, ("ncm.dbg: payload_in\n"));
   if (rx_buf == NULL)
   {
     struct ncm_nth *nth = (struct ncm_nth *)buf;
     if (nth->dwSignature != NCM_NTH_SIG) // if the SIG is invalid, something is wrong
-      return ERR_IF;
+      error = ERR_IF;
     ntb_total = nth->wBlockLength;
+    if (ntb_total > NCM_RX_NTB_MAX_SIZE) // confirm that ntb_total is within bounds set
+      error = ERR_MEM;
     rx_buf = pbuf_alloc(PBUF_RAW, ntb_total, PBUF_RAM);
     if (!rx_buf)
-      return ERR_MEM;
+      error = ERR_MEM;
+    if (error)
+      goto error;
   }
 
-  // it this would overflow buffer, we need to destroy the frame
-  if ((rx_buf->len + len) > ntb_total)
-    goto exit;
-
   // absorb received bytes into pbuf
-  pbuf_take_at(rx_buf, buf, len, rx_buf->len);
-  // rx_offset += len;
+  error = pbuf_take_at(rx_buf, buf, len, rx_offset);
+  if (error)
+    goto error;
+  rx_offset += len;
 
-  if (ntb_total > rx_buf->len)
+  if (rx_offset < ntb_total)
     return ERR_OK; // do nothing until we have the full NTB
 
   // get header and first NDP pointers
   uint8_t *ntb = (uint8_t *)rx_buf->payload;
   struct ncm_nth *nth = (struct ncm_nth *)ntb;
   struct ncm_ndp *ndp = (struct ncm_ndp *)&ntb[nth->wNdpIndex];
+  struct pbuf *rx_queue[NCM_RX_QUEUE_LEN];
+  uint16_t enqueued = 0;
+  bool parse_ntb = true;
   // repeat while ndp->wNextNdpIndex is non-zero
   do
   {
-    if (ndp->dwSignature != NCM_NDP_SIG0) // if invalid sig
-      goto exit;                          // error ?
-
+    if (ndp->dwSignature != NCM_NDP_SIG0)
+    { // if invalid sig
+      error = ERR_IF;
+      goto error;
+    }
     // set datagram number to 0 and set datagram index pointer
     uint16_t dg_num = 0;
     struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)&ndp->wDatagramIdx;
@@ -291,34 +299,47 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
     do
     {
       // attempt to allocate pbuf
-      if (idx[dg_num].wDatagramIndex > NCM_RX_NTB_MAX_SIZE)
-        break;
-      struct pbuf *p = pbuf_alloc(PBUF_RAW, idx[dg_num].wDatagramLen, PBUF_RAM);
-      if (p != NULL)
+      if (enqueued >= NCM_RX_QUEUE_LEN)
       {
-        // copy datagram into pbuf
-        pbuf_take(p, &ntb[idx[dg_num].wDatagramIndex], idx[dg_num].wDatagramLen);
-        // hand pbuf to lwIP (should we enqueue these and defer the handoffs till later?)
-        // i'll leave it for now, and if my calculator explodes I'll fix it
-        if (netif->input(p, netif) != ERR_OK)
-          pbuf_free(p);
+        parse_ntb = false;
+        break;
       }
+      struct pbuf *p = pbuf_alloc(PBUF_RAW, idx[dg_num].wDatagramLen, PBUF_RAM);
+      if (p == NULL)
+      {
+        error = ERR_MEM;
+        goto error;
+      }
+      // copy datagram into pbuf
+      pbuf_take(p, &ntb[idx[dg_num].wDatagramIndex], idx[dg_num].wDatagramLen);
+      // hand pbuf to lwIP (should we enqueue these and defer the handoffs till later?)
+      // i'll leave it for now, and if my calculator explodes I'll fix it
+      rx_queue[enqueued++] = p;
       dg_num++;
     } while ((idx[dg_num].wDatagramIndex) && (idx[dg_num].wDatagramLen));
     // if next NDP is 0, NTB is done and so is my sanity
     if (ndp->wNextNdpIndex == 0)
       break;
-    if (ndp->wNextNdpIndex > NCM_RX_NTB_MAX_SIZE)
-      break;
     // set next NDP
     ndp = (struct ncm_ndp *)&ntb[ndp->wNextNdpIndex];
-  } while (1);
-exit:
-  // delete the shadow of my own regret and prepare for more regret
-  rx_buf->len = 0;
+  } while (parse_ntb);
+
+  // maybe reclaiming this memory before handing off packets will be helpful?
   pbuf_free(rx_buf);
   rx_buf = NULL;
+  rx_offset = 0;
+  for (int i = 0; i < enqueued; i++)
+    if (rx_queue[i])
+      if (netif->input(rx_queue[i], netif) != ERR_OK)
+        pbuf_free(rx_queue[i]);
   return ERR_OK;
+
+error:
+  // delete the shadow of my own regret and prepare for more regret
+  if (rx_buf)
+    pbuf_free(rx_buf);
+  rx_offset = 0;
+  return error;
 }
 
 /* This code packs a single TX Ethernet frame into an NCM transfer. */
