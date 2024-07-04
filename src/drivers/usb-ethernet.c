@@ -263,11 +263,11 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
   }
 
   // it this would overflow buffer, we need to destroy the frame
-  if (rx_buf->len + len > ntb_total)
+  if ((rx_buf->len + len) > ntb_total)
     goto exit;
 
   // absorb received bytes into pbuf
-  pbuf_take_at(rx_buf->len, buf, len, rx_buf->len);
+  pbuf_take_at(rx_buf, buf, len, rx_buf->len);
   // rx_offset += len;
 
   if (ntb_total > rx_buf->len)
