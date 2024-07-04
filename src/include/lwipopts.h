@@ -104,7 +104,7 @@
 
 /* MEM_SIZE: the size of the heap memory. If the application will send
 a lot of data that needs to be copied, this should be set high. */
-#define MEM_SIZE 12288
+#define MEM_SIZE 16384
 
 /* MEMP_NUM_PBUF: the number of memp struct pbufs. If the application
    sends a lot of data out of ROM (or other static memory), this
@@ -124,7 +124,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define MEMP_NUM_TCP_PCB_LISTEN 2
 /* MEMP_NUM_TCP_SEG: the number of simultaneously queued TCP
    segments. */
-#define MEMP_NUM_TCP_SEG 10
+#define MEMP_NUM_TCP_SEG 16
 /* MEMP_NUM_SYS_TIMEOUT: the number of simulateously active
    timeouts. */
 #define MEMP_NUM_SYS_TIMEOUT 30
@@ -143,7 +143,7 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* ---------- Pbuf options ---------- */
 /* PBUF_POOL_SIZE: the number of buffers in the pbuf pool. */
-#define PBUF_POOL_SIZE 40
+#define PBUF_POOL_SIZE 50
 
 /* PBUF_POOL_BUFSIZE: the size of each pbuf in the pbuf pool. */
 #define PBUF_POOL_BUFSIZE 256
@@ -176,7 +176,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCP_OVERSIZE TCP_MSS
 
 /* TCP sender buffer space (bytes). */
-#define TCP_SND_BUF (2 * TCP_MSS)
+#define TCP_SND_BUF (4 * TCP_MSS)
 
 /* TCP sender buffer space (pbufs). This must be at least = 2 *
    TCP_SND_BUF/TCP_MSS for things to work. */
@@ -188,7 +188,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCP_SNDLOWAT (TCP_SND_BUF / 2)
 
 /* TCP receive window. */
-#define TCP_WND (4 * TCP_MSS)
+#define TCP_WND (8 * TCP_MSS)
 
 /* Maximum number of retransmissions of data segments. */
 #define TCP_MAXRTX 6
