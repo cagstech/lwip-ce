@@ -266,73 +266,77 @@ err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
     if (error)
       goto error;
   }
-
-  // absorb received bytes into pbuf
-  error = pbuf_take_at(rx_buf, buf, len, rx_offset);
-  if (error)
-    goto error;
-  rx_offset += len;
-
-  if (rx_offset < ntb_total)
-    return ERR_OK; // do nothing until we have the full NTB
-
-  // get header and first NDP pointers
-  uint8_t *ntb = (uint8_t *)rx_buf->payload;
-  struct ncm_nth *nth = (struct ncm_nth *)ntb;
-  struct ncm_ndp *ndp = (struct ncm_ndp *)&ntb[nth->wNdpIndex];
-  struct pbuf *rx_queue[NCM_RX_QUEUE_LEN];
-  uint16_t enqueued = 0;
-  bool parse_ntb = true;
-  // repeat while ndp->wNextNdpIndex is non-zero
-  do
+  else if (rx_buf)
   {
-    if (ndp->dwSignature != NCM_NDP_SIG0)
-    { // if invalid sig
-      error = ERR_IF;
-      goto error;
-    }
-    // set datagram number to 0 and set datagram index pointer
-    uint16_t dg_num = 0;
-    struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)&ndp->wDatagramIdx;
+    struct pbuf *rx_queue[NCM_RX_QUEUE_LEN];
+    uint16_t enqueued = 0;
+    bool parse_ntb = true;
 
-    // a null datagram index structure indicates end of NDP
+    // absorb received bytes into pbuf
+    error = pbuf_take_at(rx_buf, buf, len, rx_offset);
+    if (error)
+      goto error;
+    rx_offset += len;
+
+    if (rx_offset < ntb_total)
+      return ERR_OK; // do nothing until we have the full NTB
+
+    // get header and first NDP pointers
+    uint8_t *ntb = (uint8_t *)rx_buf->payload;
+    struct ncm_nth *nth = (struct ncm_nth *)ntb;
+    struct ncm_ndp *ndp = (struct ncm_ndp *)&ntb[nth->wNdpIndex];
+
+    // repeat while ndp->wNextNdpIndex is non-zero
     do
     {
-      // attempt to allocate pbuf
-      if (enqueued >= NCM_RX_QUEUE_LEN)
-      {
-        parse_ntb = false;
-        break;
-      }
-      struct pbuf *p = pbuf_alloc(PBUF_RAW, idx[dg_num].wDatagramLen, PBUF_RAM);
-      if (p == NULL)
-      {
-        error = ERR_MEM;
+      if (ndp->dwSignature != NCM_NDP_SIG0)
+      { // if invalid sig
+        error = ERR_IF;
         goto error;
       }
-      // copy datagram into pbuf
-      pbuf_take(p, &ntb[idx[dg_num].wDatagramIndex], idx[dg_num].wDatagramLen);
-      // hand pbuf to lwIP (should we enqueue these and defer the handoffs till later?)
-      // i'll leave it for now, and if my calculator explodes I'll fix it
-      rx_queue[enqueued++] = p;
-      dg_num++;
-    } while ((idx[dg_num].wDatagramIndex) && (idx[dg_num].wDatagramLen));
-    // if next NDP is 0, NTB is done and so is my sanity
-    if (ndp->wNextNdpIndex == 0)
-      break;
-    // set next NDP
-    ndp = (struct ncm_ndp *)&ntb[ndp->wNextNdpIndex];
-  } while (parse_ntb);
+      // set datagram number to 0 and set datagram index pointer
+      uint16_t dg_num = 0;
+      struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)&ndp->wDatagramIdx;
 
-  // maybe reclaiming this memory before handing off packets will be helpful?
-  pbuf_free(rx_buf);
-  rx_buf = NULL;
-  rx_offset = 0;
-  for (int i = 0; i < enqueued; i++)
-    if (rx_queue[i])
-      if (netif->input(rx_queue[i], netif) != ERR_OK)
-        pbuf_free(rx_queue[i]);
-  return ERR_OK;
+      // a null datagram index structure indicates end of NDP
+      do
+      {
+        // attempt to allocate pbuf
+        if (enqueued >= NCM_RX_QUEUE_LEN)
+        {
+          parse_ntb = false;
+          break;
+        }
+        struct pbuf *p = pbuf_alloc(PBUF_RAW, idx[dg_num].wDatagramLen, PBUF_RAM);
+        if (p == NULL)
+        {
+          error = ERR_MEM;
+          goto error;
+        }
+        // copy datagram into pbuf
+        pbuf_take(p, &ntb[idx[dg_num].wDatagramIndex], idx[dg_num].wDatagramLen);
+        // hand pbuf to lwIP (should we enqueue these and defer the handoffs till later?)
+        // i'll leave it for now, and if my calculator explodes I'll fix it
+        rx_queue[enqueued++] = p;
+        dg_num++;
+      } while ((idx[dg_num].wDatagramIndex) && (idx[dg_num].wDatagramLen));
+      // if next NDP is 0, NTB is done and so is my sanity
+      if (ndp->wNextNdpIndex == 0)
+        break;
+      // set next NDP
+      ndp = (struct ncm_ndp *)&ntb[ndp->wNextNdpIndex];
+    } while (parse_ntb);
+
+    // maybe reclaiming this memory before handing off packets will be helpful?
+    pbuf_free(rx_buf);
+    rx_buf = NULL;
+    rx_offset = 0;
+    for (int i = 0; i < enqueued; i++)
+      if (rx_queue[i])
+        if (netif->input(rx_queue[i], netif) != ERR_OK)
+          pbuf_free(rx_queue[i]);
+    return ERR_OK;
+  }
 
 error:
   // delete the shadow of my own regret and prepare for more regret
