@@ -62,6 +62,7 @@ int main(void)
                 // run this code if netif exists
                 // eg: dhcp_start(ethif);
                 printf("en0 registered\n");
+                netif_set_default(ethif);
                 netif_set_status_callback(ethif, ethif_status_callback_fn);
                 dhcp_start(ethif);
             }
