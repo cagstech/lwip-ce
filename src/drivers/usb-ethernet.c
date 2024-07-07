@@ -349,58 +349,25 @@ usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
   if (transferred)
   {
     rx_retries = 0;
-    static struct pbuf *rx_buf = NULL; // pointer to pbuf for RX
-    usb_error_t ncm_proc_error = USB_SUCCESS;
-    static size_t rx_offset = 0; // start RX offset at 0
-    static size_t ntb_total = 0;
-    if (rx_buf == NULL)
-    {
-      struct ncm_nth *nth = (struct ncm_nth *)recvbuf;
-      if (nth->dwSignature != NCM_NTH_SIG) // if the SIG is invalid, something is wrong
-        ncm_proc_error = USB_ERROR_SYSTEM;
-      ntb_total = nth->wBlockLength;
-      if (ntb_total > NCM_RX_NTB_MAX_SIZE) // confirm that ntb_total is within bounds set
-        ncm_proc_error = USB_ERROR_NO_MEMORY;
-      if (!(rx_buf = pbuf_alloc(PBUF_RAW, ntb_total, PBUF_RAM))) // pbuf alloc successful?
-        ncm_proc_error = USB_ERROR_NO_MEMORY;
-      if (ncm_proc_error)
-        goto exit_w_error;
-    }
-
     struct pbuf *rx_queue[NCM_RX_QUEUE_LEN];
     uint16_t enqueued = 0;
     bool parse_ntb = true;
 
-    // absorb received bytes into pbuf
-    if (pbuf_take_at(rx_buf, recvbuf, transferred, rx_offset))
-    {
-      ncm_proc_error = USB_ERROR_NO_MEMORY;
-      goto exit_w_error;
-    }
-    rx_offset += transferred;
-
-    if (rx_offset < ntb_total)
-    {
-#ifdef ETH_DEBUG
-      printf("debug: ntb in_progress %u/%u\n", rx_offset, ntb_total);
-#endif
-      usb_ScheduleBulkTransfer(dev->rx.endpoint, dev->rx.buf, NCM_RX_NTB_MAX_SIZE, dev->rx.callback, data);
-      return USB_SUCCESS; // do nothing until we have the full NTB
-    }
-
     // get header and first NDP pointers
-    uint8_t *ntb = (uint8_t *)rx_buf->payload;
+    uint8_t *ntb = (uint8_t *)recvbuf;
     struct ncm_nth *nth = (struct ncm_nth *)ntb;
+    if (nth->dwSignature != NCM_NTH_SIG)
+      return USB_SUCCESS; // validate NTH signature field. If invalid, fail out
+
+    // start proc'ing first NDP
     struct ncm_ndp *ndp = (struct ncm_ndp *)&ntb[nth->wNdpIndex];
 
     // repeat while ndp->wNextNdpIndex is non-zero
     do
     {
       if (ndp->dwSignature != NCM_NDP_SIG0)
-      { // if invalid sig
-        ncm_proc_error = USB_ERROR_SYSTEM;
-        goto exit_w_error;
-      }
+        return USB_SUCCESS; // validate NDP signature field, if invalid, fail out
+
       // set datagram number to 0 and set datagram index pointer
       uint16_t dg_num = 0;
       struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)&ndp->wDatagramIdx;
@@ -416,14 +383,19 @@ usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
         }
         struct pbuf *p = pbuf_alloc(PBUF_RAW, idx[dg_num].wDatagramLen, PBUF_POOL);
         if (p == NULL)
+        { // if allocation failed, break loops
+          parse_ntb = false;
           break;
+        }
         if (pbuf_take(p, &ntb[idx[dg_num].wDatagramIndex], idx[dg_num].wDatagramLen))
+        { // if pbuf take fails, break loops
+          parse_ntb = false;
           break;
-          // hand pbuf to lwIP (should we enqueue these and defer the handoffs till later?)
-          // i'll leave it for now, and if my calculator explodes I'll fix it
+        }
 #ifdef ETH_DEBUG
         printf("debug: ncm:packet in=%p, len=%u\n", p, p->tot_len);
 #endif
+        // enqueue packet, we will finish processing first
         rx_queue[enqueued++] = p;
         dg_num++;
       } while ((idx[dg_num].wDatagramIndex) && (idx[dg_num].wDatagramLen));
@@ -434,32 +406,17 @@ usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
       ndp = (struct ncm_ndp *)&ntb[ndp->wNextNdpIndex];
     } while (parse_ntb);
 
-    // maybe reclaiming this memory before handing off packets will be helpful?
-    pbuf_free(rx_buf);
-    rx_buf = NULL;
-    rx_offset = 0;
-
     LINK_STATS_INC(link.recv);
     MIB2_STATS_NETIF_ADD(&dev->iface, ifinoctets, transferred);
 
+    // queue up next transfer first
     usb_ScheduleBulkTransfer(dev->rx.endpoint, dev->rx.buf, NCM_RX_NTB_MAX_SIZE, dev->rx.callback, data);
 
+    // hand packet queue to lwIP
     for (int i = 0; i < enqueued; i++)
       if (rx_queue[i])
         if (dev->iface.input(rx_queue[i], &dev->iface) != ERR_OK)
           pbuf_free(rx_queue[i]);
-    return USB_SUCCESS;
-
-  exit_w_error:
-    // delete the shadow of my own regret and prepare for more regret
-    if (rx_buf)
-      pbuf_free(rx_buf);
-    rx_buf = NULL;
-    rx_offset = 0;
-#ifdef ETH_DEBUG
-    printf("debug: ncm exit_w_error\n");
-#endif
-    return ncm_proc_error;
   }
   return USB_SUCCESS;
 }
