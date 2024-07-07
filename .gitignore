@@ -1,3 +1,6 @@
 obj
 bin
 .vscode
+.dccache
+fsdata*
+*.code-workspace
