@@ -12,7 +12,7 @@
   do                          \
   {                           \
     printf x;                 \
-    putchar("\n");            \
+    outchar('\n');            \
   } while (0)
 
 #endif // LWIP_CC_H

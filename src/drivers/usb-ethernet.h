@@ -13,10 +13,16 @@
 #include "lwip/err.h"
 #include "lwip/netif.h"
 
-#define CDC_USB_MAXRETRIES 3
+#define USB_CDC_MAX_RETRIES 3
 
 /* Ethernet MTU - ECM & NCM */
 #define ETHERNET_MTU 1518
+
+/* Interrupt buffer size */
+#define INTERRUPT_RX_MAX 64
+
+/* NCM rx ntb size */
+#define NCM_RX_NTB_MAX_SIZE 2048
 
 /* USB CDC Ethernet Device Classes */
 #define USB_ECM_SUBCLASS 0x06
@@ -133,8 +139,6 @@ struct _ncm
 };
 
 // usb device metadata
-#define INTERRUPT_RX_MAX 64
-#define NCM_RX_NTB_MAX_SIZE 2048
 typedef struct _eth_device_t
 {
   usb_device_t device;
@@ -168,5 +172,9 @@ extern eth_device_t eth;
 
 usb_error_t eth_handle_usb_event(usb_event_t event, void *event_data,
                                  usb_callback_data_t *callback_data);
+
+#if ETH_DEBUG_FILE == LWIP_DBG_ON
+extern FILE *eth_logger;
+#endif
 
 #endif

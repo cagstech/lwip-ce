@@ -1,3 +1,6 @@
+#if ETH_DEBUG_FILE == LWIP_DBG_ON
+#include <string.h>
+#endif
 
 #include <usbdrvce.h>
 #include <ti/getcsc.h>
@@ -21,39 +24,6 @@
 bool run_main = false;
 bool dhcp_started = false;
 bool httpd_running = false;
-bool outchar_scroll_up = true;
-
-static void newline(void)
-{
-    if (outchar_scroll_up)
-    {
-        memmove(gfx_vram, gfx_vram + (LCD_WIDTH * 10), LCD_WIDTH * (LCD_HEIGHT - 30));
-        gfx_SetColor(255);
-        gfx_FillRectangle_NoClip(0, LCD_HEIGHT - 30, LCD_WIDTH, 10);
-        gfx_SetTextXY(2, LCD_HEIGHT - 30);
-    }
-    else
-        gfx_SetTextXY(2, gfx_GetTextY() + 10);
-}
-void outchar(char c)
-{
-    if (c == '\n')
-    {
-        newline();
-    }
-    else if (c < ' ' || c > '~')
-    {
-        return;
-    }
-    else
-    {
-        if (gfx_GetTextX() >= LCD_WIDTH - 16)
-        {
-            newline();
-        }
-        gfx_PrintChar(c);
-    }
-}
 
 void ethif_status_callback_fn(struct netif *netif)
 {
@@ -71,6 +41,12 @@ int main(void)
     gfx_Begin();
     gfx_FillScreen(255);
     lwip_init();
+
+#if ETH_DEBUG_FILE == LWIP_DBG_ON
+    eth_logger = fopen("lwiplogs", "a");
+    const char *search_string = ":tilogfile:lwIP:\n";
+    fwrite(search_string, strlen(search_string), 1, eth_logger);
+#endif
     struct netif *ethif = NULL;
 
     /* You should probably handle this function failing */
@@ -95,7 +71,6 @@ int main(void)
             {
                 // run this code if netif exists
                 // eg: dhcp_start(ethif);
-                printf("en0 registered\n");
                 netif_set_default(ethif);
                 netif_set_status_callback(ethif, ethif_status_callback_fn);
                 dhcp_start(ethif);
@@ -106,6 +81,10 @@ int main(void)
     } while (run_main);
     dhcp_release_and_stop(ethif);
 exit:
+    netif_remove(ethif);
+#if ETH_DEBUG_FILE == LWIP_DBG_ON
+    fclose(eth_logger);
+#endif
     usb_Cleanup();
     gfx_End();
     exit(0);

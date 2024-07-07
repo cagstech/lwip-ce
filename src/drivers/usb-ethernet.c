@@ -5,7 +5,14 @@
  */
 
 #include <sys/util.h>
+#include <libload.h>
 #include <usbdrvce.h>
+#if ETH_DEBUG == LWIP_DBG_ON
+#include <graphx.h>
+#if ETH_DEBUG_FILE == LWIP_DBG_ON
+#include <fileioc.h>
+#endif
+#endif
 
 /**
  * LWIP headers for handing link layer to stack,
@@ -13,6 +20,7 @@
  * managing packet buffers,
  * and tracking link stats
  */
+#include "lwip/opt.h"
 #include "lwip/debug.h"
 #include "lwip/netif.h"
 #include "lwip/ethip6.h"
@@ -26,8 +34,14 @@
 /* Define Default Hostname for NETIFs */
 const char hostname[] = "ti84plusce";
 
+/* Logging Handlers */
+#if ETH_DEBUG_FILE == LWIP_DBG_ON
+FILE *eth_logger = NULL;
+#endif
+
 /* UTF-16 -> hex conversion */
-uint8_t nibble(uint16_t c)
+uint8_t
+nibble(uint16_t c)
 {
   c -= '0';
   if (c < 10)
@@ -40,6 +54,45 @@ uint8_t nibble(uint16_t c)
     return c + 10;
   return 0xff;
 }
+#if ETH_DEBUG == LWIP_DBG_ON
+bool outchar_scroll_up = true;
+static void newline(void)
+{
+  if (outchar_scroll_up)
+  {
+    memmove(gfx_vram, gfx_vram + (LCD_WIDTH * 10), LCD_WIDTH * (LCD_HEIGHT - 30));
+    gfx_SetColor(255);
+    gfx_FillRectangle_NoClip(0, LCD_HEIGHT - 30, LCD_WIDTH, 10);
+    gfx_SetTextXY(2, LCD_HEIGHT - 30);
+  }
+  else
+    gfx_SetTextXY(2, gfx_GetTextY() + 10);
+}
+void __attribute__((optnone)) outchar(char c)
+{
+
+  if (c == '\n')
+  {
+    newline();
+  }
+  else if (c < ' ' || c > '~')
+  {
+    return;
+  }
+  else
+  {
+    if (gfx_GetTextX() >= LCD_WIDTH - 16)
+    {
+      newline();
+    }
+    gfx_PrintChar(c);
+  }
+#if ETH_DEBUG_FILE == LWIP_DBG_ON
+  if (eth_logger)
+    fwrite(&c, 1, 1, eth_logger);
+#endif
+}
+#endif
 
 /**********************************************************
  * @brief Processes interrupt requests from device.
@@ -52,10 +105,8 @@ usb_error_t interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t en
 {
   eth_device_t *dev = (eth_device_t *)data;
   uint8_t *ibuf = dev->interrupt.buf;
-#ifdef ETH_DEBUG
-  printf("debug: begin interrupt rx callback\n");
-  printf("debug: int_frame, len=%u\n", transferred);
-#endif
+  LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+              ("eth.interrupt.callback: rx=%u, status=%u", transferred, status));
   if ((status == USB_TRANSFER_COMPLETED) && transferred)
   {
     usb_control_setup_t *notify;
@@ -82,57 +133,9 @@ usb_error_t interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t en
     } while (bytes_parsed < transferred);
   }
   usb_ScheduleInterruptTransfer(dev->interrupt.endpoint, dev->interrupt.buf, INTERRUPT_RX_MAX, interrupt_receive_callback, data);
-#ifdef ETH_DEBUG
-  printf("debug: end interrupt rx callback\n");
-#endif
   return USB_SUCCESS;
 }
 
-/**********************************************************
- * @brief Processes bulk transfers from IN endpoint.
- * @note @b dev->process is either \b ecm_process or \b ncm_process .
- */
-/*
-usb_error_t bulk_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
-                               usb_transfer_status_t status,
-                               size_t transferred,
-                               usb_transfer_data_t *data)
-{
-eth_device_t *dev = (eth_device_t *)data;
-uint8_t *recvbuf = dev->bulk_rx_buf;
-static uint8_t rx_retries = 0;
-#ifdef ETH_DEBUG
-printf("debug: begin bulk rx callback\n");
-printf("debug: rx_frame, len=%u\n", transferred);
-#endif
-if ((status == USB_TRANSFER_COMPLETED) && transferred)
-{
- LINK_STATS_INC(link.recv);
- MIB2_STATS_NETIF_ADD(&dev->iface, ifinoctets, transferred);
- dev->process(&dev->iface, recvbuf, transferred);
- rx_retries = 0;
-}
-else if (status)
-{
- printf("usb rx status code: %u\n", status);
- if (rx_retries < RX_MAX_RETRIES)
- {
-   printf("usb rx retry: %u\n", rx_retries);
-   rx_retries++;
-   usb_ScheduleBulkTransfer(dev->endpoint.in, dev->bulk_rx_buf, ETHERNET_MTU, bulk_receive_callback, data);
- }
- else
- {
-   printf("FATAL ERROR [STALL?]");
-   usb_DisableDevice(dev->device);
- }
-}
-#ifdef ETH_DEBUG
-printf("debug: end bulk rx callback\n");
-#endif
-return USB_SUCCESS;
-}
-*/
 /*****************************************************
  * @brief Processes bulk transfers from OUT endpoint.
  * @note This simply frees the TX pbuf passed in \b data .
@@ -142,15 +145,10 @@ usb_error_t bulk_transmit_callback(__attribute__((unused)) usb_endpoint_t endpoi
                                    __attribute__((unused)) size_t transferred,
                                    usb_transfer_data_t *data)
 {
-// Handle completion or error of the transfer, if needed
-#ifdef ETH_DEBUG
-  printf("debug: begin bulk tx callback\n");
-#endif
+  // Handle completion or error of the transfer, if needed
   if (data)
     pbuf_free(data);
-#ifdef ETH_DEBUG
-  printf("debug: end bulk tx callback\n");
-#endif
+
   return USB_SUCCESS;
 }
 
@@ -169,23 +167,22 @@ usb_error_t ecm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
   eth_device_t *dev = (eth_device_t *)data;
   uint8_t *recvbuf = dev->rx.buf;
   static uint8_t rx_retries = 0;
-#ifdef ETH_DEBUG
-  printf("debug: begin ecm rx callback\n");
-  printf("debug: rx_frame, len=%u\n", transferred);
-#endif
+  LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+              ("eth.ecm.rx.callback: rx=%u, status=%u", transferred, status));
   if (status)
   {
-    printf("usb rx status code: %u\n", status);
-    if (rx_retries < RX_MAX_RETRIES)
+    if (rx_retries < USB_CDC_MAX_RETRIES)
     {
-      printf("usb rx retry: %u\n", rx_retries);
+      LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                  ("eth.ecm.rx.callback:error: endpoint failure, retry=%u", rx_retries));
       rx_retries++;
       usb_ScheduleBulkTransfer(dev->rx.endpoint, dev->rx.buf, ETHERNET_MTU, dev->rx.callback, data);
       return USB_SUCCESS;
     }
     else
     {
-      printf("FATAL ERROR [STALL?]");
+      LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                  ("eth.ecm.rx.callback:error: endpoint failure, giving up"));
       usb_DisableDevice(dev->device);
       return USB_ERROR_FAILED;
     }
@@ -205,10 +202,6 @@ usb_error_t ecm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
     if (dev->iface.input(p, &dev->iface) != ERR_OK)
       pbuf_free(p);
   }
-
-#ifdef ETH_DEBUG
-  printf("debug: end ecm rx callback\n");
-#endif
   return USB_SUCCESS;
 }
 
@@ -216,9 +209,8 @@ usb_error_t ecm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
 err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p)
 {
   eth_device_t *dev = (eth_device_t *)netif->state;
-#if defined(ETH_DEBUG)
-  printf("debug: begin ecm_tx\n");
-#endif
+  LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+              ("eth.ecm.tx: tx=%u", p->tot_len));
   if (p->tot_len > ETHERNET_MTU)
     return ERR_MEM;
   struct pbuf *tbuf = pbuf_alloc(PBUF_RAW, p->tot_len, PBUF_RAM);
@@ -227,9 +219,6 @@ err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p)
   MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
   if (pbuf_copy(tbuf, p))
     return ERR_MEM;
-#if defined(ETH_DEBUG)
-  printf("debug: end ecm_tx\n");
-#endif
   usb_ScheduleBulkTransfer(dev->tx.endpoint, tbuf->payload, tbuf->tot_len, bulk_transmit_callback, tbuf);
   return ERR_OK;
 }
@@ -304,14 +293,14 @@ usb_error_t ncm_control_setup(eth_device_t *eth)
   struct _ntb_config_data ntb_config_data = {NCM_RX_NTB_MAX_SIZE, NCM_RX_MAX_DATAGRAMS, 0};
 
   /* Query NTB Parameters for device (NCM devices) */
-  error |= usb_DefaultControlTransfer(eth->device, &get_ntb_params, &eth->class.ncm.ntb_params, CDC_USB_MAXRETRIES, &transferred);
+  error |= usb_DefaultControlTransfer(eth->device, &get_ntb_params, &eth->class.ncm.ntb_params, USB_CDC_MAX_RETRIES, &transferred);
 
   /* Set NTB Max Input Size to 2048 (recd minimum NCM spec v 1.2) */
-  error |= usb_DefaultControlTransfer(eth->device, &ntb_config_request, &ntb_config_data, CDC_USB_MAXRETRIES, &transferred);
+  error |= usb_DefaultControlTransfer(eth->device, &ntb_config_request, &ntb_config_data, USB_CDC_MAX_RETRIES, &transferred);
 
   /* Reset packet filters */
   if (ncm_device_supports(eth, CAPABLE_ETHERNET_PACKET_FILTER))
-    error |= usb_DefaultControlTransfer(eth->device, &packet_filter_request, NULL, CDC_USB_MAXRETRIES, &transferred);
+    error |= usb_DefaultControlTransfer(eth->device, &packet_filter_request, NULL, USB_CDC_MAX_RETRIES, &transferred);
 
   return error;
 }
@@ -325,23 +314,22 @@ usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
   eth_device_t *dev = (eth_device_t *)data;
   uint8_t *recvbuf = dev->rx.buf;
   static uint8_t rx_retries = 0;
-#ifdef ETH_DEBUG
-  printf("debug: begin ncm rx callback\n");
-  printf("debug: rx_frame, len=%u\n", transferred);
-#endif
+  LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+              ("eth.ncm.rx.callback: rx=%u, status=%u", transferred, status));
   if (status)
   {
-    printf("usb rx status code: %u\n", status);
-    if (rx_retries < RX_MAX_RETRIES)
+    if (rx_retries < USB_CDC_MAX_RETRIES)
     {
-      printf("usb rx retry: %u\n", rx_retries);
+      LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                  ("eth.ecm.rx.callback:error: endpoint failure, retry=%u", rx_retries));
       rx_retries++;
       usb_ScheduleBulkTransfer(dev->rx.endpoint, dev->rx.buf, NCM_RX_NTB_MAX_SIZE, dev->rx.callback, data);
       return USB_SUCCESS;
     }
     else
     {
-      printf("FATAL ERROR [STALL?]");
+      LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                  ("eth.ecm.rx.callback:error: endpoint failure, giving up"));
       usb_DisableDevice(dev->device);
       return USB_ERROR_FAILED;
     }
@@ -392,9 +380,6 @@ usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
           parse_ntb = false;
           break;
         }
-#ifdef ETH_DEBUG
-        printf("debug: ncm:packet in=%p, len=%u\n", p, p->tot_len);
-#endif
         // enqueue packet, we will finish processing first
         rx_queue[enqueued++] = p;
         dg_num++;
@@ -430,9 +415,8 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
 {
   eth_device_t *dev = (eth_device_t *)netif->state;
   uint16_t offset_ndp = get_next_offset(NCM_NTH_LEN, dev->class.ncm.ntb_params.wNdpInAlignment, 0);
-#if defined(ETH_DEBUG)
-  printf("debug: begin ncm_tx len=%u\n", p->tot_len);
-#endif
+  LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+              ("eth.ncm.tx: tx=%u", p->tot_len));
   if (p->tot_len > ETHERNET_MTU)
     return ERR_MEM;
 
@@ -476,13 +460,9 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
   // queue the TX
   // printf("sent packet %u at time %lu\n", sequence, sys_now());
   usb_ScheduleBulkTransfer(dev->tx.endpoint, obuf->payload, ETHERNET_MTU + NCM_HBUF_SIZE, bulk_transmit_callback, obuf);
-#if defined(ETH_DEBUG)
-  printf("debug: sending NTB\n");
-#endif
   return ERR_OK;
 }
 
-#undef ETH_DEBUG
 /****************************************************************************
  * @brief Initializes the NETWORK INTERFACE for the newly enabled USB device.
  */
@@ -681,7 +661,7 @@ bool init_ethernet_usb_device(usb_device_t device)
 
               parse_state |= PARSE_HAS_MAC_ADDR;
             }
-            else if (!usb_DefaultControlTransfer(device, &get_mac_addr, &tmp.hwaddr[0], CDC_USB_MAXRETRIES, &xferd_tmp))
+            else if (!usb_DefaultControlTransfer(device, &get_mac_addr, &tmp.hwaddr[0], USB_CDC_MAX_RETRIES, &xferd_tmp))
             {
               parse_state |= PARSE_HAS_MAC_ADDR;
             }
@@ -695,7 +675,7 @@ bool init_ethernet_usb_device(usb_device_t device)
               memcpy(&tmp.hwaddr[0], rmac, 6);
               tmp.hwaddr[0] &= 0xFE;
               tmp.hwaddr[0] |= 0x02;
-              if (!usb_DefaultControlTransfer(eth->device, &set_mac_addr, &tmp.hwaddr[0], CDC_USB_MAXRETRIES, &xferd_tmp))
+              if (!usb_DefaultControlTransfer(eth->device, &set_mac_addr, &tmp.hwaddr[0], USB_CDC_MAX_RETRIES, &xferd_tmp))
                 parse_state |= PARSE_HAS_MAC_ADDR;
             }
           }
@@ -775,7 +755,8 @@ init_success:
   // allow IPv4 and IPv6 on device
   netif_create_ip6_linklocal_address(iface, 1);
   iface->ip6_autoconfig_enabled = 1;
-
+  LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+              ("new_device: type=%u, if=%c%c%u", eth->type, iface->name[0], iface->name[1], iface->num));
   netif_set_up(iface); // tell lwIP that the interface is ready to receive
   // enqueue callbacks for receiving interrupt and RX transfers from this device.
   usb_ScheduleInterruptTransfer(eth->interrupt.endpoint, eth->interrupt.buf, INTERRUPT_RX_MAX, interrupt_receive_callback, eth);
@@ -789,9 +770,6 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
 {
   usb_device_t usb_device = event_data;
   /* Enable newly connected devices */
-#ifdef ETH_DEBUG
-  printf("debug: handle event %u\n", event);
-#endif
   switch (event)
   {
   case USB_DEVICE_CONNECTED_EVENT:
@@ -801,7 +779,9 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
   case USB_DEVICE_ENABLED_EVENT:
     if (!init_ethernet_usb_device(usb_device))
     { // device failed some aspect of setup
-      printf("device initialization failed\n");
+      eth_device_t *eth_device = (eth_device_t *)usb_GetDeviceData(usb_device);
+      LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                  ("eth.handleevents:error: device configuration failed"));
       usb_DisableDevice(usb_device);
     }
     break;
