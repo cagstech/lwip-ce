@@ -148,8 +148,9 @@ typedef struct _eth_device_t
   {
     usb_endpoint_t in, out, interrupt;
   } endpoint;
-  err_t (*process)(struct netif *netif, uint8_t *buf, size_t len);
-  err_t (*emit)(struct netif *netif, struct pbuf *p);
+  usb_error_t (*rx)(usb_endpoint_t endpoint, usb_transfer_status_t status,
+                    size_t transferred, usb_transfer_data_t *data);
+  err_t (*tx)(struct netif *netif, struct pbuf *p);
   struct netif iface;
   uint8_t interrupt_rx_buf[INTERRUPT_RX_MAX];
   uint8_t bulk_rx_buf[ETHERNET_MTU];
