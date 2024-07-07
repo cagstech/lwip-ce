@@ -51,7 +51,7 @@ usb_error_t interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t en
                                        usb_transfer_data_t *data)
 {
   eth_device_t *dev = (eth_device_t *)data;
-  uint8_t *ibuf = dev->interrupt_rx_buf;
+  uint8_t *ibuf = dev->interrupt.buf;
 #ifdef ETH_DEBUG
   printf("debug: begin interrupt rx callback\n");
   printf("debug: int_frame, len=%u\n", transferred);
@@ -81,7 +81,7 @@ usb_error_t interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t en
       bytes_parsed += sizeof(usb_control_setup_t) + notify->wLength;
     } while (bytes_parsed < transferred);
   }
-  usb_ScheduleInterruptTransfer(dev->endpoint.interrupt, dev->interrupt_rx_buf, INTERRUPT_RX_MAX, interrupt_receive_callback, data);
+  usb_ScheduleInterruptTransfer(dev->interrupt.endpoint, dev->interrupt.buf, INTERRUPT_RX_MAX, interrupt_receive_callback, data);
 #ifdef ETH_DEBUG
   printf("debug: end interrupt rx callback\n");
 #endif
@@ -167,7 +167,7 @@ usb_error_t ecm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
                                  usb_transfer_data_t *data)
 {
   eth_device_t *dev = (eth_device_t *)data;
-  uint8_t *recvbuf = dev->bulk_rx_buf;
+  uint8_t *recvbuf = dev->rx.buf;
   static uint8_t rx_retries = 0;
 #ifdef ETH_DEBUG
   printf("debug: begin ecm rx callback\n");
@@ -180,7 +180,7 @@ usb_error_t ecm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
     {
       printf("usb rx retry: %u\n", rx_retries);
       rx_retries++;
-      usb_ScheduleBulkTransfer(dev->endpoint.in, dev->bulk_rx_buf, ETHERNET_MTU, dev->rx, data);
+      usb_ScheduleBulkTransfer(dev->rx.endpoint, dev->rx.buf, ETHERNET_MTU, dev->rx.callback, data);
       return USB_SUCCESS;
     }
     else
@@ -200,7 +200,7 @@ usb_error_t ecm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
     LINK_STATS_INC(link.recv);
     MIB2_STATS_NETIF_ADD(&dev->iface, ifinoctets, transferred);
 
-    usb_ScheduleBulkTransfer(dev->endpoint.in, dev->bulk_rx_buf, ETHERNET_MTU, dev->rx, data);
+    usb_ScheduleBulkTransfer(dev->rx.endpoint, dev->rx.buf, ETHERNET_MTU, dev->rx.callback, data);
 
     if (dev->iface.input(p, &dev->iface) != ERR_OK)
       pbuf_free(p);
@@ -230,7 +230,7 @@ err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p)
 #if defined(ETH_DEBUG)
   printf("debug: end ecm_tx\n");
 #endif
-  usb_ScheduleBulkTransfer(dev->endpoint.out, tbuf->payload, tbuf->tot_len, bulk_transmit_callback, tbuf);
+  usb_ScheduleBulkTransfer(dev->tx.endpoint, tbuf->payload, tbuf->tot_len, bulk_transmit_callback, tbuf);
   return ERR_OK;
 }
 
@@ -288,7 +288,6 @@ struct ncm_ndp
 
 #define NCM_NTH_LEN sizeof(struct ncm_nth)
 #define NCM_NDP_LEN sizeof(struct ncm_ndp)
-#define NCM_RX_NTB_MAX_SIZE 2048
 #define NCM_RX_MAX_DATAGRAMS 4
 #define NCM_RX_DATAGRAMS_OVERFLOW_MUL 16 // this is here in the event that max datagrams is unsupported
 #define NCM_RX_QUEUE_LEN (NCM_RX_MAX_DATAGRAMS * NCM_RX_DATAGRAMS_OVERFLOW_MUL)
@@ -324,7 +323,7 @@ usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
                                  usb_transfer_data_t *data)
 {
   eth_device_t *dev = (eth_device_t *)data;
-  uint8_t *recvbuf = dev->bulk_rx_buf;
+  uint8_t *recvbuf = dev->rx.buf;
   static uint8_t rx_retries = 0;
 #ifdef ETH_DEBUG
   printf("debug: begin ncm rx callback\n");
@@ -337,7 +336,7 @@ usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
     {
       printf("usb rx retry: %u\n", rx_retries);
       rx_retries++;
-      usb_ScheduleBulkTransfer(dev->endpoint.in, dev->bulk_rx_buf, ETHERNET_MTU, dev->rx, data);
+      usb_ScheduleBulkTransfer(dev->rx.endpoint, dev->rx.buf, NCM_RX_NTB_MAX_SIZE, dev->rx.callback, data);
       return USB_SUCCESS;
     }
     else
@@ -385,7 +384,7 @@ usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
 #ifdef ETH_DEBUG
       printf("debug: ntb in_progress %u/%u\n", rx_offset, ntb_total);
 #endif
-      usb_ScheduleBulkTransfer(dev->endpoint.in, dev->bulk_rx_buf, ETHERNET_MTU, dev->rx, data);
+      usb_ScheduleBulkTransfer(dev->rx.endpoint, dev->rx.buf, NCM_RX_NTB_MAX_SIZE, dev->rx.callback, data);
       return USB_SUCCESS; // do nothing until we have the full NTB
     }
 
@@ -443,7 +442,7 @@ usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
     LINK_STATS_INC(link.recv);
     MIB2_STATS_NETIF_ADD(&dev->iface, ifinoctets, transferred);
 
-    usb_ScheduleBulkTransfer(dev->endpoint.in, dev->bulk_rx_buf, ETHERNET_MTU, dev->rx, data);
+    usb_ScheduleBulkTransfer(dev->rx.endpoint, dev->rx.buf, NCM_RX_NTB_MAX_SIZE, dev->rx.callback, data);
 
     for (int i = 0; i < enqueued; i++)
       if (rx_queue[i])
@@ -463,117 +462,6 @@ usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
     return ncm_proc_error;
   }
   return USB_SUCCESS;
-}
-
-err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len)
-{
-  static struct pbuf *rx_buf = NULL; // pointer to pbuf for RX
-  err_t ncm_proc_error = ERR_OK;
-  static size_t rx_offset = 0; // start RX offset at 0
-  static size_t ntb_total = 0;
-#if defined(ETH_DEBUG)
-  printf("debug: begin ncm_process, framelen=%u\n", len);
-#endif
-  if (rx_buf == NULL)
-  {
-    struct ncm_nth *nth = (struct ncm_nth *)buf;
-    if (nth->dwSignature != NCM_NTH_SIG) // if the SIG is invalid, something is wrong
-      ncm_proc_error = ERR_IF;
-    ntb_total = nth->wBlockLength;
-    if (ntb_total > NCM_RX_NTB_MAX_SIZE) // confirm that ntb_total is within bounds set
-      ncm_proc_error = ERR_MEM;
-    if (!(rx_buf = pbuf_alloc(PBUF_RAW, ntb_total, PBUF_RAM))) // pbuf alloc successful?
-      ncm_proc_error = ERR_MEM;
-    if (ncm_proc_error)
-      goto exit_w_error;
-  }
-
-  struct pbuf *rx_queue[NCM_RX_QUEUE_LEN];
-  uint16_t enqueued = 0;
-  bool parse_ntb = true;
-
-  // absorb received bytes into pbuf
-  if ((ncm_proc_error = pbuf_take_at(rx_buf, buf, len, rx_offset)))
-    goto exit_w_error;
-  rx_offset += len;
-
-  if (rx_offset < ntb_total)
-  {
-#ifdef ETH_DEBUG
-    printf("debug: ntb in_progress %u/%u\n", rx_offset, ntb_total);
-#endif
-    return ERR_OK; // do nothing until we have the full NTB
-  }
-
-  // get header and first NDP pointers
-  uint8_t *ntb = (uint8_t *)rx_buf->payload;
-  struct ncm_nth *nth = (struct ncm_nth *)ntb;
-  struct ncm_ndp *ndp = (struct ncm_ndp *)&ntb[nth->wNdpIndex];
-
-  // repeat while ndp->wNextNdpIndex is non-zero
-  do
-  {
-    if (ndp->dwSignature != NCM_NDP_SIG0)
-    { // if invalid sig
-      ncm_proc_error = ERR_IF;
-      goto exit_w_error;
-    }
-    // set datagram number to 0 and set datagram index pointer
-    uint16_t dg_num = 0;
-    struct ncm_ndp_idx *idx = (struct ncm_ndp_idx *)&ndp->wDatagramIdx;
-
-    // a null datagram index structure indicates end of NDP
-    do
-    {
-      // attempt to allocate pbuf
-      if (enqueued >= NCM_RX_QUEUE_LEN)
-      {
-        parse_ntb = false;
-        break;
-      }
-      struct pbuf *p = pbuf_alloc(PBUF_RAW, idx[dg_num].wDatagramLen, PBUF_POOL);
-      if (p == NULL)
-        break;
-      if ((ncm_proc_error = pbuf_take(p, &ntb[idx[dg_num].wDatagramIndex], idx[dg_num].wDatagramLen)))
-        break;
-        // hand pbuf to lwIP (should we enqueue these and defer the handoffs till later?)
-        // i'll leave it for now, and if my calculator explodes I'll fix it
-#ifdef ETH_DEBUG
-      printf("debug: ncm:packet in=%p, len=%u\n", p, p->tot_len);
-#endif
-      rx_queue[enqueued++] = p;
-      dg_num++;
-    } while ((idx[dg_num].wDatagramIndex) && (idx[dg_num].wDatagramLen));
-    // if next NDP is 0, NTB is done and so is my sanity
-    if (ndp->wNextNdpIndex == 0)
-      break;
-    // set next NDP
-    ndp = (struct ncm_ndp *)&ntb[ndp->wNextNdpIndex];
-  } while (parse_ntb);
-
-  // maybe reclaiming this memory before handing off packets will be helpful?
-  pbuf_free(rx_buf);
-  rx_buf = NULL;
-  rx_offset = 0;
-  for (int i = 0; i < enqueued; i++)
-    if (rx_queue[i])
-      if (netif->input(rx_queue[i], netif) != ERR_OK)
-        pbuf_free(rx_queue[i]);
-#ifdef ETH_DEBUG
-  printf("debug: end ncm_process\n");
-#endif
-  return ERR_OK;
-
-exit_w_error:
-  // delete the shadow of my own regret and prepare for more regret
-  if (rx_buf)
-    pbuf_free(rx_buf);
-  rx_buf = NULL;
-  rx_offset = 0;
-#ifdef ETH_DEBUG
-  printf("debug: ncm exit_w_error\n");
-#endif
-  return ncm_proc_error;
 }
 
 /* This code packs a single TX Ethernet frame into an NCM transfer. */
@@ -630,7 +518,7 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
 
   // queue the TX
   // printf("sent packet %u at time %lu\n", sequence, sys_now());
-  usb_ScheduleBulkTransfer(dev->endpoint.out, obuf->payload, ETHERNET_MTU + NCM_HBUF_SIZE, bulk_transmit_callback, obuf);
+  usb_ScheduleBulkTransfer(dev->tx.endpoint, obuf->payload, ETHERNET_MTU + NCM_HBUF_SIZE, bulk_transmit_callback, obuf);
 #if defined(ETH_DEBUG)
   printf("debug: sending NTB\n");
 #endif
@@ -644,7 +532,7 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
 err_t eth_netif_init(struct netif *netif)
 {
   eth_device_t *dev = (eth_device_t *)netif->state;
-  netif->linkoutput = dev->tx;
+  netif->linkoutput = dev->tx.emit;
   netif->output = etharp_output;
   netif->output_ip6 = ethip6_output;
   netif->mtu = ETHERNET_MTU;
@@ -883,21 +771,21 @@ init_success:
     // if device type is NCM, control setup
     if (ncm_control_setup(&tmp))
       return false;
-    tmp.rx = ncm_receive_callback;
-    tmp.tx = ncm_bulk_transmit;
+    tmp.rx.callback = ncm_receive_callback;
+    tmp.tx.emit = ncm_bulk_transmit;
   }
   else if (tmp.type == USB_ECM_SUBCLASS)
   {
-    tmp.rx = ecm_receive_callback;
-    tmp.tx = ecm_bulk_transmit;
+    tmp.rx.callback = ecm_receive_callback;
+    tmp.tx.emit = ecm_bulk_transmit;
   }
   // switch to alternate interface
   if (usb_SetInterface(device, if_bulk.addr, if_bulk.len))
     return false;
   // set endpoint data
-  tmp.endpoint.in = usb_GetDeviceEndpoint(device, endpoint_addr.in);
-  tmp.endpoint.out = usb_GetDeviceEndpoint(device, endpoint_addr.out);
-  tmp.endpoint.interrupt = usb_GetDeviceEndpoint(device, endpoint_addr.interrupt);
+  tmp.rx.endpoint = usb_GetDeviceEndpoint(device, endpoint_addr.in);
+  tmp.tx.endpoint = usb_GetDeviceEndpoint(device, endpoint_addr.out);
+  tmp.interrupt.endpoint = usb_GetDeviceEndpoint(device, endpoint_addr.interrupt);
   // allocate eth_device_t => contains type, usb device, metadata, and INT/RX buffers
   eth = malloc(sizeof(eth_device_t));
   if (eth == NULL)
@@ -933,8 +821,8 @@ init_success:
 
   netif_set_up(iface); // tell lwIP that the interface is ready to receive
   // enqueue callbacks for receiving interrupt and RX transfers from this device.
-  usb_ScheduleInterruptTransfer(eth->endpoint.interrupt, eth->interrupt_rx_buf, INTERRUPT_RX_MAX, interrupt_receive_callback, eth);
-  usb_ScheduleBulkTransfer(eth->endpoint.in, eth->bulk_rx_buf, ETHERNET_MTU, eth->rx, eth);
+  usb_ScheduleInterruptTransfer(eth->interrupt.endpoint, eth->interrupt.buf, INTERRUPT_RX_MAX, interrupt_receive_callback, eth);
+  usb_ScheduleBulkTransfer(eth->rx.endpoint, eth->rx.buf, (tmp.type == USB_NCM_SUBCLASS) ? NCM_RX_NTB_MAX_SIZE : ETHERNET_MTU, eth->rx.callback, eth);
   return true;
 }
 
