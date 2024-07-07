@@ -166,17 +166,6 @@ typedef struct _eth_device_t
 } eth_device_t;
 extern eth_device_t eth;
 
-usb_error_t bulk_transmit_callback(usb_endpoint_t endpoint,
-                                   usb_transfer_status_t status,
-                                   size_t transferred,
-                                   usb_transfer_data_t *data);
-
-err_t ecm_process(struct netif *netif, uint8_t *buf, size_t len);
-err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p);
-usb_error_t ncm_control_setup(eth_device_t *eth);
-err_t ncm_process(struct netif *netif, uint8_t *buf, size_t len);
-err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p);
-
 usb_error_t eth_handle_usb_event(usb_event_t event, void *event_data,
                                  usb_callback_data_t *callback_data);
 
