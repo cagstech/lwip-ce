@@ -532,6 +532,7 @@ bool init_ethernet_usb_device(usb_device_t device)
     usb_device_descriptor_t dev;         // .. device descriptor alias
     usb_configuration_descriptor_t conf; // .. config descriptor alias
   } descriptor;
+
   err = usb_GetDeviceDescriptor(device, &descriptor.dev, sizeof(usb_device_descriptor_t), &xferd);
   if (err || (xferd != sizeof(usb_device_descriptor_t)))
     return false;
@@ -773,31 +774,35 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
   switch (event)
   {
   case USB_DEVICE_CONNECTED_EVENT:
+    LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+                ("eth.event_callback: device connected, reset"));
     if (!(usb_GetRole() & USB_ROLE_DEVICE))
       usb_ResetDevice(usb_device);
     break;
   case USB_DEVICE_ENABLED_EVENT:
+    LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+                ("eth.event_callback: device enabled, parsing descriptors"));
     if (!init_ethernet_usb_device(usb_device))
-    { // device failed some aspect of setup
-      eth_device_t *eth_device = (eth_device_t *)usb_GetDeviceData(usb_device);
+    {
       LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                  ("eth.handleevents:error: device configuration failed"));
-      usb_DisableDevice(usb_device);
+                  ("eth.event_callback: invalid device"));
     }
     break;
   case USB_DEVICE_DISCONNECTED_EVENT:
   case USB_DEVICE_DISABLED_EVENT:
-  {
-    eth_device_t *eth_device = (eth_device_t *)usb_GetDeviceData(usb_device);
-    if (eth_device)
+    LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                ("eth.event_callback: device disabled or disconnected"));
     {
-      netif_set_link_down(&eth_device->iface);
-      netif_set_down(&eth_device->iface);
-      netif_remove(&eth_device->iface);
-      free(eth_device);
+      eth_device_t *eth_device = (eth_device_t *)usb_GetDeviceData(usb_device);
+      if (eth_device)
+      {
+        netif_set_link_down(&eth_device->iface);
+        netif_set_down(&eth_device->iface);
+        netif_remove(&eth_device->iface);
+        free(eth_device);
+      }
     }
-  }
-  break;
+    break;
   case USB_HOST_PORT_CONNECT_STATUS_CHANGE_INTERRUPT:
     return USB_ERROR_NO_DEVICE;
     break;

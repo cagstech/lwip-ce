@@ -38,14 +38,18 @@ void ethif_status_callback_fn(struct netif *netif)
 int main(void)
 {
     uint8_t key;
-    gfx_Begin();
-    gfx_FillScreen(255);
     lwip_init();
 
 #if ETH_DEBUG_FILE == LWIP_DBG_ON
+    gfx_Begin();
+    gfx_FillScreen(255);
     eth_logger = fopen("lwiplogs", "a");
     const char *search_string = ":tilogfile:lwIP:\n";
     fwrite(search_string, strlen(search_string), 1, eth_logger);
+#else
+    os_ClrLCDFull();
+    os_HomeUp();
+    os_FontSelect(os_SmallFont);
 #endif
     struct netif *ethif = NULL;
 
@@ -71,6 +75,7 @@ int main(void)
             {
                 // run this code if netif exists
                 // eg: dhcp_start(ethif);
+                printf("ethernet if=%c%c%u type=%s registered\n", ethif->name[0], ethif->name[1], ethif->num, (((eth_device_t *)ethif->state)->type == USB_ECM_SUBCLASS) ? "ecm" : "ncm");
                 netif_set_default(ethif);
                 netif_set_status_callback(ethif, ethif_status_callback_fn);
                 dhcp_start(ethif);
