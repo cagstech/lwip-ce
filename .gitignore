@@ -1,3 +1,6 @@
 obj
 bin
 .vscode
+*.fsdata
+*.xcworkspace
+*.code-workspace
