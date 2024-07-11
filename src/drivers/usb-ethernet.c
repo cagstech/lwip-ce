@@ -32,10 +32,11 @@
 #include "lwip/dhcp.h"
 #include "usb-ethernet.h" /* Communications Data Class header file */
 
-/* Define Default Hostname for NETIFs */
+/// Define Default Hostname for NETIFs
 const char hostname[] = "ti84plusce";
+static uint8_t ifnums_used = 0;
 
-/* UTF-16 -> hex conversion */
+/// UTF-16 -> hex conversion
 uint8_t
 nibble(uint16_t c)
 {
@@ -123,10 +124,8 @@ void __attribute__((optnone)) outchar(char c)
 }
 #endif
 
-/**********************************************************
- * @brief Processes interrupt requests from device.
- * @note Only \b NetworkConnection actually handled. Others have no effect.
- */
+///---------------------------------------------------
+/// @brief interrupt transfer callback function
 usb_error_t
 interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint, usb_transfer_status_t status, size_t transferred, usb_transfer_data_t *data)
 {
@@ -163,10 +162,8 @@ interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint, usb_
   return USB_SUCCESS;
 }
 
-/*****************************************************
- * @brief Processes bulk transfers from OUT endpoint.
- * @note This simply frees the TX pbuf passed in \b data .
- */
+///---------------------------------------------------
+/// @brief bulk out callback function
 usb_error_t bulk_transmit_callback(__attribute__((unused)) usb_endpoint_t endpoint,
                                    __attribute__((unused)) usb_transfer_status_t status,
                                    __attribute__((unused)) size_t transferred,
@@ -179,13 +176,8 @@ usb_error_t bulk_transmit_callback(__attribute__((unused)) usb_endpoint_t endpoi
   return USB_SUCCESS;
 }
 
-/****************************************************************************
- * Code for Ethernet Control Model (ECM)
- * for USB-Ethernet devices
- */
-
-/* This code processes an incoming ECM Ethernet frame */
-#define RX_MAX_RETRIES 3
+///------------------------------------------------------------------------
+/// @brief linkinput callback function for @b Ethernet_Control_Model (ECM)
 usb_error_t ecm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
                                  usb_transfer_status_t status,
                                  size_t transferred,
@@ -232,7 +224,8 @@ usb_error_t ecm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
   return USB_SUCCESS;
 }
 
-/* This code sends an ECM Ethernet frame */
+///----------------------------------------------------------------
+/// @brief linkoutput function for @b Ethernet_Control_Model (ECM)
 err_t ecm_bulk_transmit(struct netif *netif, struct pbuf *p)
 {
   eth_device_t *dev = (eth_device_t *)netif->state;
@@ -308,7 +301,8 @@ struct ncm_ndp
 #define NCM_RX_DATAGRAMS_OVERFLOW_MUL 16 // this is here in the event that max datagrams is unsupported
 #define NCM_RX_QUEUE_LEN (NCM_RX_MAX_DATAGRAMS * NCM_RX_DATAGRAMS_OVERFLOW_MUL)
 
-/* This runs during NCM device configuration before switching to alt interface. */
+///------------------------------------------------------------
+/// @brief control setup for @b Network_Control_Model (NCM)
 usb_error_t ncm_control_setup(eth_device_t *eth)
 {
   if (eth->type != USB_NCM_SUBCLASS)
@@ -334,7 +328,8 @@ usb_error_t ncm_control_setup(eth_device_t *eth)
   return error;
 }
 
-/* This processes an incoming NCM datagram queue. */
+///------------------------------------------------------------
+/// @brief linkinput function for @b Network_Control_Model (NCM)
 usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
                                  usb_transfer_status_t status,
                                  size_t transferred,
@@ -440,6 +435,8 @@ usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
 #define get_next_offset(offset, divisor, remainder) \
   (offset) + (divisor) - ((offset) % (divisor)) + (remainder)
 
+///---------------------------------------------------------------
+/// @brief linkoutput function for @b Network_Control_Model (NCM)
 err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
 {
   eth_device_t *dev = (eth_device_t *)netif->state;
@@ -492,9 +489,8 @@ err_t ncm_bulk_transmit(struct netif *netif, struct pbuf *p)
   return ERR_OK;
 }
 
-/****************************************************************************
- * @brief Initializes the NETWORK INTERFACE for the newly enabled USB device.
- */
+///----------------------------------------
+/// @brief ethernet NETIF initialization
 err_t eth_netif_init(struct netif *netif)
 {
   eth_device_t *dev = (eth_device_t *)netif->state;
@@ -527,6 +523,10 @@ enum _descriptor_parser_await_states
 /****************************************************************************
  * @brief Performs cleanup on netif prior to removal.
  */
+void eth_remove_callback(struct netif *netif)
+{
+  ifnums_used &= ~(1 << netif->num);
+}
 
 /*****************************************************************************************
  * @brief Parses descriptors for a USB device and checks for a valid CDC Ethernet device.
@@ -814,19 +814,22 @@ init_success:
 
   // fetch next available device number to use
   char temp_ifname[4] = {0};
-  uint8_t ifnum = 0;
   temp_ifname[0] = iface->name[0] = 'e';
   temp_ifname[1] = iface->name[1] = 'n';
-  for (ifnum = 0; ifnum < 10; ifnum++)
-  {
-    temp_ifname[2] = '0' + ifnum;
-    if (netif_find(temp_ifname) == NULL) // if IF doesn't exist, use that number
+
+  // better ifnum assignment
+  uint8_t ifnum_assigned;
+#define CHECK_BIT(var, pos) ((var) & (1 << (pos)))
+  for (ifnum_assigned = 0; ifnum_assigned < 8; ifnum_assigned++)
+    if (!CHECK_BIT(ifnums_used, ifnum_assigned))
       break;
-  }
-  if (ifnum == 10) // IFnum 10 is an error
+  if (ifnum_assigned > 7)
     return false;
-  iface->num = ifnum;                  // use IFnum that triggered break
+
+  iface->num = ifnum_assigned;         // use IFnum that triggered break
+  ifnums_used |= 1 << ifnum_assigned;  // set flag marking the ifnum used
   netif_set_hostname(iface, hostname); // set default hostname
+  netif_set_remove_callback(iface, eth_remove_callback);
 
   // allow IPv4 and IPv6 on device
   netif_create_ip6_linklocal_address(iface, 1);
