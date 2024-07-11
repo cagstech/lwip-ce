@@ -1,5 +1,5 @@
 #if ETH_DEBUG_FILE == LWIP_DBG_ON
-#include <string.h>
+#include "lwip/timeouts.h"
 #endif
 
 #include <usbdrvce.h>
@@ -39,18 +39,11 @@ int main(void)
 {
     uint8_t key;
     lwip_init();
-
-#if ETH_DEBUG_FILE == LWIP_DBG_ON
-    gfx_Begin();
-    gfx_FillScreen(255);
-    eth_logger = fopen("lwiplogs", "a");
-    const char *search_string = ":tilogfile:lwIP:\n";
-    fwrite(search_string, strlen(search_string), 1, eth_logger);
-#else
     os_ClrLCDFull();
     os_HomeUp();
     os_FontSelect(os_SmallFont);
-#endif
+    gfx_Begin();
+    gfx_FillScreen(255);
     struct netif *ethif = NULL;
 
     /* You should probably handle this function failing */

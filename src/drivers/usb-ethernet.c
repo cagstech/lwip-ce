@@ -5,13 +5,14 @@
  */
 
 #include <sys/util.h>
-#include <libload.h>
 #include <usbdrvce.h>
-#if ETH_DEBUG == LWIP_DBG_ON
+
+#if LWIP_USE_CONSOLE_STYLE_PRINTF == LWIP_DBG_ON
 #include <graphx.h>
-#if ETH_DEBUG_FILE == LWIP_DBG_ON
-#include <fileioc.h>
 #endif
+#if LWIP_DEBUG_LOGFILE == LWIP_DBG_ON
+#include <fileioc.h>
+#include "lwip/timeouts.h"
 #endif
 
 /**
@@ -29,15 +30,10 @@
 #include "lwip/snmp.h"
 #include "lwip/pbuf.h"
 #include "lwip/dhcp.h"
-#include "usb-ethernet.h" /*Communications Data Class header file */
+#include "usb-ethernet.h" /* Communications Data Class header file */
 
 /* Define Default Hostname for NETIFs */
 const char hostname[] = "ti84plusce";
-
-/* Logging Handlers */
-#if ETH_DEBUG_FILE == LWIP_DBG_ON
-FILE *eth_logger = NULL;
-#endif
 
 /* UTF-16 -> hex conversion */
 uint8_t
@@ -54,8 +50,39 @@ nibble(uint16_t c)
     return c + 10;
   return 0xff;
 }
-#if ETH_DEBUG == LWIP_DBG_ON
+
+/**
+ * This provides a rolling debug-output-to-file mechanism.
+ * Every 10 seconds the logfile is erased and started over.
+ * Only active when ETH_DEBUG is set to LWIP_DBG_ON in lwipopts.h
+ * @note Dumps can hit up to 15/20kb. Be sure you have enough memory.
+ */
+#if LWIP_DEBUG_LOGFILE == LWIP_DBG_ON
+void debug_log_flush_callback(__attribute__((unused)) void *arg);
+#define ETH_DEBUG_FLUSH_INTERVAL_MS 10000
+#define ETH_DEBUG_MAX_FILE_SIZE 8192
+FILE *eth_logger = NULL;
+
+void debug_init_logfile(void)
+{
+  eth_logger = fopen("lwiplogs", "w");
+  fwrite("TILOGFILE\n", 9, 1, eth_logger);
+  sys_timeout(ETH_DEBUG_FLUSH_INTERVAL_MS, debug_log_flush_callback, NULL);
+}
+
+void debug_log_flush_callback(__attribute__((unused)) void *arg)
+{
+  uint8_t if (ftell(eth_logger) >= ETH_DEBUG_MAX_FILE_SIZE)
+  {
+    fclose(eth_logger);
+    debug_init_logfile();
+  }
+}
+#endif
+
+#if LWIP_USE_CONSOLE_STYLE_PRINTF == LWIP_DBG_ON
 bool outchar_scroll_up = true;
+
 static void newline(void)
 {
   if (outchar_scroll_up)
@@ -68,9 +95,9 @@ static void newline(void)
   else
     gfx_SetTextXY(2, gfx_GetTextY() + 10);
 }
+
 void __attribute__((optnone)) outchar(char c)
 {
-
   if (c == '\n')
   {
     newline();
@@ -87,7 +114,9 @@ void __attribute__((optnone)) outchar(char c)
     }
     gfx_PrintChar(c);
   }
-#if ETH_DEBUG_FILE == LWIP_DBG_ON
+#if LWIP_DEBUG_LOGFILE == LWIP_DBG_ON
+  if (!eth_logger)
+    debug_init_logfile();
   if (eth_logger)
     fwrite(&c, 1, 1, eth_logger);
 #endif
@@ -98,10 +127,8 @@ void __attribute__((optnone)) outchar(char c)
  * @brief Processes interrupt requests from device.
  * @note Only \b NetworkConnection actually handled. Others have no effect.
  */
-usb_error_t interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
-                                       usb_transfer_status_t status,
-                                       size_t transferred,
-                                       usb_transfer_data_t *data)
+usb_error_t
+interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint, usb_transfer_status_t status, size_t transferred, usb_transfer_data_t *data)
 {
   eth_device_t *dev = (eth_device_t *)data;
   uint8_t *ibuf = dev->interrupt.buf;
@@ -284,6 +311,8 @@ struct ncm_ndp
 /* This runs during NCM device configuration before switching to alt interface. */
 usb_error_t ncm_control_setup(eth_device_t *eth)
 {
+  if (eth->type != USB_NCM_SUBCLASS)
+    return USB_SUCCESS;
   size_t transferred;
   usb_error_t error = 0;
   usb_control_setup_t get_ntb_params = {0b10100001, REQUEST_GET_NTB_PARAMETERS, 0, 0, 0x1c};
@@ -537,10 +566,16 @@ bool init_ethernet_usb_device(usb_device_t device)
   if (err || (xferd != sizeof(usb_device_descriptor_t)))
     return false;
 
+  LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+              ("eth.configdevice: has device descriptor"));
+
   // check for main DeviceClass being type 0x00 - composite/if-specific
   if (descriptor.dev.bDeviceClass != USB_INTERFACE_SPECIFIC_CLASS)
+  {
+    LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+                ("eth.configdevice: not Ethernet device or unsupported"));
     return false;
-
+  }
   // parse both configs for the correct one
   uint8_t num_configs = descriptor.dev.bNumConfigurations;
   for (uint8_t config = 0; config < num_configs; config++)
@@ -558,6 +593,8 @@ bool init_ethernet_usb_device(usb_device_t device)
       // if error or not full descriptor, skip
       continue;
 
+    LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+                ("eth.configdevice: has config descriptor"));
     // set pointer to current working descriptor
     usb_descriptor_t *desc = &descriptor.desc;
     while (parsed_len < desc_len)
@@ -576,6 +613,8 @@ bool init_ethernet_usb_device(usb_device_t device)
           {
             endpoint_addr.in = endpoint->bEndpointAddress; // set out endpoint address
             parse_state |= PARSE_HAS_ENDPOINT_IN;
+            LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+                        ("eth.configdevice: has bulk rx endpoint"));
           }
           else
           {
@@ -592,6 +631,8 @@ bool init_ethernet_usb_device(usb_device_t device)
         {
           endpoint_addr.interrupt = endpoint->bEndpointAddress;
           parse_state |= PARSE_HAS_ENDPOINT_INT;
+          LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+                      ("eth.configdevice: has int endpoint"));
         }
       }
       break;
@@ -612,6 +653,8 @@ bool init_ethernet_usb_device(usb_device_t device)
               if_bulk.addr = iface;
               if_bulk.len = desc_len - parsed_len;
               parse_state |= PARSE_HAS_BULK_IF;
+              LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+                          ("eth.configdevice: has bulk if"));
             }
           }
           else
@@ -633,6 +676,8 @@ bool init_ethernet_usb_device(usb_device_t device)
               if (usb_SetConfiguration(device, configdata.addr, configdata.len))
                 return false;
               parse_state |= PARSE_HAS_CONTROL_IF;
+              LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+                          ("eth.configdevice: has control if, type=%u", iface->bInterfaceSubClass));
             }
           }
         }
@@ -661,10 +706,14 @@ bool init_ethernet_usb_device(usb_device_t device)
                 tmp.hwaddr[i] = (nibble(macaddr->bString[2 * i]) << 4) | nibble(macaddr->bString[2 * i + 1]);
 
               parse_state |= PARSE_HAS_MAC_ADDR;
+              LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+                          ("eth.configdevice: has hwaddr from descriptor"));
             }
             else if (!usb_DefaultControlTransfer(device, &get_mac_addr, &tmp.hwaddr[0], USB_CDC_MAX_RETRIES, &xferd_tmp))
             {
               parse_state |= PARSE_HAS_MAC_ADDR;
+              LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+                          ("eth.configdevice: has hwaddr from control req"));
             }
             else
             {
@@ -677,7 +726,11 @@ bool init_ethernet_usb_device(usb_device_t device)
               tmp.hwaddr[0] &= 0xFE;
               tmp.hwaddr[0] |= 0x02;
               if (!usb_DefaultControlTransfer(eth->device, &set_mac_addr, &tmp.hwaddr[0], USB_CDC_MAX_RETRIES, &xferd_tmp))
+              {
                 parse_state |= PARSE_HAS_MAC_ADDR;
+                LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_TRACE,
+                            ("eth.configdevice: random hwaddr"));
+              }
             }
           }
           break;
@@ -702,24 +755,39 @@ bool init_ethernet_usb_device(usb_device_t device)
       desc = (usb_descriptor_t *)(((uint8_t *)desc) + desc->bLength);
     }
   }
+  LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+              ("eth.configdevice: configuration failure"));
   return false;
 init_success:
-  if (tmp.type == USB_NCM_SUBCLASS)
+  if (ncm_control_setup(&tmp))
   {
-    // if device type is NCM, control setup
-    if (ncm_control_setup(&tmp))
-      return false;
-    tmp.rx.callback = ncm_receive_callback;
-    tmp.tx.emit = ncm_bulk_transmit;
+    LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                ("eth.configdevice: control setup error"));
+    return false;
   }
-  else if (tmp.type == USB_ECM_SUBCLASS)
+
+  tmp.rx.callback = (tmp.type == USB_NCM_SUBCLASS)   ? ncm_receive_callback
+                    : (tmp.type == USB_ECM_SUBCLASS) ? ecm_receive_callback
+                                                     : NULL;
+
+  tmp.tx.emit = (tmp.type == USB_NCM_SUBCLASS)   ? ncm_bulk_transmit
+                : (tmp.type == USB_ECM_SUBCLASS) ? ecm_bulk_transmit
+                                                 : NULL;
+
+  if ((tmp.tx.emit == NULL) || (tmp.rx.callback == NULL))
   {
-    tmp.rx.callback = ecm_receive_callback;
-    tmp.tx.emit = ecm_bulk_transmit;
+    LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                ("eth.configdevice: linkoutput func assign error"));
+    return false;
   }
+
   // switch to alternate interface
   if (usb_SetInterface(device, if_bulk.addr, if_bulk.len))
+  {
+    LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                ("eth.configdevice: error setting alternate interface"));
     return false;
+  }
   // set endpoint data
   tmp.rx.endpoint = usb_GetDeviceEndpoint(device, endpoint_addr.in);
   tmp.tx.endpoint = usb_GetDeviceEndpoint(device, endpoint_addr.out);
@@ -733,7 +801,14 @@ init_success:
   struct netif *iface = &eth->iface;
   // add to lwIP list of active netifs (save pointer to eth_device_t too)
   if (netif_add_noaddr(iface, eth, eth_netif_init, netif_input) == NULL)
+  {
+    LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                ("eth.configdevice: error adding netif"));
     return false;
+  }
+
+  LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+              ("eth.configdevice: netif added successfully"));
   // set pointer to eth_device_t as associated data for usb device too
   usb_SetDeviceData(device, eth);
 

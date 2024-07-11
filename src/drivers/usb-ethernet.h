@@ -172,9 +172,4 @@ extern eth_device_t eth;
 
 usb_error_t eth_handle_usb_event(usb_event_t event, void *event_data,
                                  usb_callback_data_t *callback_data);
-
-#if ETH_DEBUG_FILE == LWIP_DBG_ON
-extern FILE *eth_logger;
-#endif
-
 #endif
