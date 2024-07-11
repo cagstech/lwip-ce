@@ -825,9 +825,7 @@ init_success:
     if (!CHECK_BIT(ifnums_used, ifnum_assigned))
       break;
 
-  // we are allowed only 8 interfaces with this system, but it should be more than enough
-  // in theory, we can allow up to 64 by using a uint64_t , or 24 with a uint24_t.
-  // do we want more or is 8 fine?
+  // we are allowed only 8 interfaces with this system
   if (ifnum_assigned == NETIFS_MAX_ALLOWED)
     return false;
 
