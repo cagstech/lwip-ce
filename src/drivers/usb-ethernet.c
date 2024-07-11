@@ -819,11 +819,16 @@ init_success:
 
   // better ifnum assignment
   uint8_t ifnum_assigned;
+#define NETIFS_MAX_ALLOWED 8
 #define CHECK_BIT(var, pos) ((var) & (1 << (pos)))
-  for (ifnum_assigned = 0; ifnum_assigned < 8; ifnum_assigned++)
+  for (ifnum_assigned = 0; ifnum_assigned < NETIFS_MAX_ALLOWED; ifnum_assigned++)
     if (!CHECK_BIT(ifnums_used, ifnum_assigned))
       break;
-  if (ifnum_assigned > 7)
+
+  // we are allowed only 8 interfaces with this system, but it should be more than enough
+  // in theory, we can allow up to 64 by using a uint64_t , or 24 with a uint24_t.
+  // do we want more or is 8 fine?
+  if (ifnum_assigned == NETIFS_MAX_ALLOWED)
     return false;
 
   iface->num = ifnum_assigned;         // use IFnum that triggered break
