@@ -170,6 +170,15 @@ typedef struct _eth_device_t
 } eth_device_t;
 extern eth_device_t eth;
 
+/// @brief Callback function to be passed to @b usb_Init to enable Ethernet driver for lwIP
 usb_error_t eth_handle_usb_event(usb_event_t event, void *event_data,
                                  usb_callback_data_t *callback_data);
+
+/// @brief Polls for the registration status of interfaces.
+/// @return A bitmap indicating what NETIFs are registered (netif->num)
+/// @note Example: a return value of 0b00001101 indicates that en0, en2, and en3 currently exist.
+/// @note The ifnum assignment system seeks to the next free ifnum.
+/// @note Up to 8 simultaneous interfaces allowed. Any more causes device init to fail.
+uint8_t eth_get_interfaces(void);
+
 #endif

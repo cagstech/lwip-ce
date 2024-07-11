@@ -793,6 +793,23 @@ init_success:
   tmp.tx.endpoint = usb_GetDeviceEndpoint(device, endpoint_addr.out);
   tmp.interrupt.endpoint = usb_GetDeviceEndpoint(device, endpoint_addr.interrupt);
   // allocate eth_device_t => contains type, usb device, metadata, and INT/RX buffers
+
+  // better ifnum assignment
+  uint8_t ifnum_assigned;
+#define NETIFS_MAX_ALLOWED 8
+#define CHECK_BIT(var, pos) ((var) & (1 << (pos)))
+  for (ifnum_assigned = 0; ifnum_assigned < NETIFS_MAX_ALLOWED; ifnum_assigned++)
+    if (!CHECK_BIT(ifnums_used, ifnum_assigned))
+      break;
+
+  // we are allowed only 8 interfaces with this system
+  if (ifnum_assigned == NETIFS_MAX_ALLOWED)
+  {
+    LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                ("new_device: netif not created, all slots in use"));
+    return false;
+  }
+
   eth = malloc(sizeof(eth_device_t));
   if (eth == NULL)
     return false;
@@ -816,18 +833,6 @@ init_success:
   char temp_ifname[4] = {0};
   temp_ifname[0] = iface->name[0] = 'e';
   temp_ifname[1] = iface->name[1] = 'n';
-
-  // better ifnum assignment
-  uint8_t ifnum_assigned;
-#define NETIFS_MAX_ALLOWED 8
-#define CHECK_BIT(var, pos) ((var) & (1 << (pos)))
-  for (ifnum_assigned = 0; ifnum_assigned < NETIFS_MAX_ALLOWED; ifnum_assigned++)
-    if (!CHECK_BIT(ifnums_used, ifnum_assigned))
-      break;
-
-  // we are allowed only 8 interfaces with this system
-  if (ifnum_assigned == NETIFS_MAX_ALLOWED)
-    return false;
 
   iface->num = ifnum_assigned;         // use IFnum that triggered break
   ifnums_used |= 1 << ifnum_assigned;  // set flag marking the ifnum used
@@ -891,4 +896,9 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
     break;
   }
   return USB_SUCCESS;
+}
+
+uint8_t eth_get_interfaces(void)
+{
+  return ifnums_used;
 }
