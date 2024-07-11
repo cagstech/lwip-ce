@@ -1,6 +1,15 @@
+# random osx filesystem nonsense
+.dccache
+
+# VS Code and XCode workspace files/directories
+.vscode
+*.xcworkspace   
+*.code-workspace
+
+# build and object directories
 obj
 bin
-.vscode
+
+# httpd server example filesystem includes
+*makefsdata.c.*
 *.fsdata
-*.xcworkspace
-*.code-workspace
