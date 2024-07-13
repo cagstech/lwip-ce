@@ -1,6 +1,6 @@
 ;--------------------------------------------
 ; tls_Hmac frontend EZ80 implementation
-; code by acagliano
+; Author: acagliano
 ;--------------------------------------------
 ; include to supported algorithms
 include "sha256.asm"
