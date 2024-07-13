@@ -22,10 +22,10 @@ _indcallhl:
 ;--------------------------------
 ; SHA256_CTX
 virtual at 0
-	offset_data     rb 64
-	offset_datalen  rb 1
-	offset_bitlen   rb 8
-	offset_state    rb 4*8
+	sha256_offset_data     rb 64
+	sha256_offset_datalen  rb 1
+	sha256_offset_bitlen   rb 8
+	sha256_offset_state    rb 4*8
 	_sha256ctx_size:
 end virtual
 
@@ -281,7 +281,7 @@ hash_sha256_init:
 	pop iy,de
 	push de
 	ld hl,$FF0000
-	ld bc,offset_state
+	ld bc,sha256_offset_state
 	ldir
 	ld c,8*4
 	ld hl,_sha256_state_init
@@ -299,7 +299,7 @@ hash_sha256_update:
 	; (ix + 12) arg3: len
 	ld iy, (ix + 6)			; iy = context, reference
 		; start writing data to the right location in the data block
-	ld a, (iy + offset_datalen)
+	ld a, (iy + sha256_offset_datalen)
 	ld bc, 0
 	ld c, a
 	; scf
@@ -315,7 +315,7 @@ hash_sha256_update:
 	cp a,64
 	call z,_sha256_update_apply_transform
 	ld iy, (ix + 6)
-	ld (iy + offset_datalen), a		   ;save current datalen
+	ld (iy + sha256_offset_datalen), a		   ;save current datalen
 	pop ix
 	restore_interrupts hash_sha256_update
 	ret
@@ -335,7 +335,7 @@ _sha256_update_apply_transform:
 	pop iy
 	ld bc, 512				  ; add 1 blocksize of bitlen to the bitlen field
 	push bc
-	pea iy + offset_bitlen
+	pea iy + sha256_offset_bitlen
 	call u64_addi
 	pop bc, bc, bc, de, hl
 	xor a,a
@@ -360,7 +360,7 @@ _sha256_update_apply_transform:
 	ld bc, _sha256ctx_size
 	ldir
 	ld bc, 0
-	ld c, (iy + offset_datalen)     ; data length
+	ld c, (iy + sha256_offset_datalen)     ; data length
 	lea hl, ix-_sha256ctx_size					; ld hl, context_block_cache_addr
 	add hl, bc						; hl + bc (context_block_cache_addr + bytes cached)
 	ld a,55
@@ -393,16 +393,16 @@ _sha256_final_pad_loop1:
 	ldir
 _sha256_final_done_pad:
 	lea iy, ix-_sha256ctx_size
-	ld c, (iy + offset_datalen)
+	ld c, (iy + sha256_offset_datalen)
 	ld b,8
 	mlt bc ;multiply 8-bit datalen by 8-bit value 8
 	push bc
-	pea iy + offset_bitlen
+	pea iy + sha256_offset_bitlen
 	call u64_addi
 	pop bc,bc
 	lea iy, ix-_sha256ctx_size ;ctx
-	lea hl,iy + offset_bitlen
-	lea de,iy + offset_data + 63
+	lea hl,iy + sha256_offset_bitlen
+	lea de,iy + sha256_offset_data + 63
 	ld b,8
 _sha256_final_pad_message_len_loop:
 	ld a,(hl)
@@ -414,7 +414,7 @@ _sha256_final_pad_message_len_loop:
 	call _sha256_transform
 	pop iy
 	ld hl, (ix + 9)
-	lea iy, iy + offset_state
+	lea iy, iy + sha256_offset_state
 	ld b, 8
 	call _sha256_reverse_endianness
 	ld sp,ix
@@ -553,7 +553,7 @@ _sha256_transform:
 
 
 	ld iy, (ix + 6)
-	lea hl, iy + offset_state
+	lea hl, iy + sha256_offset_state
 	lea de, ix + ._state_vars
 	ld bc, 8*4
 	ldir				; copy the ctx state to scratch stack memory (uint32_t a,b,c,d,e,f,g,h)
@@ -767,7 +767,7 @@ _sha256_transform:
 
 	push ix
 	ld iy, (ix + 6)
-	lea iy, iy + offset_state
+	lea iy, iy + sha256_offset_state
 	lea ix, ix + ._state_vars
 	ld b,8
 ._loop4:
