@@ -4,7 +4,7 @@ include "../helpers/clear_stack.asm
 include "../helpers/kill_interrupts.asm"
 ;--------------------------------------------
 ; SHA-256 EZ80 implementation
-; code by beckadamtheinventor
+; Author: beckadamtheinventor
 ;--------------------------------------------
 export hash_sha256_init
 export hash_sha256_update
