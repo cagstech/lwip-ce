@@ -351,9 +351,6 @@ _sha256_update_apply_transform:
 	; (ix + 3) saved IX
 	; (ix + 6) arg1: ctx
 	; (ix + 9) arg2: outbuf
-	; scf
-	; sbc hl,hl
-	; ld (hl),2
 	ld iy, (ix + 6)					; iy =  context block
 	lea hl, iy
 	lea de, ix-_sha256ctx_size
