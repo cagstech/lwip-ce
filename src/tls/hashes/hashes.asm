@@ -39,6 +39,7 @@ _tls_hash_context_create;
 ; dynamically allocates a tls_Hash context for use with the Hash api.
 ; in = algorithm_id
 ; out = *tls_Hash
+; destroys: hl, bc, ix, a, flags
 	pop bc, hl
 	push hl, bc   ; hl has hash algorithm id
 	ld a, l       ; algorithm id into c
@@ -76,23 +77,27 @@ _tls_hash_context_create;
 	ld (ix + 1), (hl)   ; ctx->digest_len
 	; now we call to the hash init algorithm with ctx->state
 	pea ix
-	pea ix + tls_hash_context_header_size
-	ld hl, tls_hash_init_funcs
-	add hl, bc        ; get the correct hash init function
-	call _indcallhl   ; call it
-	pop de  ; we no longer need that
+		pea ix + tls_hash_context_header_size
+			ld hl, tls_hash_init_funcs
+			add hl, bc        ; get the correct hash init function
+			call _indcallhl   ; call it
+		pop de  ; we no longer need that
 	pop hl    ; that we need to return to the caller
 	ret
 
 ;---------------------------------------------------------------------------------
 ; bool tls_hash_update(struct tls_Hash *context, void *data, size_t len);
 _tls_hash_update:
-call  ti._frameset0
-; (ix+0) return vector
-; (ix+3) old ix
-; (ix+6) context
-; (ix+9) data
-; (ix+12) len
+; updates a hash context for input data
+; in: context, data, len
+; out: bool
+; destroys: hl, bc, ix, iy, a, flags
+	call  ti._frameset0
+	; (ix+0) return vector
+	; (ix+3) old ix
+	; (ix+6) context
+	; (ix+9) data
+	; (ix+12) len
 	; validate algorithm_id again. users like to do all sorts of mess.
 	ld iy, (ix + 6)
 	ld a, (iy + 0)
@@ -102,34 +107,42 @@ call  ti._frameset0
 	xor a
 	jr .exit        ; return false;
 .algorithmid_ok:
+	ld l, a			; algorithm id from a into l
+	ld h, 3			; * 3
+	mlt hl			; hl = l * h
+	push hl
+	pop bc          ; bc should have correct offset
 	; push ctx->state, data, len for inner call
 	ld hl, (ix + 12)
 	push hl
-	ld hl, (ix + 9)
-	push hl
-	pea iy + tls_hash_context_header_size   ; iy from earlier
-	ld hl, (iy + 3)
-	; get update func for hash
-	ld hl, tls_hash_update_funcs
-	ld b, 0
-	ld c, a
-	add hl, bc
-	call _indcallhl
+		ld hl, (ix + 9)
+		push hl
+			pea iy + tls_hash_context_header_size   ; iy from earlier
+				ld hl, (iy + 3)
+				; get update func for hash
+				ld hl, tls_hash_update_funcs
+				add hl, bc					; get the correct hash update function
+				call _indcallhl
+				ld a, 1
+	pop hl,hl,hl
 .exit:
 	ld sp, ix
 	pop ix
 	ret
 
 ;---------------------------------------------------------------------------------
-; bool tls_hash_digest(struct tls_Hash *context, void *data, size_t len);
+; bool tls_hash_digest(struct tls_Hash *context, void *digest);
 _tls_hash_digest:
-call ti._frameset0
-; (ix+0) return vector
-; (ix+3) old ix
-; (ix+6) context
-; (ix+9) outbuf
-	ld hl, (ix + 9)
-	push hl
+; returns a digest from hash state
+; in: context, digest buffer
+; out: bool
+; destroys: hl, bc, ix, iy, a, flags
+	ld hl, -tls_hash_context_state_size
+	call ti._frameset0
+	; (ix+0) return vector
+	; (ix+3) old ix
+	; (ix+6) context
+	; (ix+9) outbuf
 	; validate algorithm_id again. users like to do all sorts of mess.
 	ld iy, (ix + 6)
 	ld a, (iy)
@@ -138,10 +151,21 @@ call ti._frameset0
 	jr c, .algorithmid_ok               ; if carry set, a < b, then goto ok
 	xor a
 	jr .exit        ; return false;
-.algorithm_ok:
-	pea iy + tls_hash_context_header_size
-	ld hl, (iy + 6)
-	call _indcallhl
+.algorithmid_ok:
+	ld l, a			; algorithm id from a into l
+	ld h, 3			; * 3
+	mlt hl			; hl = l * h
+	push hl
+	pop bc          ; bc should have correct offset
+	ld hl, (ix + 9)
+	push hl
+		pea iy + tls_hash_context_header_size
+			ld hl, tls_hash_digest_funcs
+			add hl, bc					; get the correct hash digest function
+			call _indcallhl
+	pop hl,hl
+	ld a, 1
+.exit:
 	ld sp, ix
 	pop ix
 	ret
