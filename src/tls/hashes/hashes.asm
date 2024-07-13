@@ -7,7 +7,7 @@ include "sha256.asm"
 
 ;------------------------------------
 ; Public Functions
-export _tls_hash_init
+export _tls_hash_context_create
 export _tls_hash_update
 export _tls_hash_digest
 

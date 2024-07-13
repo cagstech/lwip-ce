@@ -10,10 +10,16 @@
 
 #include <stdint.h>
 
+enum {
+	TLS_HASH_SHA1,
+	TLS_HASH_SHA256
+	// TLS_HASH_SHA512 ??
+};
+
 struct tls_Hash {
-  uint8_t algorithm_id;
-  uint8_t digest_len;
-  uint8_t state[];
+	uint8_t algorithm_id;
+	uint8_t digest_len;
+	uint8_t state[];
 };
 
 // avoiding static allocation for contexts in lwip where possible
@@ -23,13 +29,7 @@ bool tls_hash_digest(struct tls_Hash *context, void *digest);
 
 
 // moving this to an hmac module
-struct tls_Hmac {
-  uint8_t algorithm_id;
-  size_t digest_len;
-  uint8_t ipad[64];       /**< holds the key xored with a magic value to be hashed with the inner digest */
-  uint8_t opad[64];       /**< holds the key xored with a magic value to be hashed with the outer digest */
-  uint8_t state[];
-};
+
 
 
 
