@@ -50,16 +50,22 @@ It is maintained by non-GNU (https://github.com/lwip-tcpip/lwip). You can view t
             usb_HandleEvents();
             sys_check_timeouts();
         } while(run_loop_condition);
+        /* If you wish to handle multiple netifs, the easiest solution is to utilize the
+            `netif_status_change_callback` to set a dev-facing netif pointer to
+            that of the current netif. Another option is to maintain a bitmap of 
+            'interface changes handled' XOR the output of `eth_get_interfaces` to get a
+            bitmap of all interface state changes. From there, for each set bit in that,
+            check the value of bitmap returned by `eth_get_interfaces`. */
 
 
 5. **Create a Do-While-Network-Up Loop**: The general flow of your application can be run in a do-while loop with the exit condition being the netif marked as up.
 
-			 do {
-					 // code in here to handle your application
-					 // keypress detection, rendering graphics, etc
-					 usb_HandleEvents();     // polls/triggers all USB events - allows Ethernet drivers to function
-					 sys_check_timeouts();   // polls/triggers all lwIP timer events/callbacks - allows IP stack to function
-       } while(netif_is_up(ethif));
+        do {
+            // code in here to handle your application
+            // keypress detection, rendering graphics, etc
+            usb_HandleEvents();     // polls/triggers all USB events - allows Ethernet drivers to function
+            sys_check_timeouts();   // polls/triggers all lwIP timer events/callbacks - allows IP stack to function
+        } while(netif_is_up(ethif));
 
 6. **Use the Appropriate API for your Application from the lwIP Docs**: As I value my dwindling sanity, I will not be re-documenting the entire lwIP codebase in here. The documentation for lwIP is here: https://www.nongnu.org/lwip/2_1_x/group__callbackstyle__api.html. The callback-style "raw" API is the only thing that will work in a NOSYS implementation. Do not implement the threaded API and then wonder why it does not work on a device that doesn't know what the heck a thread is. If you require assistance with the API for lwIP, feel free to ask in the [Discord](https://discord.gg/kvcuygqU) or contact the lwIP authors directly using the link above.
 
