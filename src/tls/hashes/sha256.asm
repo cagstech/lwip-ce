@@ -6,9 +6,9 @@ include "../helpers/kill_interrupts.asm"
 ; SHA-256 EZ80 implementation
 ; Author: beckadamtheinventor
 ;--------------------------------------------
-export hash_sha256_init
-export hash_sha256_update
-export hash_sha256_final
+; export hash_sha256_init
+; export hash_sha256_update
+; export hash_sha256_final
 
 ;------------------------------------------
 ; defines
@@ -785,3 +785,12 @@ _sha256_transform:
 	ld sp,ix
 	pop ix
 	ret
+
+
+; nothing in here needs to be state-guarded
+virtual at $E30800
+	_tls_random_reserved0   rb 119
+	_tls_random_reserved1   rb 32
+	_sha256_m_buffer        rb (64*4)
+	; tls_random_reservedN
+end virtual

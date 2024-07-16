@@ -5,18 +5,19 @@
 ; include to supported algorithms
 include "clear_stack.asm"
 include "kill_interrupts.asm"
-include "sha256.asm"
+include "../hashes/sha256.asm"
 
 ;------------------------------------
 ; Public Functions
-export _tls_random_get
-export _tls_random_fill
+export _tls_random_init_entropy
+export _tls_random
+export _tls_random_bytes
 
 ;-------------------------
 
 ;-------------------------------------
 ; bool tls_random_init(void);
-_tls_random_init:
+_tls_random_init_entropy:
 ; ix = selected byte
 ; de = current deviation
 ; hl = starting address
@@ -125,46 +126,21 @@ _smc_samples:=$+1
 	ex de,hl
 	ret
 
-__tls_random_hash_pool:
-	ld hl, (_sprng_read_addr)
-	add	hl,de
-	or	a,a
-	sbc	hl,de
-	ret z
-	ld de, _sprng_entropy_pool
-	ld b, 119
-.byte_read_loop:
-	ld a, (hl)
-	xor a, (hl)
-	xor a, (hl)
-	xor a, (hl)
-	xor a, (hl)
-	xor a, (hl)
-	xor a, (hl)
-	ld (de), a
-	inc de
-	djnz .byte_read_loop
-	ret
-
-_tls_random_get:
+;--------------------------------------
+; uint32_t tls_random(void);
+_tls_random:
 	save_interrupts
-_csrand_init_skip_smc	:=	$
-	call csrand_init
-  or a
-  ret z
 ; set rand to 0
 	ld hl, 0
 	ld a, l
 	ld (_sprng_rand), hl
 	ld (_sprng_rand+3), a
-	call __tls_random_hash_pool
 	
-	; hash entropy pool
-	ld hl, (_sprng_read_addr)
-	add	hl,de
-	or	a,a
-	sbc	hl,de
-	ret z
+    ; there is no realistic way to differentiate a error of 0 from a
+    ; totally random return of 0. 1/2^32 is stupid small, but non-zero.
+    ; ensure that any internal use of this RNG calls init_entropy first
+    ; trust users to do that as well.
+ 
 	ld de, _sprng_entropy_pool
 	ld b, 119
 .byte_read_loop:
@@ -179,23 +155,21 @@ _csrand_init_skip_smc	:=	$
 	inc de
 	djnz .byte_read_loop
 
-	ld hl, 0
-	push hl
 	ld hl, _sprng_hash_ctx
 	push hl
-	call cryptx_hash_init
-	pop bc, hl
+	call hash_sha256_init
+	pop bc
 	ld hl, 119
 	push hl
 	ld hl, _sprng_entropy_pool
 	push hl
 	push bc
-	call cryptx_hash_update
+	call hash_sha256_update
 	pop bc, hl, hl
 	ld hl, _sprng_sha_digest
 	push hl
 	push bc
-	call cryptx_hash_digest
+	call hash_sha256_final
 	pop bc, hl
 	
 	; xor hash cyclically into _rand
@@ -223,13 +197,12 @@ _csrand_init_skip_smc	:=	$
 	ld a, (_sprng_rand+3)
 	ld e, a
 .return:
-	restore_interrupts csrand_get
+	restore_interrupts _tls_random
 	ret
 
 
-_tls_random_fill:
+_tls_random_bytes:
 	save_interrupts
-
 	ld	hl, -10
 	call	ti._frameset
 	ld	de, (ix + 9)
@@ -241,7 +214,7 @@ _tls_random_fill:
 	sbc	hl, de
 	jq	nc, .lbl2
 	ld	(ix + -10), iy
-	call	csrand_get
+	call	_tls_random
 	ld	(ix + -4), hl
 	ld	(ix + -1), e
 	ld	de, (ix + -10)
@@ -276,7 +249,7 @@ _tls_random_fill:
 	ld	sp, ix
 	pop	ix
 
-	restore_interrupts csrand_fill
+	restore_interrupts _tls_random_bytes
 	ret
 
 
@@ -287,7 +260,6 @@ virtual at $E30800
 	_sprng_entropy_pool     rb _sprng_entropy_pool.size
 	_sprng_sha_digest       rb 32
 	_sprng_sha_mbuffer      rb (64*4)
-	_sprng_hash_ctx         rb _hashctx_size
+	_sprng_hash_ctx         rb _sha256ctx_size
 	_sprng_rand             rb 4
 end virtual
-_sha256_m_buffer    :=  _sprng_sha_mbuffer

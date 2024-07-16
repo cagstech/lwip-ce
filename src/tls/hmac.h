@@ -5,8 +5,8 @@
 //  Created by Anthony Cagliano on 7/13/24.
 //
 
-#ifndef hmac_h
-#define hmac_h
+#ifndef tls_hmac_h
+#define tls_hmac_h
 
 enum {
 	TLS_HMAC_SHA1,
