@@ -37,28 +37,30 @@ It is maintained by non-GNU (https://github.com/lwip-tcpip/lwip). You can view t
 
 3. **Poll for an Active Netif**: The usb-Ethernet driver is fully-internalized and does not expose anything, but does register a netif when a new Ethernet device is detected. To detect an active netif, you can poll in your own code for the presence of a netif. You may use only the first netif to handle your application's network or you can map netifs to different connections. The only determining factor is how big of a migraine you want.
 
-       uint8_t bmInterfacesUp;
-       struct *ethif = NULL;
-       do {
-           bmInterfacesUp = eth_get_interfaces();
-           // do something in reponse to previously reset bit being set
-           if(bmInterfaces & 1)		// assuming we only care about one netif
-							ethif = netif_find("en0");	// start DHCP here if desired
-           else
-							ethif = NULL;
-           // or a previously set bit being reset
-           usb_HandleEvents();
-           sys_check_timeouts();
-       } while(run_loop_condition);
+			uint8_t bmInterfacesUp;
+			struct *ethif = NULL;
+			do {
+				bmInterfacesUp = eth_get_interfaces();
+				// do something in reponse to netif state
+				if(bmInterfaces & 1) {	// assuming we only care about one netif
+					if(ethif==NULL)
+						ethif = netif_find("en0");	// start DHCP here if desired
+				}
+				else if(ethif)	
+					ethif = NULL;
+					
+				usb_HandleEvents();
+				sys_check_timeouts();
+			} while(run_loop_condition);
 
 
 5. **Create a Do-While-Network-Up Loop**: The general flow of your application can be run in a do-while loop with the exit condition being the netif marked as up.
 
-       do {
-           // code in here to handle your application
-           // keypress detection, rendering graphics, etc
-           usb_HandleEvents();     // polls/triggers all USB events - allows Ethernet drivers to function
-           sys_check_timeouts();   // polls/triggers all lwIP timer events/callbacks - allows IP stack to function
+			 do {
+					 // code in here to handle your application
+					 // keypress detection, rendering graphics, etc
+					 usb_HandleEvents();     // polls/triggers all USB events - allows Ethernet drivers to function
+					 sys_check_timeouts();   // polls/triggers all lwIP timer events/callbacks - allows IP stack to function
        } while(netif_is_up(ethif));
 
 6. **Use the Appropriate API for your Application from the lwIP Docs**: As I value my dwindling sanity, I will not be re-documenting the entire lwIP codebase in here. The documentation for lwIP is here: https://www.nongnu.org/lwip/2_1_x/group__callbackstyle__api.html. The callback-style "raw" API is the only thing that will work in a NOSYS implementation. Do not implement the threaded API and then wonder why it does not work on a device that doesn't know what the heck a thread is. If you require assistance with the API for lwIP, feel free to ask in the [Discord](https://discord.gg/kvcuygqU) or contact the lwIP authors directly using the link above.
