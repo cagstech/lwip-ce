@@ -2,26 +2,31 @@ QUICKNOTES - Implementing TLS
 ==============================
 
 https://www.rfc-editor.org/rfc/pdfrfc/rfc8446.txt.pdf
-I think we should only implement TLS 1.3. It seems to be a shorter handshake.
 
-Mandatory (rfc8446)
---------------------
-- TLS_AES_128_GCM_SHA256 (symmetric)
-- rsa_pkcs1_sha256 (for certificates/digital signatures)
-- rsa_pss_rsae_sha256 (for CertificateVerify and certificates)
-- ecdsa_secp256r1_sha256
-- secp256r1 (kex)
+TLS 1.2
+----------
+** ECDSA Certificates **
+- TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 (0xC0, 0x2B)
+- TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 (0xC0, 0x2C) ** if we implement SHA-384
 
-** This means we must implement the following **
-- SHA256
-- AES-128 galois counter mode
-- RSA encrypt and decrypt
-- probabilistic signature scheme for RSA
-- elliptic curve digital signing algorithm using secp256r1
-- elliptic curve kex using secp256r1
+** RSA Certificates **
+- TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 (0xC0, 0x2F)
+- TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 (0xC0, 0x30) ** if we implement SHA-384
 
-** That also means I get to undertake the fun task of researching the ObjectIDs for these suites and adding them here. **
+TLS 1.3
+----------
+- TLS_AES_128_GCM_SHA256 (0x13, 0x01)
+- TLS_AES_256_GCM_SHA384 (0x13, 0x02) ** if we implement SHA-384
+- TLS_AES_128_CCM_SHA256 (0x13, 0x04) ** if we implement CCM
+- TLS_AES_128_CCM_8_SHA256 (0x13, 0x05) ** if we implement CCM
+  
+I think we should only implement TLS 1.3. It seems to be a shorter handshake?
 
+TODO
+---------
+- RSA bigint ^ bigint % bigint
+- RSA PSS
+- SECP256r1 ECDHE/ECDSA
 
 
 TLS NEGOTIATION PROCESS
