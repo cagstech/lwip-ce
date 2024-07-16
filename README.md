@@ -50,12 +50,15 @@ It is maintained by non-GNU (https://github.com/lwip-tcpip/lwip). You can view t
             usb_HandleEvents();
             sys_check_timeouts();
         } while(run_loop_condition);
-        /* If you wish to handle multiple netifs, the easiest solution is to utilize the
-            `netif_status_change_callback` to set a dev-facing netif pointer to
-            that of the current netif. Another option is to maintain a bitmap of 
-            'interface changes handled' XOR the output of `eth_get_interfaces` to get a
-            bitmap of all interface state changes. From there, for each set bit in that,
-            check the value of bitmap returned by `eth_get_interfaces`. */
+        /* Two options for handling more than one netif:
+            1. Utilize the `netif_status_change_callback` to set a 
+            dev-facing netif pointer to the current netif if set up 
+            (or reset it if set down). 
+            2. Maintain a bitmap of 'interface changes handled', XOR 
+            the output of `eth_get_interfaces` to get a bitmap of 
+            interface state changes (XOR returning set if a bit changed).
+            From there, for each set bit in that, check the value of that bit
+            in the bitmap returned by `eth_get_interfaces`. */
 
 
 5. **Create a Do-While-Network-Up Loop**: The general flow of your application can be run in a do-while loop with the exit condition being the netif marked as up.
