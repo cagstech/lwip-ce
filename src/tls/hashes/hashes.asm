@@ -23,7 +23,7 @@ _indcallhl:
 ; Define total size of hash context (including state)
 tls_hash_context_state_size := _sha256ctx_size  ; change this if the largest context changes
 tls_hash_total_size := tls_hash_context_state_size + tls_hash_context_header_size
-tls_hashes_implemented := 2
+tls_hashes_implemented := 1
 
 ;--------------------------------
 ; Define hash header format
@@ -182,17 +182,17 @@ tls_hash_digest_len:
 ; LUT for hash init
 tls_hash_init_funcs:
 	dl hash_sha256_init
-	dl hash_sha384_init
+	; dl hash_sha384_init
 
 ; LUT for hash update
 tls_hash_update_funcs:
 	dl hash_sha256_update
-	dl hash_sha384_update
+	; dl hash_sha384_update
 
 ; LUT for hash digest
 tls_hash_digest_funcs:
 	dl hash_sha256_digest
-	dl hash_sha384_digest
+	; dl hash_sha384_digest
 
 
 extern _malloc
