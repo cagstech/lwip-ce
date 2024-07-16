@@ -42,11 +42,11 @@ It is maintained by non-GNU (https://github.com/lwip-tcpip/lwip). You can view t
       do {
         bmInterfacesUp = eth_get_interfaces();
         // do something in reponse to netif state
-        if(bmInterfaces & 1) {	// assuming we only care about one netif
+        if(bmInterfaces & 1) {  // assuming we only care about one netif
           if(ethif==NULL)
-            ethif = netif_find("en0");	// start DHCP here if desired
+            ethif = netif_find("en0");  // start DHCP here if desired
         }
-        else if(ethif)	
+        else if(ethif)  
           ethif = NULL;
 
         usb_HandleEvents();
