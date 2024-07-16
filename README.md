@@ -37,21 +37,19 @@ It is maintained by non-GNU (https://github.com/lwip-tcpip/lwip). You can view t
 
 3. **Poll for an Active Netif**: The usb-Ethernet driver is fully-internalized and does not expose anything, but does register a netif when a new Ethernet device is detected. To detect an active netif, you can poll in your own code for the presence of a netif. You may use only the first netif to handle your application's network or you can map netifs to different connections. The only determining factor is how big of a migraine you want.
 
-      uint8_t bmInterfacesUp;
-      struct *ethif = NULL;
-      do {
-        bmInterfacesUp = eth_get_interfaces();
-        // do something in reponse to netif state
-        if(bmInterfaces & 1) {  // assuming we only care about one netif
-          if(ethif==NULL)
-            ethif = netif_find("en0");  // start DHCP here if desired
-        }
-        else if(ethif)  
-          ethif = NULL;
-
-        usb_HandleEvents();
-        sys_check_timeouts();
-      } while(run_loop_condition);
+        uint8_t bmInterfacesUp;
+        struct *ethif = NULL;
+        do {
+            bmInterfacesUp = eth_get_interfaces();
+            // do something in reponse to netif state
+            if(bmInterfaces & 1) {  // assuming we only care about one netif
+                if(ethif==NULL)
+                    ethif = netif_find("en0");  // start DHCP here if desired
+            } else if(ethif)  
+                ethif = NULL;
+            usb_HandleEvents();
+            sys_check_timeouts();
+        } while(run_loop_condition);
 
 
 5. **Create a Do-While-Network-Up Loop**: The general flow of your application can be run in a do-while loop with the exit condition being the netif marked as up.
