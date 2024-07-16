@@ -837,6 +837,8 @@ init_success:
   iface->num = ifnum_assigned;         // use IFnum that triggered break
   ifnums_used |= 1 << ifnum_assigned;  // set flag marking the ifnum used
   netif_set_hostname(iface, hostname); // set default hostname
+	LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+							("hostname: %s", netif_get_hostname(iface)));
   netif_set_remove_callback(iface, eth_remove_callback);
 
   // allow IPv4 and IPv6 on device
