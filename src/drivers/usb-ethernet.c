@@ -520,14 +520,6 @@ enum _descriptor_parser_await_states
   PARSE_HAS_ENDPOINT_OUT = (1 << 6)
 };
 
-/****************************************************************************
- * @brief Performs cleanup on netif prior to removal.
- */
-void eth_remove_callback(struct netif *netif)
-{
-  ifnums_used &= ~(1 << netif->num);
-}
-
 /*****************************************************************************************
  * @brief Parses descriptors for a USB device and checks for a valid CDC Ethernet device.
  * @return \b True if success (with NETIF initialized), \b False if not CDC-ECM/NCM or error.
@@ -839,7 +831,6 @@ init_success:
   netif_set_hostname(iface, hostname); // set default hostname
 	LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
 							("hostname: %s", netif_get_hostname(iface)));
-  netif_set_remove_callback(iface, eth_remove_callback);
 
   // allow IPv4 and IPv6 on device
   netif_create_ip6_linklocal_address(iface, 1);
@@ -884,6 +875,7 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
       eth_device_t *eth_device = (eth_device_t *)usb_GetDeviceData(usb_device);
       if (eth_device)
       {
+        ifnums_used &= ~(1 << eth_device->iface.num);
         netif_set_link_down(&eth_device->iface);
         netif_set_down(&eth_device->iface);
         netif_remove(&eth_device->iface);
