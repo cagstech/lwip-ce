@@ -13,114 +13,68 @@ export _tls_random_init_entropy
 export _tls_random
 export _tls_random_bytes
 
+;-------------------------
+
 ;-------------------------------------
 ; bool tls_random_init(void);
 _tls_random_init_entropy:
-; ix = selected byte
-; de = current deviation
-; hl = starting address
-; inputs: stack = samples / 4, Max is 256 (256*4 = 1024 samples)
-; outputs: hl = address
-	ld de, 256		; thorough sampling
-.start:
-	ld a, e
-	ld (_smc_samples), a
- 
-	push ix
-	   ld ix, 0
-	   ld hl, $D65800
-	   ld bc,513
-.test_range_loop:
-	   push bc
-		  call _test_byte
-	   pop bc
-	   cpi
-	   jq pe,.test_range_loop
- 
-	   lea hl, ix+0
-	   ld (_sprng_read_addr), hl
- 
-	   xor a, a
-	   sbc hl, bc  ; subtract 0 to set the z flag if HL is 0
-	pop ix
+	ld hl, $D65800
+	ld iy, 0
+	ld de,$FFFFFF
+	ld c, l
+.loop1: ; loops 256 times
+	call .test_byte
+	dec c
+	jr nz,.loop1
+.loop2: ; loops 256 times
+	call .test_byte
+	dec c
+	jr nz,.loop2
+	call .test_byte ; run a total of 513 times
+
+	lea hl, iy+0
+	ld (_sprng_read_addr), hl
+
+	add hl, bc
+	xor a, a
+	sbc hl, bc  ; set the z flag if HL is 0
 	ret z
 	inc a
 	ret
- 
-_test_byte:
-; inputs: hl = byte
-; inputs: de = minimum deviance
-; inputs: ix = pointer to the byte with minimum deviance
-; outputs: de is the new minimum deviance (if updated)
-; outputs: ix updated to hl if this byte contains the bit with lowest deviance
-; outputs: b = 0
-; outputs: a = 0x86
-; destroys: f
-; modifies: a, b, de, ix
-	ld a,0x46 ; second half of the `bit 0,(hl)` command
-.test_byte_bitloop:
-	push hl
-	   push de
-		  call _test_bit  ; HL = deviance (|desired - actual|)
-	   pop de
- 
-	   add a,8       ; never overflows, so resets carry
-	   sbc hl, de    ; check if HL is smaller than DE
- 
-	   jq nc, .skip_next_bit          ; HL >= DE
-	   add hl,de
-	   ex de,hl
-	   pop ix
-	   push ix
-.skip_next_bit:
-	pop hl
-	cp 0x86
-	jq nz, .test_byte_bitloop
-	ret
-  
-_test_bit:
-; inputs: a = second byte of CB**
-; inputs: hl = byte
-; outputs: hl = hit count
-; destroys: af, bc, de, hl
- 
-_smc_samples:=$+1
-	ld b,0
-	ld (.smc1),a
-	ld (.smc2),a
-	ld (.smc3),a
-	ld (.smc4),a
+
+; test byte at hl, set iy=hl if entropy is better
+.test_byte:
+	push de
 	ld de,0
-.loop:
-	bit 0,(hl)
-.smc1:=$-1
-	jq z,.next1
-	inc de
-.next1:
-	bit 0,(hl)
-.smc2:=$-1
-	jq nz,.next2    ; notice the inverted logic !
-	dec de          ; and the dec instead of inc !
-.next2:
-	bit 0,(hl)
-.smc3:=$-1
-	jq z, .next3
-	inc de
-.next3:
-	bit 0,(hl)
-.smc4:=$-1
-	jq nz,.next4    ; notice the inverted logic !
-	dec de          ; and the dec instead of inc !
-.next4:
-	djnz .loop
- 
-	; return |DE|
+	ld b,7 ; probably enough tests
+.test_byte_outer_loop:
+; sample byte twice and bitwise-xor
+	ld a,(hl) ; sample 1
+	xor a,(hl) ; sample 2
+; test the entropy for each of the 8 bits
+.test_byte_loop:
+	jr z,.done_test_byte_loop
+	add a,a ; test next bit (starting with the high bit)
+	jr nc,.test_byte_loop ; jump if bit unset
+	inc de ; increment score
+	jr .test_byte_loop
+.done_test_byte_loop:
+	djnz .test_byte_outer_loop
+
+	ex (sp),hl ; save pointer to byte, restore current entropy score
+; check if the new entropy score is higher than the current entropy score
 	or a,a
-	sbc hl,hl
-	sbc hl,de
-	ret nc
-	ex de,hl
+	sbc hl,de ; current - new
+	jr nc,.test_byte_is_worse
+	pop iy ; return iy = pointer to byte
+	lea hl,iy+1 ; advance pointer to byte for next test
 	ret
+.test_byte_is_worse:
+	ex hl,de ; de = current score
+	pop hl ; restore pointer to byte
+	inc hl ; advance pointer
+	ret
+
 
 ;--------------------------------------
 ; uint32_t tls_random(void);
@@ -137,6 +91,7 @@ _tls_random:
     ; ensure that any internal use of this RNG calls init_entropy first
     ; trust users to do that as well.
  
+	ld hl,(_sprng_read_addr)
 	ld de, _sprng_entropy_pool
 	ld b, 119
 .byte_read_loop:
@@ -250,7 +205,6 @@ _tls_random_bytes:
 
 
 ; will have to manually edit context in this instance
-_sprng_read_addr:        rb 3
 _sprng_entropy_pool.size = 119
 virtual at $E30800
 	_sprng_entropy_pool     rb _sprng_entropy_pool.size
@@ -258,4 +212,5 @@ virtual at $E30800
 	_sprng_sha_mbuffer      rb (64*4)
 	_sprng_hash_ctx         rb _sha256ctx_size
 	_sprng_rand             rb 4
+	_sprng_read_addr        rb 3
 end virtual
