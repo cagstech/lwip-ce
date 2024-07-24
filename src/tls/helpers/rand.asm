@@ -13,8 +13,6 @@ export _tls_random_init_entropy
 export _tls_random
 export _tls_random_bytes
 
-;-------------------------
-
 ;-------------------------------------
 ; bool tls_random_init(void);
 _tls_random_init_entropy:
@@ -37,7 +35,7 @@ _tls_random_init_entropy:
 		  call _test_byte
 	   pop bc
 	   cpi
-	   jp pe,.test_range_loop
+	   jq pe,.test_range_loop
  
 	   lea hl, ix+0
 	   ld (_sprng_read_addr), hl
@@ -46,8 +44,6 @@ _tls_random_init_entropy:
 	   sbc hl, bc  ; subtract 0 to set the z flag if HL is 0
 	pop ix
 	ret z
-	ld bc,0x0418
-	ld (_csrand_init_skip_smc),bc
 	inc a
 	ret
  
