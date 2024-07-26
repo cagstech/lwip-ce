@@ -11,9 +11,8 @@
 #include <stdint.h>
 
 enum {
-	TLS_HASH_SHA1,
 	TLS_HASH_SHA256
-	// TLS_HASH_SHA512 ??
+	// TLS_HASH_SHA384 ??
 };
 
 struct tls_hash {

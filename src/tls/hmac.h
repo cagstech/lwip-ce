@@ -9,9 +9,8 @@
 #define tls_hmac_h
 
 enum {
-	TLS_HMAC_SHA1,
 	TLS_HMAC_SHA256
-	// TLS_HASH_SHA512 ??
+	// TLS_HASH_SHA384 ??
 };
 
 struct tls_Hmac {
