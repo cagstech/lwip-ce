@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Prerequisites
-declare -a search_directories=("src/include/lwip")
-declare -a excluded_files=()
+declare -a search_directories=("src/drivers" "src/include/lwip")
+declare -a excluded_files=("api.h" "sockets.h")
 prototype_match_pattern="([a-zA-Z_][a-zA-Z0-9_]*\s+\**)\s*([a-zA-Z_][a-zA-Z0-9_]*\s*)\(([^)]*)\);"
 prototype_no_return_type_pattern="([a-zA-Z_][a-zA-Z0-9_]*\s*)\("
 prototype_no_parenthesis_pattern="[a-zA-Z_][a-zA-Z0-9_]*\s*"
@@ -19,27 +19,17 @@ fi
 
 [[ ! -f $output_file ]] && touch $output_file
 
-# Function to process lines
-process_line() {
-    local line=$1
-    filtered_line=$(echo $line | grep -E "$prototype_match_pattern")
-    filtered_line=$(echo $filtered_line | grep -Eo "$prototype_no_return_type_pattern")
-    filtered_line=$(echo $filtered_line | grep -Eo "$prototype_no_parenthesis_pattern")
-    if [ -n "$filtered_line" ]; then
-        if ! grep -Fxq "$filtered_line" $output_file
-        then
-            echo "$filtered_line," >> $output_file
-        fi
-    fi
-}
-
 # Function to process files
 process_file() {
     local file=$1
     echo "Processing file: $file"
-    while read p; do
-        process_line "$p"
-    done < $file
+    local prefix=$(basename $file .h)
+    /usr/local/bin/ctags -f- --kinds-C=p $file | awk '{ print $1; }' | sed 's/$/,/' | while read -r line; do
+        if ! grep -Fxq "$line" "$output_file"; then
+            echo "appending function: $line"
+            echo "$line" >> "$output_file"
+        fi
+    done
 }
 
 

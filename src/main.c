@@ -25,6 +25,11 @@ bool run_main = false;
 bool dhcp_started = false;
 bool httpd_running = false;
 
+void *functable[] {
+#include "functable.inc"
+};
+
+
 void ethif_status_callback_fn(struct netif *netif)
 {
     if (dhcp_supplied_address(netif) && (!httpd_running))

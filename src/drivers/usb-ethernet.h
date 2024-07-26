@@ -171,8 +171,7 @@ typedef struct _eth_device_t
 extern eth_device_t eth;
 
 /// @brief Callback function to be passed to @b usb_Init to enable Ethernet driver for lwIP
-usb_error_t eth_handle_usb_event(usb_event_t event, void *event_data,
-                                 usb_callback_data_t *callback_data);
+usb_error_t eth_handle_usb_event(usb_event_t event, void *event_data, usb_callback_data_t *callback_data);
 
 /// @brief Polls for the registration status of interfaces.
 /// @return A bitmap indicating what NETIFs are registered (netif->num)
