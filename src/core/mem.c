@@ -86,8 +86,8 @@
 
 #if MEM_CUSTOM_ALLOCATOR==1
 
-void* (*usr_malloc)(size_t size) __attribute__((malloc));
-void (*usr_free)(void *ptr) __NOEXCEPT;
+void* (*usr_malloc)(size_t size) = NULL;
+void (*usr_free)(void *ptr) = NULL;
 
 void* custom_malloc(size_t size){
     if(!usr_malloc) return NULL;
