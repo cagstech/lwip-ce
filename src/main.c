@@ -39,6 +39,7 @@ void ethif_status_callback_fn(struct netif *netif)
 int main(void)
 {
     uint8_t key;
+    mem_set_allocator(malloc, free);
     lwip_init();
     os_ClrLCDFull();
     os_HomeUp();

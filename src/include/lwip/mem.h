@@ -75,6 +75,12 @@ void *mem_malloc(mem_size_t size);
 void *mem_calloc(mem_size_t count, mem_size_t size);
 void  mem_free(void *mem);
 
+// custom mem allocation for lwip => pass in program malloc
+void* custom_malloc(size_t size);
+void custom_free(void* ptr);
+void* custom_calloc(size_t num, size_t size);
+void mem_set_allocator(void* (*malloc)(), void (*free)());
+
 #ifdef __cplusplus
 }
 #endif

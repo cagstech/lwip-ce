@@ -84,6 +84,48 @@
 #define MEM_SANITY_OVERHEAD 0
 #endif
 
+#if MEM_CUSTOM_ALLOCATOR==1
+
+void* (*usr_malloc)(size_t size) __attribute__((malloc));
+void (*usr_free)(void *ptr) __NOEXCEPT;
+
+void* custom_malloc(size_t size){
+    if(!usr_malloc) return NULL;
+    return usr_malloc(size);
+}
+
+void custom_free(void *ptr){
+    if(!usr_free) return;
+    usr_free(ptr);
+}
+
+void* custom_calloc(mem_size_t count, mem_size_t size)
+{
+    void *p;
+    size_t alloc_size = (size_t)count * (size_t)size;
+    
+    if ((size_t)(mem_size_t)alloc_size != alloc_size) {
+        LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("mem_calloc: could not allocate %"SZT_F" bytes\n", alloc_size));
+        return NULL;
+    }
+    
+    /* allocate 'count' objects of size 'size' */
+    p = mem_malloc((mem_size_t)alloc_size);
+    if (p) {
+        /* zero the memory */
+        memset(p, 0, alloc_size);
+    }
+    return p;
+}
+
+void mem_set_allocator(void* (*in_malloc)(size_t),
+                       void (*in_free)(void *ptr)){
+    usr_malloc = in_malloc;
+    usr_free = in_free;
+}
+
+#endif
+
 #if MEM_OVERFLOW_CHECK || MEMP_OVERFLOW_CHECK
 /**
  * Check if a mep element was victim of an overflow or underflow
