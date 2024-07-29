@@ -85,7 +85,9 @@ typedef enum {
 /** Connection closed.       */
   ERR_CLSD       = -15,
 /** Illegal argument.        */
-  ERR_ARG        = -16
+  ERR_ARG        = -16,
+/** User-malloc implementation unset */
+  ERR_SYS_MALLOC_UNSET  = -17
 } err_enum_t;
 
 /** Define LWIP_ERR_T in cc.h if you want to use

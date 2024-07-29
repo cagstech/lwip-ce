@@ -86,17 +86,40 @@
 
 #if MEM_CUSTOM_ALLOCATOR==1
 
+#define LWIP_HEAP_MAX_DEFAULT   (1024*16)
+#define MEM_MALLOC_HELPER_SIZE  2
+
 void* (*usr_malloc)(size_t size) = NULL;
 void (*usr_free)(void *ptr) = NULL;
+size_t lwip_heap_max = LWIP_HEAP_MAX_DEFAULT;
+size_t lwip_heap_usage = 0;
 
-void* custom_malloc(size_t size){
-    if(!usr_malloc) return NULL;
-    return usr_malloc(size);
+void *custom_malloc(size_t size) {
+    if(!usr_malloc) {
+        LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("mem_malloc: usr_malloc unset\n"));
+        return NULL;
+    }
+    if(lwip_heap_usage >= lwip_heap_max) {
+        LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("mem_malloc: did not allocate %"SZT_F" bytes, %"SZT_F"/%"SZT_F" of user-defined heap limit used.\n", size, lwip_heap_usage, lwip_heap_max));
+        return NULL;
+    }
+    void *ptr = usr_malloc(size + MEM_MALLOC_HELPER_SIZE);
+    if (ptr) {
+        *(uint16_t*)ptr = size + MEM_MALLOC_HELPER_SIZE;
+        lwip_heap_usage += size + MEM_MALLOC_HELPER_SIZE;
+        return ptr + MEM_MALLOC_HELPER_SIZE;
+    }
+    return NULL;
 }
 
 void custom_free(void *ptr){
-    if(!usr_free) return;
-    usr_free(ptr);
+    if(!usr_free) {
+        LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("mem_free: usr_free unset\n"));
+        return;
+    }
+    uint16_t size = *(uint16_t*)(ptr - MEM_MALLOC_HELPER_SIZE);
+    free(ptr - MEM_MALLOC_HELPER_SIZE);
+    lwip_heap_usage -= size;
 }
 
 void* custom_calloc(mem_size_t count, mem_size_t size)
@@ -118,10 +141,12 @@ void* custom_calloc(mem_size_t count, mem_size_t size)
     return p;
 }
 
-void mem_set_allocator(void* (*in_malloc)(size_t),
-                       void (*in_free)(void *ptr)){
-    usr_malloc = in_malloc;
-    usr_free = in_free;
+void lwip_configure_allocator(void* (*in_malloc)(size_t),
+                              void (*in_free)(void *ptr),
+                              size_t heap_max){
+    usr_malloc = (in_malloc) ? in_malloc : usr_malloc;
+    usr_free = (in_free) ? in_free : usr_free;
+    lwip_heap_max = (heap_max > LWIP_HEAP_MAX_DEFAULT) ? heap_max : LWIP_HEAP_MAX_DEFAULT;
 }
 
 #endif
