@@ -4,7 +4,7 @@
 
 NAME = lwIP
 ICON = icon.png
-DESCRIPTION = lwIP Networking Stack DEMO
+DESCRIPTION = lwIP Networking Stack
 
 APP_NAME = lwIP
 APP_VERSION = 0
