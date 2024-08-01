@@ -30,7 +30,7 @@ Programs using lwIP as a dynamic library need to follow a specific initializatio
         // NOTE: if you use additional modules, you will need those headers as well
     
     
-2. **Configure lwIP to Use the Program's Malloc Implementation**: This is something you cannot skip. In order to allocate memory and not conflict with your own program, lwIP needs to use your program's implementation of malloc. This is so important that I actually modified the lwIP source to return an error on init if this is not done.
+2. **Configure lwIP to Use the Program's Malloc Implementation**: This is something you cannot skip. In order to allocate memory and not conflict with your own program, lwIP needs to use your program's implementation of malloc. This is so important that I actually modified the lwIP source to return an error on init if this is not done. *Note: The max_heap (third) argument to that function sets a limit on how much heap space lwIP is allowed to use. This is useful for tailoring memory constraints to your use case. If your program needs more for itself, configure lwIP to use less. If you anticipate sending lots of data with lwIP, set it higher.*
 
         #define LWIP_MAX_HEAP   (1024 * 16)
         lwip_configure_allocator(malloc, free, LWIP_MAX_HEAP);
@@ -99,4 +99,12 @@ Your imagination (and I guess the remaining heap space) on the calculator are yo
 
 **Proper Cleanup and Exit**
 
-Always end your code by performing the appropriate cleanup. This means that you call `usb_Cleanup();` at some point between the shutdown of network services and actual end of your program. Make sure you do this on ALL control paths that may lead to terminating the program, as failing to do this may cause USB issues within the OS requiring a reset. Also make sure that you properly close any sockets and protocols you are running. Failing to do so may cause memory leaks. The order is also important here. Remember that with certain network services, they need to cleanly disconnect from remotes and await success messages before the resource is destroyed and the memory is returned to the stack. For example, after calling `tcp_close()` you should ideally await the full TCP shutdown handshake before doing anything else like freeing the network interface or calling `usb_Cleanup()` (if you disable the Ethernet drivers, how are you going to actually receive the disconnect ACKS?). This means pressing the **Clear** key can now no longer just be a `goto exit;`. It should send a `tcp_close()` on any active pcbs, each of which should await their reset/fin/fin-acks before beginning the control flow for ending the program. This should be: (1) close all pcbs and await confirmation, (2) set the interface down (`netif_set_down(yournetif)`), (3) then on `netif_is_down(yournetif)`, `netif_remove(yournetif)`, and then finally (4) `usb_Cleanup()`.
+Networked applications are not simple programs where you can just exit with no consequences. An average use of lwIP has timers in effect, callbacks, queued data transfers, packet buffers, control blocks -- a lot of memory-occupying allocated resources. If you just exit without properly setting down these resources... you can imagine the results. You should ideally follow a proper sequence of deinitializing and removing resources.
+
+    1. Call the appropriate close() functions on any protocol control blocks. For TCP, await a FIN response from the remote using the callbacks. Wait for connections to PROPERLY close, which causes lwIP to release their resources.
+    
+    2. Once all PCBs are confirmed closed, begin to deregister network interfaces. Call `netif_remove()` on any interface that is active.
+    
+    3. Call usb_Cleanup() to immediately terminate all pending USB transfers, reset device(s), and free resources associated with the USB driver.
+    
+    4. NOW you can exit your application.
