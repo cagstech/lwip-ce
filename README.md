@@ -101,10 +101,10 @@ Your imagination (and I guess the remaining heap space) on the calculator are yo
 
 Networked applications are not simple programs where you can just exit with no consequences. An average use of lwIP has timers in effect, callbacks, queued data transfers, packet buffers, control blocks -- a lot of memory-occupying allocated resources. If you just exit without properly setting down these resources... you can imagine the results. You should ideally follow a proper sequence of deinitializing and removing resources.
 
-    1. Call the appropriate close() functions on any protocol control blocks. For TCP, await a FIN response from the remote using the callbacks. Wait for connections to PROPERLY close, which causes lwIP to release their resources.
+1. Call the appropriate close() functions on any protocol control blocks. For TCP, await a FIN response from the remote using the callbacks. Wait for connections to PROPERLY close, which causes lwIP to release their resources.
     
-    2. Once all PCBs are confirmed closed, begin to deregister network interfaces. Call `netif_remove()` on any interface that is active.
+2. Once all PCBs are confirmed closed, begin to deregister network interfaces. Call `netif_remove()` on any interface that is active.
     
-    3. Call usb_Cleanup() to immediately terminate all pending USB transfers, reset device(s), and free resources associated with the USB driver.
+3. Call usb_Cleanup() to immediately terminate all pending USB transfers, reset device(s), and free resources associated with the USB driver.
     
-    4. NOW you can exit your application.
+4. NOW you can exit your application.
