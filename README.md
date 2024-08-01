@@ -32,20 +32,20 @@ Programs using lwIP as a dynamic library need to follow a specific initializatio
     
 2. **Configure lwIP to Use the Program's Malloc Implementation**: This is something you cannot skip. In order to allocate memory and not conflict with your own program, lwIP needs to use your program's implementation of malloc. This is so important that I actually modified the lwIP source to return an error on init if this is not done.
 
-    #define LWIP_MAX_HEAP   (1024 * 16)
-    lwip_configure_allocator(malloc, free, LWIP_MAX_HEAP);
+        #define LWIP_MAX_HEAP   (1024 * 16)
+        lwip_configure_allocator(malloc, free, LWIP_MAX_HEAP);
 
 
 3. **Initialize the lwIP Stack**: Finally we fire up the IP stack.
 
-    if(lwip_init() != ERR_OK)
-        goto exit;      // whatever your exit w/ error method is
+        if(lwip_init() != ERR_OK)
+            goto exit;      // whatever your exit w/ error method is
         
         
 4. **Initialize the CDC-Ethernet Driver**: `eth_handle_usb_event` is the entry point to the data-link layer driver for Ethernet provided in this library. Initialize the calculator's USB hardware, passing that function as a callback as shown below.
 
-    if (usb_Init(eth_handle_usb_event, NULL, NULL, USB_DEFAULT_INIT_FLAGS))
-        goto exit;      // whatever your exit w/ error method is      
+        if (usb_Init(eth_handle_usb_event, NULL, NULL, USB_DEFAULT_INIT_FLAGS))
+            goto exit;      // whatever your exit w/ error method is      
 
         
 # Using the lwIP API # 
@@ -54,47 +54,47 @@ Programs using lwIP as a dynamic library need to follow a specific initializatio
 
 Your imagination (and I guess the remaining heap space) on the calculator are your limits. You can use lwIP in literally the same way that you would on a computer or any other device. The only constraint is that you are limited to the *callback-style API*. You cannot use modules such as sockets, netconn and others that require an OS. That doesn't matter much though, as you can use the slightly-lower-level raw API for protocols like TCP, UDP, ICMP, and more. Here is an example of a simple TCP-client application that sets up a network interface, connects to a TCP server, then disconnects. *Note that it does not wait for FIN when disconnecting and in a proper TCP client you must.*
 
-    #include "lwip/netif.h"     // we will use the netif_find function
-    #include "lwip/tcp.h"       // raw TCP API
+        #include "lwip/netif.h"     // we will use the netif_find function
+        #include "lwip/tcp.h"       // raw TCP API
     
-    err_t do_when_connected(void *arg, struct tcp_pcb *tpcb, err_t err);
+        err_t do_when_connected(void *arg, struct tcp_pcb *tpcb, err_t err);
     
-    int main(void) {
-        // .. the init logic ..
+        int main(void) {
+            // .. the init logic ..
     
-        bool do_main_loop = true;
-        struct netif* ethif = NULL;
-        struct tcp_pcb *pcb = tcp_new();
-        do {
-            // code in here to handle your application
-            // keypress detection, rendering graphics, etc
-            if(!ethif){
-                ethif = netif_find("en0");
-                if(ethif){
-                    netif_set_default(ethif);   // anything we do defaults to this IF now
-                    ip_addr_t remote = IPADDR4_INIT_BYTES(<ip to connect to>);
-                    if(tcp_connect(pcb, &remote, <port>, do_when_connected) != ERR_OK)
-                        do_error_handle();
+            bool do_main_loop = true;
+            struct netif* ethif = NULL;
+            struct tcp_pcb *pcb = tcp_new();
+            do {
+                // code in here to handle your application
+                // keypress detection, rendering graphics, etc
+                if(!ethif){
+                    ethif = netif_find("en0");
+                    if(ethif){
+                        netif_set_default(ethif);   // anything we do defaults to this IF now
+                        ip_addr_t remote = IPADDR4_INIT_BYTES(<ip to connect to>);
+                        if(tcp_connect(pcb, &remote, <port>, do_when_connected) != ERR_OK)
+                            do_error_handle();
+                    }
                 }
-            }
-            usb_HandleEvents();
-        sys_check_timeouts();
-        } while(do_main_loop);
-    }
-    
-    // tcp connected callback
-    err_t do_when_connected(void *arg, struct tcp_pcb *tpcb, err_t err){
-        if(err == ERR_OK){
-            printf("connection successful, disconnecting...");
-            if(tcp_close(pcb) != ERR_OK)
-                printf("disconnect error");
+                usb_HandleEvents();
+                sys_check_timeouts();
+            } while(do_main_loop);
         }
-        else
-            printf("connect error");
-    }
     
-    // this is just the tip of the iceberg of how to implement TCP and designed to give
-    // you a feel for how to set it up, not a comprehensive TCP client.
+        // tcp connected callback
+        err_t do_when_connected(void *arg, struct tcp_pcb *tpcb, err_t err){
+            if(err == ERR_OK){
+                printf("connection successful, disconnecting...");
+                if(tcp_close(pcb) != ERR_OK)
+                    printf("disconnect error");
+            }
+            else
+                printf("connect error");
+        }
+    
+        // this is just the tip of the iceberg of how to implement TCP and designed to give
+        // you a feel for how to set it up, not a comprehensive TCP client.
 
 
 **Proper Cleanup and Exit**
