@@ -89,16 +89,17 @@
 #define LWIP_HEAP_MAX_DEFAULT   (1024*16)
 #define MEM_MALLOC_HELPER_SIZE  2
 
-void* (*usr_malloc)(size_t size) = NULL;
-void (*usr_free)(void *ptr) = NULL;
+void *function_unset(size_t size){
+    LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("internal_error: user malloc/free unset\n"));
+    return NULL;
+}
+
+void* (*usr_malloc)(size_t size) = function_unset;
+void (*usr_free)(void *ptr) = function_unset;
 size_t lwip_heap_max = LWIP_HEAP_MAX_DEFAULT;
 size_t lwip_heap_usage = 0;
 
 void *custom_malloc(size_t size) {
-    if(!usr_malloc) {
-        LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("mem_malloc: usr_malloc unset\n"));
-        return NULL;
-    }
     if(lwip_heap_usage >= lwip_heap_max) {
         LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("mem_malloc: did not allocate %"SZT_F" bytes, %"SZT_F"/%"SZT_F" of user-defined heap limit used.\n", size, lwip_heap_usage, lwip_heap_max));
         return NULL;
@@ -117,9 +118,12 @@ void custom_free(void *ptr){
         LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("mem_free: usr_free unset\n"));
         return;
     }
-    uint16_t size = *(uint16_t*)(ptr - MEM_MALLOC_HELPER_SIZE);
-    free(ptr - MEM_MALLOC_HELPER_SIZE);
-    lwip_heap_usage -= size;
+    if(ptr){
+        uint16_t size = *(uint16_t*)(ptr - MEM_MALLOC_HELPER_SIZE);
+        LWIP_ASSERT("mem_free: heap underflow occurred", size <= lwip_heap_usage);
+        free(ptr - MEM_MALLOC_HELPER_SIZE);
+        lwip_heap_usage -= size;
+    }
 }
 
 void* custom_calloc(mem_size_t count, mem_size_t size)
