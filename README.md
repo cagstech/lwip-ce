@@ -24,10 +24,10 @@ Programs using lwIP as a dynamic library need to follow a specific initializatio
 
 1. **Include the Necessary Headers**: The following headers are needed for things to work at all.
 
-    #include <usbdrvce.h>                   // USB driver
-    #include "drivers/usb-ethernet.h"       // CDC-Ethernet driver (ECM/NCM)
-    #include "lwip/init.h"                  // lwIP initialization
-    // NOTE: if you use additional modules, you will need those headers as well
+        #include <usbdrvce.h>                   // USB driver
+        #include "drivers/usb-ethernet.h"       // CDC-Ethernet driver (ECM/NCM)
+        #include "lwip/init.h"                  // lwIP initialization
+        // NOTE: if you use additional modules, you will need those headers as well
     
     
 2. **Configure lwIP to Use the Program's Malloc Implementation**: This is something you cannot skip. In order to allocate memory and not conflict with your own program, lwIP needs to use your program's implementation of malloc. This is so important that I actually modified the lwIP source to return an error on init if this is not done.
