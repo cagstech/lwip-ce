@@ -97,7 +97,7 @@ Your imagination (and I guess the remaining heap space) on the calculator are yo
         // you a feel for how to set it up, not a comprehensive TCP client.
 
 
-**Proper Cleanup and Exit**
+# Proper Cleanup and Exit #
 
 Networked applications are not simple programs where you can just exit with no consequences. An average use of lwIP has timers in effect, callbacks, queued data transfers, packet buffers, control blocks -- a lot of memory-occupying allocated resources. If you just exit without properly setting down these resources... you can imagine the results. You should ideally follow a proper sequence of deinitializing and removing resources.
 
