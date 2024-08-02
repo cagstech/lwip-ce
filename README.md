@@ -54,20 +54,21 @@ Programs using lwIP as a dynamic library need to follow a specific initializatio
 
 I'll be direct. lwIP is not a trivial thing to use. As the TI-84+ CE does not possess what qualifies as an operating system for the purposes of lwIP, we are restricted to the use of the raw API, also called the *callback API*. In this framework you declare a resource for a connection, called a *protocol control block (PCB)* and you register callback functions to the PCB for various actions that may occur on that resource -- sent, recvd, connected, error, etc. lwIP handles the routing of those packets and processing of network events on the PCBs, executing the callbacks in response to appropriate event. This means you will need familiarity with callback/event-driven programming to use lwIP.
 
-he documentation for callback-style API is here: https://www.nongnu.org/lwip/2_1_x/group__callbackstyle__api.html. As you will see if you spend any amount of time perusing the documentation you will find that in many places it tells you next to nothing about what functions do. If you require assistance with the API for lwIP, feel free to ask in the [Discord](https://discord.gg/kvcuygqU) or contact the lwIP authors directly using the link above. 
+The documentation for the callback-style API is here: https://www.nongnu.org/lwip/2_1_x/group__callbackstyle__api.html. As you will see if you spend any amount of time perusing the documentation you will find that in many places it tells you next to nothing about what functions do. If you require assistance with the API for lwIP, feel free to ask in the [Discord](https://discord.gg/kvcuygqU) or contact the lwIP authors directly using the link above. 
 
 ## Error Handling ##
 
-To be fully stable your application needs to properly handle any errors that may arise. The Ethernet driver has robust error handling including an error recovery mechanism (attempting to reset the USB device while persisting lwIP state). lwIP's stack has its own robust error-handling mechanisms as well.
+To be fully stable your application needs to properly handle any errors that may arise. You, the end user, only need to focus on application-layer error handling as the IP stack and the link-layer Ethernet driver have robust error handling built in with the latter even having an error recovery system designed to reset a problematic USB device without losing lwIP state.
 
+Many of the protocols, such as TCP or UDP, that you can implement provide a way to pass error handling functions to the PCB which allows you to react to errors on the connection. These errors may include rejected packets, connection failures, and memory-low errors. How you handle these errors is up to you.
 
-You also need to handle responses to network events -- 
-handle error conditions. The remote host may return an error. The connection may fail and then reconnect, a packet may fail to send because of queue full or memory issues. Your application needs to be robust enough to handle that and your use case will determine whether your response is just to lose the packet or to queue it for retry later.
+## Proper Cleanup and Exit ##
 
-T
+The lwIP API is not something that should ideally just be `exit()`ed from. While exiting a program deallocates all resources, networks and servers don't react well when connections are not cleanly set down and the operating system of the calculator gets mad when certain resources aren't reset. Therefore I highly recommend that when you want to exit the program you:
 
+1. Call `_close()` on any active PCBs.
+2. Await acknolwedgement on that where applicable (eg: TCP/ALTCP).
+3. De-register any registered network interfaces (`netif_remove()`).
+4. Call `usb_Cleanup()` to reset USB state to TI-OS default. USB can behave weirdly after program exit if you don't do this.
 
-# Proper Cleanup and Exit #
-
-
-Networked applications 
+At this point it is now safe to exit the program.
