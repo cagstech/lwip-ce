@@ -58,9 +58,8 @@ he documentation for callback-style API is here: https://www.nongnu.org/lwip/2_1
 
 ## Error Handling ##
 
-To be fully stable your application needs to properly handle any errors that may arise. This section describes error handling already implemented at various parts of the network model:
+To be fully stable your application needs to properly handle any errors that may arise. The Ethernet driver has robust error handling including an error recovery mechanism (attempting to reset the USB device while persisting lwIP state). lwIP's stack has its own robust error-handling mechanisms as well.
 
-- **data link**: USB CDC Ethernet drivers implement retries for failed bulk transfers; reaching retry max disables the device which in turn disables lwIP to prevent continued operation on a damaged driver state.
 
 You also need to handle responses to network events -- 
 handle error conditions. The remote host may return an error. The connection may fail and then reconnect, a packet may fail to send because of queue full or memory issues. Your application needs to be robust enough to handle that and your use case will determine whether your response is just to lose the packet or to queue it for retry later.

@@ -128,11 +128,31 @@ void __attribute__((optnone)) outchar(char c)
 ///---------------------------------------------------
 /// @brief interrupt transfer callback function
 usb_error_t
-interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint, usb_transfer_status_t status, size_t transferred, usb_transfer_data_t *data)
+interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
+                           usb_transfer_status_t status,
+                           size_t transferred,
+                           usb_transfer_data_t *data)
 {
     eth_device_t *dev = (eth_device_t *)data;
     uint8_t *ibuf = dev->interrupt.buf;
-    if ((status == USB_TRANSFER_COMPLETED) && transferred)
+    static uint8_t int_retries = 0;
+    if (status)
+    {
+        // much like RX, we will retry a INT USB_CDC_MAX_RETRIES times
+        if(int_retries == USB_CDC_MAX_RETRIES){
+            LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
+                        ("int: endpoint failure, giving up"));
+            // if it fails repeatedly, free the pbuf, disable the device,
+            // and set driver error state
+            usb_DisableDevice(dev->device);
+            eth_disabled_with_error = true;
+            return USB_ERROR_FAILED;
+        }
+        LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
+                    ("int: endpoint failure, retry=%u", int_retries));
+        // increment TX retry counter and queue the transfer again
+        int_retries++;
+    } else if ((status == USB_TRANSFER_COMPLETED) && transferred)
     {
         usb_control_setup_t *notify;
         size_t bytes_parsed = 0;
@@ -156,6 +176,7 @@ interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint, usb_
             }
             bytes_parsed += sizeof(usb_control_setup_t) + notify->wLength;
         } while (bytes_parsed < transferred);
+        int_retries = 0;
     }
     usb_ScheduleInterruptTransfer(dev->interrupt.endpoint, dev->interrupt.buf, INTERRUPT_RX_MAX, interrupt_receive_callback, data);
     return USB_SUCCESS;
@@ -782,7 +803,7 @@ init_success:
         // copy new usb config without destroying netif config
         memcpy(eth, &tmp, sizeof(eth_device_t) - sizeof(struct netif));
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                    ("netif=%c%c%u <- device=%p, RESUME", eth->iface.name[0], eth->iface.name[1], eth->iface.num, device));
+                    ("RESUME, netif=%c%c%u <- device=%p", eth->iface.name[0], eth->iface.name[1], eth->iface.num, device));
     }
     else {
         // ## ELSE CONFIG NEW NETIF ##
@@ -814,7 +835,7 @@ init_success:
         ifnums_used |= 1 << ifnum_assigned;  // set flag marking the ifnum used
         netif_set_hostname(iface, hostname); // set default hostname
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                    ("netif=%c%c%u <- device=%p, NEW", iface->name[0], iface->name[1], iface->num, device));
+                    ("NEW, netif=%c%c%u <- device=%p", iface->name[0], iface->name[1], iface->num, device));
     }
     
     netif_set_up(&eth->iface); // tell lwIP that the interface is ready to receive
