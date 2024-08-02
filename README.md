@@ -50,61 +50,25 @@ Programs using lwIP as a dynamic library need to follow a specific initializatio
         
 # Using the lwIP API # 
 
-**Use the Appropriate API for your Application from the lwIP Docs**: As I value my dwindling sanity, I will not be re-documenting the entire lwIP codebase in here. The documentation for callback-style API is here: https://www.nongnu.org/lwip/2_1_x/group__callbackstyle__api.html. If you require assistance with the API for lwIP, feel free to ask in the [Discord](https://discord.gg/kvcuygqU) or contact the lwIP authors directly using the link above.
+## Callback-Style API ##
 
-Your imagination (and I guess the remaining heap space) on the calculator are your limits. You can use lwIP in literally the same way that you would on a computer or any other device. The only constraint is that you are limited to the *callback-style API*. You cannot use modules such as sockets, netconn and others that require an OS. That doesn't matter much though, as you can use the slightly-lower-level raw API for protocols like TCP, UDP, ICMP, and more. Here is an example of a simple TCP-client application that sets up a network interface, connects to a TCP server, then disconnects. *Note that it does not wait for FIN when disconnecting and in a proper TCP client you must.*
+I'll be direct. lwIP is not a trivial thing to use. As the TI-84+ CE does not possess what qualifies as an operating system for the purposes of lwIP, we are restricted to the use of the raw API, also called the *callback API*. In this framework you declare a resource for a connection, called a *protocol control block (PCB)* and you register callback functions to the PCB for various actions that may occur on that resource -- sent, recvd, connected, error, etc. lwIP handles the routing of those packets and processing of network events on the PCBs, executing the callbacks in response to appropriate event. This means you will need familiarity with callback/event-driven programming to use lwIP.
 
-        #include "lwip/netif.h"     // we will use the netif_find function
-        #include "lwip/tcp.h"       // raw TCP API
-    
-        err_t do_when_connected(void *arg, struct tcp_pcb *tpcb, err_t err);
-    
-        int main(void) {
-            // .. the init logic ..
-    
-            bool do_main_loop = true;
-            struct netif* ethif = NULL;
-            struct tcp_pcb *pcb = tcp_new();
-            do {
-                // code in here to handle your application
-                // keypress detection, rendering graphics, etc
-                if(!ethif){
-                    ethif = netif_find("en0");
-                    if(ethif){
-                        netif_set_default(ethif);   // anything we do defaults to this IF now
-                        ip_addr_t remote = IPADDR4_INIT_BYTES(<ip to connect to>);
-                        if(tcp_connect(pcb, &remote, <port>, do_when_connected) != ERR_OK)
-                            do_error_handle();
-                    }
-                }
-                usb_HandleEvents();
-                sys_check_timeouts();
-            } while(do_main_loop);
-        }
-    
-        // tcp connected callback
-        err_t do_when_connected(void *arg, struct tcp_pcb *tpcb, err_t err){
-            if(err == ERR_OK){
-                printf("connection successful, disconnecting...");
-                if(tcp_close(pcb) != ERR_OK)
-                    printf("disconnect error");
-            }
-            else
-                printf("connect error");
-        }
-    
-        // this is just the tip of the iceberg of how to implement TCP and designed to give
-        // you a feel for how to set it up, not a comprehensive TCP client.
+he documentation for callback-style API is here: https://www.nongnu.org/lwip/2_1_x/group__callbackstyle__api.html. As you will see if you spend any amount of time perusing the documentation you will find that in many places it tells you next to nothing about what functions do. If you require assistance with the API for lwIP, feel free to ask in the [Discord](https://discord.gg/kvcuygqU) or contact the lwIP authors directly using the link above. 
+
+## Error Handling ##
+
+To be fully stable your application needs to properly handle any errors that may arise. This section describes error handling already implemented at various parts of the network model:
+
+- **data link**: USB CDC Ethernet drivers implement retries for failed bulk transfers; reaching retry max disables the device which in turn disables lwIP to prevent continued operation on a damaged driver state.
+
+You also need to handle responses to network events -- 
+handle error conditions. The remote host may return an error. The connection may fail and then reconnect, a packet may fail to send because of queue full or memory issues. Your application needs to be robust enough to handle that and your use case will determine whether your response is just to lose the packet or to queue it for retry later.
+
+T
 
 
 # Proper Cleanup and Exit #
 
-Networked applications are not simple programs where you can just exit with no consequences. An average use of lwIP has timers in effect, callbacks, queued data transfers, packet buffers, control blocks -- a lot of memory-occupying allocated resources. If you just exit without properly setting down these resources... you can imagine the results. You should ideally follow a proper sequence of deinitializing and removing resources.
 
-1. Call the appropriate close() functions on any protocol control blocks. For TCP, await a FIN response from the remote using the callbacks. Wait for connections to PROPERLY close, which causes lwIP to release their resources.
-    
-2. Once all PCBs are confirmed closed, begin to deregister network interfaces. Call `netif_remove()` on any interface that is active.
-    
-3. Call usb_Cleanup() to immediately terminate all pending USB transfers, reset device(s), and free resources associated with the USB driver.
-    
-4. NOW you can exit your application.
+Networked applications 
