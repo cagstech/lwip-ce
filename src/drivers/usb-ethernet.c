@@ -125,6 +125,20 @@ void __attribute__((optnone)) outchar(char c)
 }
 #endif
 
+bool eth_xmit_fatal_error(eth_device_t *dev, uint8_t retries){
+    if(retries == USB_CDC_MAX_RETRIES){
+        LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
+                    ("int: endpoint failure, giving up"));
+        // if it fails repeatedly, free the pbuf, disable the device,
+        // and set driver error state
+        usb_DisableDevice(dev->device);
+        eth_disabled_with_error = true;
+        return true;
+    }
+    return false;
+}
+
+
 ///---------------------------------------------------
 /// @brief interrupt transfer callback function
 usb_error_t
@@ -139,15 +153,8 @@ interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
     if (status)
     {
         // much like RX, we will retry a INT USB_CDC_MAX_RETRIES times
-        if(int_retries == USB_CDC_MAX_RETRIES){
-            LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
-                        ("int: endpoint failure, giving up"));
-            // if it fails repeatedly, free the pbuf, disable the device,
-            // and set driver error state
-            usb_DisableDevice(dev->device);
-            eth_disabled_with_error = true;
+        if(eth_xmit_fatal_error(dev, int_retries))
             return USB_ERROR_FAILED;
-        }
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
                     ("int: endpoint failure, retry=%u", int_retries));
         // increment TX retry counter and queue the transfer again
@@ -196,14 +203,8 @@ usb_error_t bulk_transmit_callback(__attribute__((unused)) usb_endpoint_t endpoi
     {
         // much like RX, we will retry a TX USB_CDC_MAX_RETRIES times
         struct pbuf *tbuf = (struct pbuf*)data;
-        if(tx_retries == USB_CDC_MAX_RETRIES){
-            LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
-                        ("tx: endpoint failure, giving up"));
-            // if it fails repeatedly, free the pbuf, disable the device,
-            // and set driver error state
+        if(eth_xmit_fatal_error(dev, tx_retries)){
             pbuf_free(data);
-            usb_DisableDevice(dev->device);
-            eth_disabled_with_error = true;
             return USB_ERROR_FAILED;
         }
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
@@ -231,20 +232,15 @@ usb_error_t ecm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
     static uint8_t rx_retries = 0;
     if (status)
     {
-        if(rx_retries == USB_CDC_MAX_RETRIES){
-            LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
-                        ("ecm_rx: endpoint failure, giving up"));
-            usb_DisableDevice(dev->device);
-            eth_disabled_with_error = true;
+        if(eth_xmit_fatal_error(dev, rx_retries))
             return USB_ERROR_FAILED;
-        }
+        
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
                     ("ecm_rx: endpoint failure, retry=%u", rx_retries));
         rx_retries++;
-        usb_ScheduleBulkTransfer(dev->rx.endpoint, dev->rx.buf, NCM_RX_NTB_MAX_SIZE, dev->rx.callback, data);
+        usb_ScheduleBulkTransfer(dev->rx.endpoint, dev->rx.buf, ETHERNET_MTU, dev->rx.callback, data);
         return USB_SUCCESS;
-    }
-    if (transferred)
+    } else if (transferred)
     {
         rx_retries = 0;
         struct pbuf *p = pbuf_alloc(PBUF_RAW, transferred, PBUF_POOL);
@@ -376,11 +372,8 @@ usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
     static uint8_t rx_retries = 0;
     if (status)
     {
-        if(rx_retries == USB_CDC_MAX_RETRIES){
-            LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
-                        ("ncm_rx: endpoint failure, giving up"));
-            usb_DisableDevice(dev->device);
-            eth_disabled_with_error = true;
+        if(eth_xmit_fatal_error(dev, rx_retries)){
+            pbuf_free(data);
             return USB_ERROR_FAILED;
         }
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
@@ -804,6 +797,7 @@ init_success:
         memcpy(eth, &tmp, sizeof(eth_device_t) - sizeof(struct netif));
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
                     ("RESUME, netif=%c%c%u <- device=%p", eth->iface.name[0], eth->iface.name[1], eth->iface.num, device));
+        eth_netif_init(&eth->iface);
     }
     else {
         // ## ELSE CONFIG NEW NETIF ##
