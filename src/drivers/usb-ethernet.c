@@ -809,7 +809,7 @@ init_success:
         if (netif_add_noaddr(iface, eth, eth_netif_init, netif_input) == NULL)
         {
             LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_WARNING,
-                        ("netif_add error for device=%p", device));
+                        ("FAILURE, netif=ERR <- device=%p", device));
             free(eth);
             return false;
         }
@@ -885,7 +885,7 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
             netif_set_down(&eth_device->iface);
             if(eth_disabled_with_error){
                 LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
-                            ("device ptr=%p: disabled with error, resetting...", usb_device));
+                            ("device ptr=%p: disabled with error, resetting!", usb_device));
                 usb_ResetDevice(usb_device);
                 eth_disabled_with_error = false;
                 break;
@@ -897,6 +897,8 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
                 free(eth_device);
                 eth_device = NULL;
                 usb_SetDeviceData(usb_device, eth_device);
+                LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
+                            ("device ptr=%p: disconnected", usb_device));
             }
         }
             break;
