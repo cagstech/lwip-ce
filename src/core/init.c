@@ -36,6 +36,7 @@
  */
 
 #include "lwip/opt.h"
+#include "lwip/err.h"
 
 #include "lwip/init.h"
 #include "lwip/stats.h"
@@ -338,9 +339,10 @@ PACK_STRUCT_END
  * Initialize all modules.
  * Use this in NO_SYS mode. Use tcpip_init() otherwise.
  */
-void
+err_t
 lwip_init(void)
 {
+    if(!(usr_malloc && usr_free)) return ERR_SYS_MALLOC_UNSET;
 #ifndef LWIP_SKIP_CONST_CHECK
   int a = 0;
   LWIP_UNUSED_ARG(a);
@@ -387,4 +389,5 @@ lwip_init(void)
 #if LWIP_TIMERS
   sys_timeouts_init();
 #endif /* LWIP_TIMERS */
+    return ERR_OK;
 }

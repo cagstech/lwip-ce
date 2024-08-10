@@ -25,10 +25,6 @@ bool run_main = false;
 bool dhcp_started = false;
 bool httpd_running = false;
 
-void *functable[] {
-#include "functable.inc"
-};
-
 
 void ethif_status_callback_fn(struct netif *netif)
 {
@@ -43,7 +39,9 @@ void ethif_status_callback_fn(struct netif *netif)
 int main(void)
 {
     uint8_t key;
-    lwip_init();
+    lwip_configure_allocator(malloc, free, 1024 * 24);
+    if(lwip_init()!= ERR_OK)
+        return 1;
     os_ClrLCDFull();
     os_HomeUp();
     os_FontSelect(os_SmallFont);

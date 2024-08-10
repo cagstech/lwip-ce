@@ -84,6 +84,77 @@
 #define MEM_SANITY_OVERHEAD 0
 #endif
 
+#if MEM_CUSTOM_ALLOCATOR==1
+
+#define LWIP_HEAP_MAX_DEFAULT   (1024*16)
+#define MEM_MALLOC_HELPER_SIZE  2
+
+void *function_unset(size_t size){
+    LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("internal_error: user malloc/free unset\n"));
+    return NULL;
+}
+
+void* (*usr_malloc)(size_t size) = function_unset;
+void (*usr_free)(void *ptr) = function_unset;
+size_t lwip_heap_max = LWIP_HEAP_MAX_DEFAULT;
+size_t lwip_heap_usage = 0;
+
+void *custom_malloc(size_t size) {
+    if(lwip_heap_usage >= lwip_heap_max) {
+        LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("mem_malloc: did not allocate %"SZT_F" bytes, %"SZT_F"/%"SZT_F" of user-defined heap limit used.\n", size, lwip_heap_usage, lwip_heap_max));
+        return NULL;
+    }
+    void *ptr = usr_malloc(size + MEM_MALLOC_HELPER_SIZE);
+    if (ptr) {
+        *(uint16_t*)ptr = size + MEM_MALLOC_HELPER_SIZE;
+        lwip_heap_usage += size + MEM_MALLOC_HELPER_SIZE;
+        return ptr + MEM_MALLOC_HELPER_SIZE;
+    }
+    return NULL;
+}
+
+void custom_free(void *ptr){
+    if(!usr_free) {
+        LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("mem_free: usr_free unset\n"));
+        return;
+    }
+    if(ptr){
+        uint16_t size = *(uint16_t*)(ptr - MEM_MALLOC_HELPER_SIZE);
+        LWIP_ASSERT("mem_free: heap underflow occurred", size <= lwip_heap_usage);
+        free(ptr - MEM_MALLOC_HELPER_SIZE);
+        lwip_heap_usage -= size;
+    }
+}
+
+void* custom_calloc(mem_size_t count, mem_size_t size)
+{
+    void *p;
+    size_t alloc_size = (size_t)count * (size_t)size;
+    
+    if ((size_t)(mem_size_t)alloc_size != alloc_size) {
+        LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("mem_calloc: could not allocate %"SZT_F" bytes\n", alloc_size));
+        return NULL;
+    }
+    
+    /* allocate 'count' objects of size 'size' */
+    p = mem_malloc((mem_size_t)alloc_size);
+    if (p) {
+        /* zero the memory */
+        memset(p, 0, alloc_size);
+    }
+    return p;
+}
+
+void lwip_configure_allocator(void* (*in_malloc)(size_t),
+                              void (*in_free)(void *ptr),
+                              size_t heap_max){
+    usr_malloc = (in_malloc) ? in_malloc : usr_malloc;
+    usr_free = (in_free) ? in_free : usr_free;
+    lwip_heap_max = (heap_max > LWIP_HEAP_MAX_DEFAULT) ? heap_max : LWIP_HEAP_MAX_DEFAULT;
+}
+
+#endif
+
 #if MEM_OVERFLOW_CHECK || MEMP_OVERFLOW_CHECK
 /**
  * Check if a mep element was victim of an overflow or underflow

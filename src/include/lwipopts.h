@@ -60,11 +60,11 @@
 
 #ifdef LWIP_DEBUG
 
-#define LWIP_USE_CONSOLE_STYLE_PRINTF LWIP_DBG_OFF
+#define LWIP_USE_CONSOLE_STYLE_PRINTF LWIP_DBG_ON
 #define LWIP_DEBUG_LOGFILE LWIP_DBG_OFF
 
 #define LWIP_DBG_MIN_LEVEL 0
-#define ETH_DEBUG LWIP_DBG_OFF
+#define ETH_DEBUG LWIP_DBG_ON
 #define PPP_DEBUG LWIP_DBG_OFF
 #define MEM_DEBUG LWIP_DBG_OFF
 #define MEMP_DEBUG LWIP_DBG_OFF
@@ -97,7 +97,18 @@
 #define LWIP_DBG_TYPES_ON (LWIP_DBG_ON | LWIP_DBG_TRACE | LWIP_DBG_STATE | LWIP_DBG_FRESH | LWIP_DBG_HALT)
 
 /* ---------- Memory options ---------- */
-#define MAX_STACK_MEMORY_USAGE 32768
+// Disable using pools entirely, use user malloc
+#define MEM_USE_POOLS   0
+#define MEM_CUSTOM_ALLOCATOR 1
+#define MEMP_MEM_MALLOC 1
+#if MEM_CUSTOM_ALLOCATOR==1
+#define MEM_CUSTOM_FREE                 custom_free
+#define MEM_CUSTOM_MALLOC               custom_malloc
+#define MEM_CUSTOM_CALLOC               custom_calloc
+
+#endif
+
+#define MAX_HEAP_USAGE 24576
 
 /* MEM_ALIGNMENT: should be set to the alignment of the CPU for which
    lwIP is compiled. 4 byte alignment -> define MEM_ALIGNMENT to 4, 2
@@ -108,12 +119,12 @@
 
 /* MEM_SIZE: the size of the heap memory. If the application will send
 a lot of data that needs to be copied, this should be set high. */
-#define MEM_SIZE (MAX_STACK_MEMORY_USAGE / 2)
+#define MEM_SIZE (MAX_HEAP_USAGE / 2)
 
 /* MEMP_NUM_PBUF: the number of memp struct pbufs. If the application
    sends a lot of data out of ROM (or other static memory), this
    should be set high. */
-#define MEMP_NUM_PBUF 16
+#define MEMP_NUM_PBUF 8
 /* MEMP_NUM_RAW_PCB: the number of UDP protocol control blocks. One
    per active RAW "connection". */
 #define MEMP_NUM_RAW_PCB 1
@@ -151,7 +162,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define PBUF_POOL_BUFSIZE 256
 
 /* PBUF_POOL_SIZE: the number of buffers in the pbuf pool. */
-#define PBUF_POOL_SIZE ((MAX_STACK_MEMORY_USAGE / 2) / PBUF_POOL_BUFSIZE)
+#define PBUF_POOL_SIZE ((MAX_HEAP_USAGE / 2) / PBUF_POOL_BUFSIZE)
 
 /** SYS_LIGHTWEIGHT_PROT
  * define SYS_LIGHTWEIGHT_PROT in lwipopts.h if you want inter-task protection
