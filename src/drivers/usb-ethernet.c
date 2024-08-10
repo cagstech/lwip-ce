@@ -854,10 +854,27 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
                 usb_ResetDevice(usb_device);
             break;
         case USB_DEVICE_ENABLED_EVENT:
-            if (!init_ethernet_usb_device(usb_device))
+            if (init_ethernet_usb_device(usb_device))
             {
                 LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                            ("device ptr=%p: invalid device", usb_device));
+                            ("device ptr=%p, type=usb_ethernet", usb_device));
+                break;
+            }
+            if(usb_GetDeviceFlags(usb_device) & USB_IS_HUB){
+                // add handling for hubs
+                union
+                {
+                    uint8_t bytes[DESCRIPTOR_MAX_LEN];   // allocate 256 bytes for descriptors
+                    usb_configuration_descriptor_t conf; // .. config descriptor alias
+                } descriptor;
+                size_t desc_len = usb_GetConfigurationDescriptorTotalLength(usb_device, 0);
+                size_t xferd;
+                usb_GetConfigurationDescriptor(usb_device, 0, &descriptor.conf, desc_len, &xferd);
+                if(desc_len != xferd) break;
+                usb_SetConfiguration(usb_device, &descriptor.conf, desc_len);
+                LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                            ("device ptr=%p: type=hub", usb_device));
+                break;
             }
             break;
         case USB_DEVICE_DISCONNECTED_EVENT:
@@ -878,6 +895,8 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
                 ifnums_used &= ~(1 << eth_device->iface.num);
                 netif_remove(&eth_device->iface);
                 free(eth_device);
+                eth_device = NULL;
+                usb_SetDeviceData(usb_device, eth_device);
             }
         }
             break;
