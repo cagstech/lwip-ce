@@ -19,7 +19,7 @@
 #include "lwip/apps/httpd.h"
 // due to the build structure of lwIP, "lwip/file.h" corresponds to "include/lwip/file.h"
 
-#include "drivers/usb-ethernet.h"
+#include "drivers/usb_ethernet.h"
 
 bool run_main = false;
 bool dhcp_started = false;

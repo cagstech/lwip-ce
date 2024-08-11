@@ -89,22 +89,25 @@
 #define LWIP_HEAP_MAX_DEFAULT   (1024*16)
 #define MEM_MALLOC_HELPER_SIZE  2
 
+struct mem_configurator mem_settings = {
+    sizeof(struct mem_configurator);
+    function_unset,
+    function_unset,
+    LWIP_HEAP_MAX_DEFAULT
+};
+size_t lwip_heap_usage = 0;
+
 void *function_unset(size_t size){
     LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("internal_error: user malloc/free unset\n"));
     return NULL;
 }
 
-void* (*usr_malloc)(size_t size) = function_unset;
-void (*usr_free)(void *ptr) = function_unset;
-size_t lwip_heap_max = LWIP_HEAP_MAX_DEFAULT;
-size_t lwip_heap_usage = 0;
-
 void *custom_malloc(size_t size) {
-    if(lwip_heap_usage >= lwip_heap_max) {
-        LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("mem_malloc: did not allocate %"SZT_F" bytes, %"SZT_F"/%"SZT_F" of user-defined heap limit used.\n", size, lwip_heap_usage, lwip_heap_max));
+    if(lwip_heap_usage >= mem_settings.heap_max) {
+        LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("mem_malloc: did not allocate %"SZT_F" bytes, %"SZT_F"/%"SZT_F" of user-defined heap limit used.\n", size, lwip_heap_usage, mem_settings.heap_max));
         return NULL;
     }
-    void *ptr = usr_malloc(size + MEM_MALLOC_HELPER_SIZE);
+    void *ptr = mem_settings.in_malloc(size + MEM_MALLOC_HELPER_SIZE);
     if (ptr) {
         *(uint16_t*)ptr = size + MEM_MALLOC_HELPER_SIZE;
         lwip_heap_usage += size + MEM_MALLOC_HELPER_SIZE;
@@ -121,7 +124,7 @@ void custom_free(void *ptr){
     if(ptr){
         uint16_t size = *(uint16_t*)(ptr - MEM_MALLOC_HELPER_SIZE);
         LWIP_ASSERT("mem_free: heap underflow occurred", size <= lwip_heap_usage);
-        free(ptr - MEM_MALLOC_HELPER_SIZE);
+        mem_settings.in_free(ptr - MEM_MALLOC_HELPER_SIZE);
         lwip_heap_usage -= size;
     }
 }
@@ -145,12 +148,10 @@ void* custom_calloc(mem_size_t count, mem_size_t size)
     return p;
 }
 
-void lwip_configure_allocator(void* (*in_malloc)(size_t),
-                              void (*in_free)(void *ptr),
-                              size_t heap_max){
-    usr_malloc = (in_malloc) ? in_malloc : usr_malloc;
-    usr_free = (in_free) ? in_free : usr_free;
-    lwip_heap_max = (heap_max > LWIP_HEAP_MAX_DEFAULT) ? heap_max : LWIP_HEAP_MAX_DEFAULT;
+bool mem_configure(struct mem_configurator &conf){
+    size_t copylen = LWIP_MIN(conf->size, sizeof(struct mem_configurator));
+    memcpy(&mem_settings, conf, copylen);
+    return true;
 }
 
 #endif

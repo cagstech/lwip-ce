@@ -38,6 +38,7 @@
 #include "lwip/opt.h"
 #include "lwip/err.h"
 
+#include "../drivers/usb_ethernet.h"
 #include "lwip/init.h"
 #include "lwip/stats.h"
 #include "lwip/sys.h"
@@ -334,6 +335,8 @@ PACK_STRUCT_END
 #endif /* LWIP_TCP */
 #endif /* !LWIP_DISABLE_TCP_SANITY_CHECKS */
 
+bool lwip_configured = false;
+
 /**
  * @ingroup lwip_nosys
  * Initialize all modules.
@@ -342,7 +345,7 @@ PACK_STRUCT_END
 err_t
 lwip_init(void)
 {
-    if(!(usr_malloc && usr_free)) return ERR_SYS_MALLOC_UNSET;
+    if(!lwip_configured) return ERR_NOT_CONFIGURED;
 #ifndef LWIP_SKIP_CONST_CHECK
   int a = 0;
   LWIP_UNUSED_ARG(a);
@@ -390,4 +393,18 @@ lwip_init(void)
   sys_timeouts_init();
 #endif /* LWIP_TIMERS */
     return ERR_OK;
+}
+
+
+bool lwip_configure(void* (*in_malloc)(size_t),
+                    void (*in_free)(void *ptr),
+                    size_t heap_max,
+                    uint8_t usb_max_retries,
+                    bool usb_reset_device_on_error){
+    if(!mem_configure_allocator(in_malloc, in_free, heap_max))
+        return false;
+    if(!eth_configure(max_retries, usb_reset_device_on_error))
+        return false;
+    lwip_configured = true;
+    return true;
 }

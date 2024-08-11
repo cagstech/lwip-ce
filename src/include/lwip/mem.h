@@ -81,7 +81,16 @@ extern void (*usr_free)(void *ptr);
 void* custom_malloc(size_t size);
 void custom_free(void* ptr);
 void* custom_calloc(size_t num, size_t size);
-// allocator configuration set as an `lwip_` function for forward exposure
+
+
+struct mem_configurator {
+    size_t size;
+    void* (*in_malloc)(size_t);
+    void (*in_free)(void *ptr);
+    size_t heap_max;
+};
+
+bool mem_configure(struct mem_configurator &mem);
 
 #ifdef __cplusplus
 }

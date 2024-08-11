@@ -104,9 +104,7 @@ err_t lwip_init(void);
  *      set everything else to @b NULL.
  * @note @b heap_max has a minimum value of @b 16,384. Trying to set anything lower will set it to that value.
  */
-void lwip_configure_allocator(void* (*in_malloc)(size_t),
-                              void (*in_free)(void *ptr),
-                              size_t heap_max);
+bool lwip_configure();
 
 #ifdef __cplusplus
 }

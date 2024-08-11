@@ -37,6 +37,15 @@ const char hostname[] = "ti84plusce";
 static uint8_t ifnums_used = 0;
 bool eth_disabled_with_error = false;
 
+struct {
+    uint8_t max_retries;
+    bool do_restart_on_error;
+} eth_configuration = {
+    USB_CDC_MAX_RETRIES,
+    true;
+};
+
+
 /// UTF-16 -> hex conversion
 uint8_t
 nibble(uint16_t c)
@@ -126,7 +135,7 @@ void __attribute__((optnone)) outchar(char c)
 #endif
 
 bool eth_xmit_fatal_error(eth_device_t *dev, uint8_t retries){
-    if(retries == USB_CDC_MAX_RETRIES){
+    if(retries == eth_configuration.max_retries){
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
                     ("int: endpoint failure, giving up"));
         // if it fails repeatedly, free the pbuf, disable the device,
@@ -705,7 +714,7 @@ bool init_ethernet_usb_device(usb_device_t device)
                                 
                                 parse_state |= PARSE_HAS_MAC_ADDR;
                             }
-                            else if (!usb_DefaultControlTransfer(device, &get_mac_addr, &tmp.hwaddr[0], USB_CDC_MAX_RETRIES, &xferd_tmp))
+                            else if (!usb_DefaultControlTransfer(device, &get_mac_addr, &tmp.hwaddr[0], eth_configuration.max_retries, &xferd_tmp))
                             {
                                 parse_state |= PARSE_HAS_MAC_ADDR;
                             }
@@ -719,7 +728,7 @@ bool init_ethernet_usb_device(usb_device_t device)
                                 memcpy(&tmp.hwaddr[0], rmac, 6);
                                 tmp.hwaddr[0] &= 0xFE;
                                 tmp.hwaddr[0] |= 0x02;
-                                if (!usb_DefaultControlTransfer(eth->device, &set_mac_addr, &tmp.hwaddr[0], USB_CDC_MAX_RETRIES, &xferd_tmp))
+                                if (!usb_DefaultControlTransfer(eth->device, &set_mac_addr, &tmp.hwaddr[0], eth_configuration.max_retries, &xferd_tmp))
                                 {
                                     parse_state |= PARSE_HAS_MAC_ADDR;
                                 }
@@ -909,6 +918,11 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
             break;
     }
     return USB_SUCCESS;
+}
+
+bool eth_configure(uint8_t retries, bool reset_device_on_error){
+    eth_configuration.max_retries = retries;
+    eth_configuration.do_restart_on_error = reset_device_on_error;
 }
 
 uint8_t eth_get_interfaces(void)
