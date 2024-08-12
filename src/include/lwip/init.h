@@ -94,17 +94,6 @@ extern "C" {
 /* Modules initialization */
 err_t lwip_init(void);
 
-/*************************************************************
- * @brief Configures lwIP to use caller's malloc implementation.
- * @param in_malloc     Pointer to caller's @b malloc function.
- * @param in_free       Pointer to caller's @b free function.
- * @param heap_max      Maximum amount of heap space lwIP is allowed to use.
- * @warning This function must be called before @b lwip_init or it will fail and @b ERR_SYS_MALLOC_UNSET will be returned.
- * @note @b heap_max can be altered on the fly by calling this function again. Provide the new value for @b heap_max and
- *      set everything else to @b NULL.
- * @note @b heap_max has a minimum value of @b 16,384. Trying to set anything lower will set it to that value.
- */
-bool lwip_configure();
 
 #ifdef __cplusplus
 }

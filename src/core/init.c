@@ -335,8 +335,6 @@ PACK_STRUCT_END
 #endif /* LWIP_TCP */
 #endif /* !LWIP_DISABLE_TCP_SANITY_CHECKS */
 
-bool lwip_configured = false;
-
 /**
  * @ingroup lwip_nosys
  * Initialize all modules.
@@ -345,7 +343,6 @@ bool lwip_configured = false;
 err_t
 lwip_init(void)
 {
-    if(!lwip_configured) return ERR_NOT_CONFIGURED;
 #ifndef LWIP_SKIP_CONST_CHECK
   int a = 0;
   LWIP_UNUSED_ARG(a);
@@ -360,7 +357,7 @@ lwip_init(void)
 #if !NO_SYS
   sys_init();
 #endif /* !NO_SYS */
-  mem_init();
+  if(!mem_init()) return ERR_MEM_CONFIG_UNSET;
   memp_init();
   pbuf_init();
   netif_init();
@@ -393,18 +390,4 @@ lwip_init(void)
   sys_timeouts_init();
 #endif /* LWIP_TIMERS */
     return ERR_OK;
-}
-
-
-bool lwip_configure(void* (*in_malloc)(size_t),
-                    void (*in_free)(void *ptr),
-                    size_t heap_max,
-                    uint8_t usb_max_retries,
-                    bool usb_reset_device_on_error){
-    if(!mem_configure_allocator(in_malloc, in_free, heap_max))
-        return false;
-    if(!eth_configure(max_retries, usb_reset_device_on_error))
-        return false;
-    lwip_configured = true;
-    return true;
 }

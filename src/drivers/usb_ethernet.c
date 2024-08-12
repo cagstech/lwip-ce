@@ -30,19 +30,17 @@
 #include "lwip/snmp.h"
 #include "lwip/pbuf.h"
 #include "lwip/dhcp.h"
-#include "usb-ethernet.h" /* Communications Data Class header file */
+#include "usb_ethernet.h" /* Communications Data Class header file */
 
 /// Define Default Hostname for NETIFs
 const char hostname[] = "ti84plusce";
 static uint8_t ifnums_used = 0;
 bool eth_disabled_with_error = false;
 
-struct {
-    uint8_t max_retries;
-    bool do_restart_on_error;
-} eth_configuration = {
+struct eth_configurator eth_conf = {
+    ETH_CONFIGURATOR_V1,
     USB_CDC_MAX_RETRIES,
-    true;
+    true
 };
 
 
@@ -62,80 +60,9 @@ nibble(uint16_t c)
     return 0xff;
 }
 
-/**
- * This provides a rolling debug-output-to-file mechanism.
- * Every 10 seconds the logfile is erased and started over.
- * Only active when ETH_DEBUG is set to LWIP_DBG_ON in lwipopts.h
- * @note Dumps can hit up to 15/20kb. Be sure you have enough memory.
- */
-#if LWIP_DEBUG_LOGFILE == LWIP_DBG_ON
-void debug_log_flush_callback(__attribute__((unused)) void *arg);
-#define ETH_DEBUG_FLUSH_INTERVAL_MS 10000
-#define ETH_DEBUG_MAX_FILE_SIZE 8192
-FILE *eth_logger = NULL;
-
-void debug_init_logfile(void)
-{
-    eth_logger = fopen("lwiplogs", "w");
-    fwrite("TILOGFILE\n", 9, 1, eth_logger);
-    sys_timeout(ETH_DEBUG_FLUSH_INTERVAL_MS, debug_log_flush_callback, NULL);
-}
-
-void debug_log_flush_callback(__attribute__((unused)) void *arg)
-{
-    uint8_t if (ftell(eth_logger) >= ETH_DEBUG_MAX_FILE_SIZE)
-    {
-        fclose(eth_logger);
-        debug_init_logfile();
-    }
-}
-#endif
-
-#if LWIP_USE_CONSOLE_STYLE_PRINTF == LWIP_DBG_ON
-bool outchar_scroll_up = true;
-
-static void newline(void)
-{
-    if (outchar_scroll_up)
-    {
-        memmove(gfx_vram, gfx_vram + (LCD_WIDTH * 10), LCD_WIDTH * (LCD_HEIGHT - 30));
-        gfx_SetColor(255);
-        gfx_FillRectangle_NoClip(0, LCD_HEIGHT - 30, LCD_WIDTH, 10);
-        gfx_SetTextXY(2, LCD_HEIGHT - 30);
-    }
-    else
-        gfx_SetTextXY(2, gfx_GetTextY() + 10);
-}
-
-void __attribute__((optnone)) outchar(char c)
-{
-    if (c == '\n')
-    {
-        newline();
-    }
-    else if (c < ' ' || c > '~')
-    {
-        return;
-    }
-    else
-    {
-        if (gfx_GetTextX() >= LCD_WIDTH - 16)
-        {
-            newline();
-        }
-        gfx_PrintChar(c);
-    }
-#if LWIP_DEBUG_LOGFILE == LWIP_DBG_ON
-    if (!eth_logger)
-        debug_init_logfile();
-    if (eth_logger)
-        fwrite(&c, 1, 1, eth_logger);
-#endif
-}
-#endif
 
 bool eth_xmit_fatal_error(eth_device_t *dev, uint8_t retries){
-    if(retries == eth_configuration.max_retries){
+    if(retries == eth_conf.max_retries){
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
                     ("int: endpoint failure, giving up"));
         // if it fails repeatedly, free the pbuf, disable the device,
@@ -159,6 +86,7 @@ interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
     eth_device_t *dev = (eth_device_t *)data;
     uint8_t *ibuf = dev->interrupt.buf;
     static uint8_t int_retries = 0;
+    static bool default_netif_set = false;
     if (status)
     {
         // much like RX, we will retry a INT USB_CDC_MAX_RETRIES times
@@ -180,10 +108,20 @@ interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
                 switch (notify->bRequest)
                 {
                     case NOTIFY_NETWORK_CONNECTION:
-                        if (notify->wValue)
+                        if (notify->wValue){
                             netif_set_link_up(&dev->iface);
-                        else
+                            if(!default_netif_set){
+                                netif_set_default(&dev->iface);
+                                default_netif_set = true;
+                            }
+                        }
+                        else {
                             netif_set_link_down(&dev->iface);
+                            if(netif_default == &dev->iface){
+                                netif_default = NULL;
+                                default_netif_set = false;
+                            }
+                        }
                         break;
                     case NOTIFY_CONNECTION_SPEED_CHANGE:
                         // this will have no effect - calc too slow
@@ -563,6 +501,13 @@ bool init_ethernet_usb_device(usb_device_t device)
     size_t xferd, parsed_len, desc_len;
     usb_error_t err;
     tmp.device = device;
+    
+    if(ifnums_used == 0b11111111){
+        LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_WARNING,
+                    ("WARNING, device=%p, if_slots full", device));
+        return false;
+    }
+    
     struct
     {
         usb_configuration_descriptor_t *addr;
@@ -714,7 +659,7 @@ bool init_ethernet_usb_device(usb_device_t device)
                                 
                                 parse_state |= PARSE_HAS_MAC_ADDR;
                             }
-                            else if (!usb_DefaultControlTransfer(device, &get_mac_addr, &tmp.hwaddr[0], eth_configuration.max_retries, &xferd_tmp))
+                            else if (!usb_DefaultControlTransfer(device, &get_mac_addr, &tmp.hwaddr[0], eth_conf.max_retries, &xferd_tmp))
                             {
                                 parse_state |= PARSE_HAS_MAC_ADDR;
                             }
@@ -728,7 +673,7 @@ bool init_ethernet_usb_device(usb_device_t device)
                                 memcpy(&tmp.hwaddr[0], rmac, 6);
                                 tmp.hwaddr[0] &= 0xFE;
                                 tmp.hwaddr[0] |= 0x02;
-                                if (!usb_DefaultControlTransfer(eth->device, &set_mac_addr, &tmp.hwaddr[0], eth_configuration.max_retries, &xferd_tmp))
+                                if (!usb_DefaultControlTransfer(eth->device, &set_mac_addr, &tmp.hwaddr[0], eth_conf.max_retries, &xferd_tmp))
                                 {
                                     parse_state |= PARSE_HAS_MAC_ADDR;
                                 }
@@ -790,13 +735,14 @@ init_success:
         if (!CHECK_BIT(ifnums_used, ifnum_assigned))
             break;
     
-    // we are allowed only 8 interfaces with this system
-    if (ifnum_assigned == NETIFS_MAX_ALLOWED)
-    {
-        LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_WARNING,
-                    ("netif not created, all slots in use"));
+#if ETH_DEBUG
+    if(ifnum_assigned == NETIFS_MAX_ALLOWED){
+        // this is a bug because code earlier should detect this condition
+        LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
+                    ("ERROR: Interface assign err. This is a bug. File an issue on https://github.com/cagstech/lwip-ce with the following:\nusb_ethernet.c:731 ifs_used=%u, if_assign=%u", ifnums_used, ifnum_assigned));
         return false;
     }
+#endif
     
     if(usb_GetDeviceData(device)){
         // ## IF DEVICE ALREADY USED FOR NETIF ##
@@ -817,8 +763,8 @@ init_success:
         // add to lwIP list of active netifs (save pointer to eth_device_t too)
         if (netif_add_noaddr(iface, eth, eth_netif_init, netif_input) == NULL)
         {
-            LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_WARNING,
-                        ("FAILURE, netif=ERR <- device=%p", device));
+            LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
+                        ("ERROR, ? netif= <- device=%p, netif add failed", device));
             free(eth);
             return false;
         }
@@ -851,7 +797,7 @@ init_success:
 
 
 usb_error_t
-eth_handle_usb_event(usb_event_t event, void *event_data,
+eth_usb_event_callback(usb_event_t event, void *event_data,
                      __attribute__((unused)) usb_callback_data_t *callback_data)
 {
     usb_device_t usb_device = event_data;
@@ -863,12 +809,6 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
                 usb_ResetDevice(usb_device);
             break;
         case USB_DEVICE_ENABLED_EVENT:
-            if (init_ethernet_usb_device(usb_device))
-            {
-                LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                            ("device ptr=%p, type=usb_ethernet", usb_device));
-                break;
-            }
             if(usb_GetDeviceFlags(usb_device) & USB_IS_HUB){
                 // add handling for hubs
                 union
@@ -882,9 +822,11 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
                 if(desc_len != xferd) break;
                 usb_SetConfiguration(usb_device, &descriptor.conf, desc_len);
                 LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                            ("device ptr=%p: type=hub", usb_device));
+                            ("NEW device=%p, type=hub", usb_device));
                 break;
             }
+            if (init_ethernet_usb_device(usb_device))
+                break;
             break;
         case USB_DEVICE_DISCONNECTED_EVENT:
         case USB_DEVICE_DISABLED_EVENT:
@@ -892,7 +834,7 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
             eth_device_t *eth_device = (eth_device_t *)usb_GetDeviceData(usb_device);
             netif_set_link_down(&eth_device->iface);
             netif_set_down(&eth_device->iface);
-            if(eth_disabled_with_error){
+            if(eth_disabled_with_error && eth_conf.do_reset_on_error){
                 LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
                             ("device ptr=%p: disabled with error, resetting!", usb_device));
                 usb_ResetDevice(usb_device);
@@ -920,10 +862,17 @@ eth_handle_usb_event(usb_event_t event, void *event_data,
     return USB_SUCCESS;
 }
 
-bool eth_configure(uint8_t retries, bool reset_device_on_error){
-    eth_configuration.max_retries = retries;
-    eth_configuration.do_restart_on_error = reset_device_on_error;
+bool eth_configure(struct eth_configurator *conf){
+    if(conf==NULL || (!conf->version))
+        return false;
+    if(conf->version > sizeof(struct eth_configurator)) {
+        LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_WARNING,
+                    ("Newer configuration passed than supported. Some options will have no effect."));
+    }
+    memcpy(&eth_conf, conf, LWIP_MIN(conf->version, sizeof(struct eth_configurator)));
+    return true;
 }
+
 
 uint8_t eth_get_interfaces(void)
 {

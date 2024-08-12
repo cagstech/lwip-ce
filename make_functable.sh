@@ -2,15 +2,12 @@
 
 # Explicitly include headers
 declare -a include_headers=(
-    # ethernet driver
-    "drivers/usb-ethernet.h"
+    "drivers/usb_ethernet.h"
     "include/lwip/etharp.h"
     "include/lwip/ethip6.h"
-    # stats checking
     "include/lwip/igmp.h"
     "include/lwip/snmp.h"
     "include/lwip/stats.h"
-    # ip stuff
     "include/lwip/ip4.h"
     "include/lwip/ip4_addr.h"
     "include/lwip/ip4_frag.h"
@@ -21,11 +18,9 @@ declare -a include_headers=(
     "include/lwip/ip.h"
     "include/lwip/ip_addr.h"
     "include/lwip/autoip.h"
-    # buffers and mem
     "include/lwip/pbuf.h"
     "include/lwip/mem.h"
     "include/lwip/memp.h"
-    # lwip general
     "include/lwip/init.h"
     "include/lwip/netif.h"
     "include/lwip/dhcp.h"
@@ -100,7 +95,7 @@ process_file() {
         skip=0
         if ! grep -Fxq "$line" "$output_functable"; then
             for exclude in "${excluded_functions[@]}"; do
-                if [[ "$exclude" =~ $line ]]; then
+                if [[ "$exclude" == $line ]]; then
                     echo "found $line in excluded_headers, skipping"
                     skip=1
                     break

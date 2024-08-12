@@ -2,8 +2,9 @@ section .rodata
 public _app_library_table
 
 _app_library_table:
+    dl _eth_configure
     dl _eth_get_interfaces
-    dl _eth_handle_usb_event
+    dl _eth_usb_event_callback
     dl _etharp_acd_announce
     dl _etharp_acd_probe
     dl _etharp_cleanup_netif
@@ -34,10 +35,12 @@ _app_library_table:
     dl _stats_display_sys
     dl _stats_init
     dl _ip4_input
+    dl _ip4_output
     dl _ip4_output_if
     dl _ip4_output_if_opt
     dl _ip4_output_if_opt_src
     dl _ip4_output_if_src
+    dl _ip4_route
     dl _ip4_set_default_multicast_netif
     dl _ip4_addr_isbroadcast_u32
     dl _ip4_addr_netmask_valid
@@ -50,6 +53,7 @@ _app_library_table:
     dl _ip_reass_tmr
     dl _ip6_input
     dl _ip6_options_add_hbh_ra
+    dl _ip6_output
     dl _ip6_output_if
     dl _ip6_output_if_src
     dl _ip6_route
@@ -108,14 +112,16 @@ _app_library_table:
     dl _custom_free
     dl _custom_malloc
     dl _mem_calloc
+    dl _mem_configure
     dl _mem_free
     dl _mem_init
     dl _mem_malloc
     dl _mem_trim
     dl _memp_free
     dl _memp_init
-    dl _lwip_configure_allocator
+    dl _memp_malloc
     dl _lwip_init
+    dl _netif_add
     dl _netif_add_ext_callback
     dl _netif_add_ip6_address
     dl _netif_add_noaddr
@@ -135,6 +141,7 @@ _app_library_table:
     dl _netif_name_to_index
     dl _netif_poll
     dl _netif_poll_all
+    dl _netif_remove
     dl _netif_remove_ext_callback
     dl _netif_set_addr
     dl _netif_set_default
@@ -243,6 +250,7 @@ _app_library_table:
     dl _altcp_tcp_new_ip_type
     dl _altcp_tcp_wrap
     dl _tcp_debug_state_str
+    dl _udp_bind
     dl _udp_bind_netif
     dl _udp_connect
     dl _udp_disconnect
@@ -253,10 +261,15 @@ _app_library_table:
     dl _udp_new_ip_type
     dl _udp_recv
     dl _udp_remove
+    dl _udp_send
+    dl _udp_sendto
+    dl _udp_sendto_if
+    dl _udp_sendto_if_src
 
 
+extern _eth_configure
 extern _eth_get_interfaces
-extern _eth_handle_usb_event
+extern _eth_usb_event_callback
 extern _etharp_acd_announce
 extern _etharp_acd_probe
 extern _etharp_cleanup_netif
@@ -287,10 +300,12 @@ extern _stats_display_proto
 extern _stats_display_sys
 extern _stats_init
 extern _ip4_input
+extern _ip4_output
 extern _ip4_output_if
 extern _ip4_output_if_opt
 extern _ip4_output_if_opt_src
 extern _ip4_output_if_src
+extern _ip4_route
 extern _ip4_set_default_multicast_netif
 extern _ip4_addr_isbroadcast_u32
 extern _ip4_addr_netmask_valid
@@ -303,6 +318,7 @@ extern _ip4_reass
 extern _ip_reass_tmr
 extern _ip6_input
 extern _ip6_options_add_hbh_ra
+extern _ip6_output
 extern _ip6_output_if
 extern _ip6_output_if_src
 extern _ip6_route
@@ -361,14 +377,16 @@ extern _custom_calloc
 extern _custom_free
 extern _custom_malloc
 extern _mem_calloc
+extern _mem_configure
 extern _mem_free
 extern _mem_init
 extern _mem_malloc
 extern _mem_trim
 extern _memp_free
 extern _memp_init
-extern _lwip_configure_allocator
+extern _memp_malloc
 extern _lwip_init
+extern _netif_add
 extern _netif_add_ext_callback
 extern _netif_add_ip6_address
 extern _netif_add_noaddr
@@ -388,6 +406,7 @@ extern _netif_loop_output
 extern _netif_name_to_index
 extern _netif_poll
 extern _netif_poll_all
+extern _netif_remove
 extern _netif_remove_ext_callback
 extern _netif_set_addr
 extern _netif_set_default
@@ -496,6 +515,7 @@ extern _altcp_tcp_alloc
 extern _altcp_tcp_new_ip_type
 extern _altcp_tcp_wrap
 extern _tcp_debug_state_str
+extern _udp_bind
 extern _udp_bind_netif
 extern _udp_connect
 extern _udp_disconnect
@@ -506,3 +526,7 @@ extern _udp_new
 extern _udp_new_ip_type
 extern _udp_recv
 extern _udp_remove
+extern _udp_send
+extern _udp_sendto
+extern _udp_sendto_if
+extern _udp_sendto_if_src

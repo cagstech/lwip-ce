@@ -9,6 +9,7 @@
 #include "lwip/init.h"
 #include "lwip/timeouts.h"
 #include "lwip/netif.h"
+#include "lwip/mem.h"
 
 /* These commented out, but may be headers you might wish to enable. */
 // #include "lwip/altcp_tcp.h"
@@ -25,6 +26,44 @@ bool run_main = false;
 bool dhcp_started = false;
 bool httpd_running = false;
 
+#define LWIP_USE_CONSOLE_STYLE_PRINTF
+#ifdef LWIP_USE_CONSOLE_STYLE_PRINTF
+bool outchar_scroll_up = true;
+
+static void newline(void)
+{
+    if (outchar_scroll_up)
+    {
+        memmove(gfx_vram, gfx_vram + (LCD_WIDTH * 10), LCD_WIDTH * (LCD_HEIGHT - 30));
+        gfx_SetColor(255);
+        gfx_FillRectangle_NoClip(0, LCD_HEIGHT - 30, LCD_WIDTH, 10);
+        gfx_SetTextXY(2, LCD_HEIGHT - 30);
+    }
+    else
+        gfx_SetTextXY(2, gfx_GetTextY() + 10);
+}
+
+void __attribute__((optnone)) outchar(char c)
+{
+    if (c == '\n')
+    {
+        newline();
+    }
+    else if (c < ' ' || c > '~')
+    {
+        return;
+    }
+    else
+    {
+        if (gfx_GetTextX() >= LCD_WIDTH - 16)
+        {
+            newline();
+        }
+        gfx_PrintChar(c);
+    }
+}
+#endif
+
 
 void ethif_status_callback_fn(struct netif *netif)
 {
@@ -39,7 +78,14 @@ void ethif_status_callback_fn(struct netif *netif)
 int main(void)
 {
     uint8_t key;
-    lwip_configure_allocator(malloc, free, 1024 * 24);
+    struct mem_configurator memcfg = {
+        MEM_CONFIGURATOR_V1,
+        malloc,
+        free,
+        1024*20
+    };
+    if(!mem_configure(&memcfg))
+        return 1;
     if(lwip_init()!= ERR_OK)
         return 1;
     os_ClrLCDFull();
@@ -50,7 +96,7 @@ int main(void)
     struct netif *ethif = NULL;
 
     /* You should probably handle this function failing */
-    if (usb_Init(eth_handle_usb_event, NULL, NULL, USB_DEFAULT_INIT_FLAGS))
+    if (usb_Init(eth_usb_event_callback, NULL, NULL, USB_DEFAULT_INIT_FLAGS))
         goto exit;
 
     run_main = true;
@@ -65,27 +111,23 @@ int main(void)
         {
             run_main = false;
         }
-        if (ethif == NULL)
+        if (netif_default && (!dhcp_started))
         {
-            if ((ethif = netif_find("en0")))
-            {
-                // run this code if netif exists
-                // eg: dhcp_start(ethif);
-                printf("ethernet if=%c%c%u type=%s registered\n", ethif->name[0], ethif->name[1], ethif->num, (((eth_device_t *)ethif->state)->type == USB_ECM_SUBCLASS) ? "ecm" : "ncm");
-                netif_set_default(ethif);
-                netif_set_status_callback(ethif, ethif_status_callback_fn);
-                dhcp_start(ethif);
-            }
+            // run this code if netif exists
+            // eg: dhcp_start(ethif);
+            printf("default if=%c%c%u registered\n", netif_default->name[0], netif_default->name[1], netif_default->num);
+            netif_set_status_callback(netif_default, ethif_status_callback_fn);
+            dhcp_start(netif_default);
+            dhcp_started = true;
+        }
+        if(!netif_default) {
+            dhcp_started = false;
         }
         usb_HandleEvents();   // usb events
         sys_check_timeouts(); // lwIP timers/event callbacks
     } while (run_main);
     dhcp_release_and_stop(ethif);
 exit:
-    netif_remove(ethif);
-#if ETH_DEBUG_FILE == LWIP_DBG_ON
-    fclose(eth_logger);
-#endif
     usb_Cleanup();
     gfx_End();
     exit(0);
