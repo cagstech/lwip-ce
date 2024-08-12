@@ -40,6 +40,7 @@ bool eth_disabled_with_error = false;
 struct eth_configurator eth_conf = {
     ETH_CONFIGURATOR_V1,
     USB_CDC_MAX_RETRIES,
+    true,
     true
 };
 
@@ -110,6 +111,8 @@ interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
                     case NOTIFY_NETWORK_CONNECTION:
                         if (notify->wValue){
                             netif_set_link_up(&dev->iface);
+                            if(eth_conf.do_start_dhcp_on_all_netifs)
+                                dhcp_start(&dev->iface);
                             if(!default_netif_set){
                                 netif_set_default(&dev->iface);
                                 default_netif_set = true;
