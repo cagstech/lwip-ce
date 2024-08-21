@@ -36,7 +36,9 @@
  */
 
 #include "lwip/opt.h"
+#include "lwip/err.h"
 
+#include "../drivers/usb_ethernet.h"
 #include "lwip/init.h"
 #include "lwip/stats.h"
 #include "lwip/sys.h"
@@ -338,7 +340,7 @@ PACK_STRUCT_END
  * Initialize all modules.
  * Use this in NO_SYS mode. Use tcpip_init() otherwise.
  */
-void
+err_t
 lwip_init(void)
 {
 #ifndef LWIP_SKIP_CONST_CHECK
@@ -355,7 +357,7 @@ lwip_init(void)
 #if !NO_SYS
   sys_init();
 #endif /* !NO_SYS */
-  mem_init();
+  if(!mem_init()) return ERR_MEM_CONFIG_UNSET;
   memp_init();
   pbuf_init();
   netif_init();
@@ -387,4 +389,5 @@ lwip_init(void)
 #if LWIP_TIMERS
   sys_timeouts_init();
 #endif /* LWIP_TIMERS */
+    return ERR_OK;
 }

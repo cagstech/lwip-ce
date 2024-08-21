@@ -38,6 +38,7 @@
 #define LWIP_HDR_INIT_H
 
 #include "lwip/opt.h"
+#include "lwip/err.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -91,7 +92,8 @@ extern "C" {
  */
 
 /* Modules initialization */
-void lwip_init(void);
+err_t lwip_init(void);
+
 
 #ifdef __cplusplus
 }

@@ -69,11 +69,31 @@ typedef u16_t mem_size_t;
 #endif /* MEM_SIZE > 64000 */
 #endif
 
-void  mem_init(void);
+bool  mem_init(void);
 void *mem_trim(void *mem, mem_size_t size);
 void *mem_malloc(mem_size_t size);
 void *mem_calloc(mem_size_t count, mem_size_t size);
 void  mem_free(void *mem);
+
+// custom mem allocation for lwip => pass in program malloc
+extern void* (*usr_malloc)(size_t size);
+extern void (*usr_free)(void *ptr);
+void* custom_malloc(size_t size);
+void custom_free(void* ptr);
+void* custom_calloc(size_t num, size_t size);
+
+
+struct mem_configurator {
+    size_t version;
+    void* (*in_malloc)(size_t);
+    void (*in_free)(void *ptr);
+    size_t heap_max;
+};
+
+#define MEM_CONFIGURATOR_V1     sizeof(struct mem_configurator)
+
+
+bool mem_configure(struct mem_configurator *mem);
 
 #ifdef __cplusplus
 }
