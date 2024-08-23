@@ -5,9 +5,6 @@
 ; include to supported algorithms
 include "share/virtuals.inc"
 include "share/kill_interrupts.inc"
-include "share/helpers.asm"
-include "share/clear_stack.asm"
-include "hash/sha256.asm"
 
 ; ------------------------------------------------------
 ; Define total size of hash context (including state)

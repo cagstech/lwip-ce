@@ -3,14 +3,19 @@
 ; Author: beckadamtheinventor
 ;--------------------------------------------
 
+assume adl=1
+section .text
 include "../share/virtuals.inc"
 include "../share/helpers.asm"
 include "../share/clear_stack.asm"
 include "../share/kill_interrupts.inc"
 
+public hash_sha256_init
+public hash_sha256_update
+public hash_sha256_final
+
 sha256_m_buffer := _sprng_sha_mbuffer
 
-section .text
 ; reverse b longs endianness from iy to hl
 _sha256_reverse_endianness:
 	ld a, (iy + 0)
@@ -258,8 +263,7 @@ _ROTRIGHT:
 	djnz .
 	ret
 
-section .text
-public hash_sha256_init
+
 ; initialize sha256 hash state
 hash_sha256_init:
 	pop iy,de
@@ -273,8 +277,7 @@ hash_sha256_init:
 	ld a, 1
 	jp (iy)
 
-section .text
-public hash_sha256_update
+
 hash_sha256_update:
 	save_interrupts
 	call ti._frameset0
@@ -328,8 +331,7 @@ _sha256_update_apply_transform:
 	ld de, (ix + 6)
 	ret
  
- section .text
- public hash_sha256_final
+
  hash_sha256_final:
 	save_interrupts
 	ld hl,-_sha256ctx_size
@@ -773,3 +775,6 @@ _sha256_transform:
 	ld sp,ix
 	pop ix
 	ret
+
+
+extern u64_addi

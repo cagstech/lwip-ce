@@ -3,19 +3,20 @@
 ; Author: nefariousarcher, beckadamtheinventor
 ;--------------------------------------------
 ; include to supported algorithms
-include "share/virtuals.inc"
-include "share/clear_stack.asm"
-include "share/kill_interrupts.inc"
-include "hash/sha256.asm"
+
 
 assume adl=1
-;-------------------------
+section .text
 
+include "share/virtuals.inc"
+include "share/kill_interrupts.inc"
 
- section .text
+public _tls_random_init_entropy
+public _tls_random
+public _tls_random_bytes
+
 ;-------------------------------------
 ; bool tls_random_init_entropy(void);
-    public  _tls_random_init_entropy
 _tls_random_init_entropy:
     ld hl, $D65800
     ld iy, 0
@@ -73,7 +74,6 @@ _tls_random_init_entropy:
     ret
 
 
-section .text
 ;--------------------------------------
 ; uint64_t tls_random(void);
     public _tls_random
@@ -169,10 +169,9 @@ _tls_random:
     ld hl,(hl)
     ret
 
-section .text
+
 ; -----------------------------------------------
 ; void* tls_random_bytes(void* buf, size_t len);
-    public _tls_random_bytes
 _tls_random_bytes:
     save_interrupts
     ld hl,-3
@@ -208,3 +207,8 @@ _tls_random_bytes:
     pop ix
     ret
 
+
+extern hash_sha256_init
+extern hash_sha256_update
+extern hash_sha256_final
+extern clear_stack

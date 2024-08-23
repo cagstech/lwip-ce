@@ -4,10 +4,7 @@
 ;--------------------------------------------
 ; include to supported algorithms
 include "share/virtuals.inc"
-include "share/helpers.asm"
-include "share/clear_stack.asm"
 include "share/kill_interrupts.inc"
-include "hash/sha256.asm"
 
 
 ; ------------------------------------------------------
