@@ -5,16 +5,15 @@
 
 assume adl=1
 section .text
+
 include "../share/virtuals.inc"
-include "../share/helpers.asm"
-include "../share/clear_stack.asm"
 include "../share/kill_interrupts.inc"
 
 public hash_sha256_init
 public hash_sha256_update
 public hash_sha256_final
 
-sha256_m_buffer := _sprng_sha_mbuffer
+_sha256_m_buffer := _sprng_sha_mbuffer
 
 ; reverse b longs endianness from iy to hl
 _sha256_reverse_endianness:
@@ -778,3 +777,8 @@ _sha256_transform:
 
 
 extern u64_addi
+extern hash_sha256_init
+extern hash_sha256_update
+extern hash_sha256_final
+extern clear_stack
+extern __frameset

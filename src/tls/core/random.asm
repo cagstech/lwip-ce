@@ -76,7 +76,6 @@ _tls_random_init_entropy:
 
 ;--------------------------------------
 ; uint64_t tls_random(void);
-    public _tls_random
 _tls_random:
     save_interrupts
 ; set rand to 0
@@ -175,7 +174,7 @@ _tls_random:
 _tls_random_bytes:
     save_interrupts
     ld hl,-3
-    call ti._frameset
+    call __frameset
     ld hl,(ix+6)
     ld (ix-3),hl ; temp pointer
 .loop:
@@ -212,3 +211,4 @@ extern hash_sha256_init
 extern hash_sha256_update
 extern hash_sha256_final
 extern clear_stack
+extern __frameset

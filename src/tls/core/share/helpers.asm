@@ -1,8 +1,10 @@
 
 assume adl=1
-
 section .text
+
 public _indcallhl
+
+
 ;-------------------------
 ; call hl
 _indcallhl:

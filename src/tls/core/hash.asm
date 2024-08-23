@@ -79,7 +79,7 @@ _tls_hash_update:
 ; in: context, data, len
 ; out: bool
 ; destroys: hl, bc, ix, iy, a, flags
-	call  ti._frameset0
+	call  __frameset0
 	; (ix+0) return vector
 	; (ix+3) old ix
 	; (ix+6) context
@@ -125,7 +125,7 @@ _tls_hash_digest:
 ; out: bool
 ; destroys: hl, bc, ix, iy, a, flags
 	ld hl, -tls_hash_context_state_size
-	call ti._frameset0
+	call __frameset0
 	; (ix+0) return vector
 	; (ix+3) old ix
 	; (ix+6) context
@@ -163,23 +163,22 @@ _tls_hash_digest:
 
 ; LUT for hash digest lengths
 tls_hash_digest_len:
-;	db 20
 	db 32
 
 ; LUT for hash init
 tls_hash_init_funcs:
 	dl hash_sha256_init
-	; dl hash_sha384_init
 
 ; LUT for hash update
 tls_hash_update_funcs:
 	dl hash_sha256_update
-	; dl hash_sha384_update
 
 ; LUT for hash digest
 tls_hash_digest_funcs:
 	dl hash_sha256_digest
-	; dl hash_sha384_digest
-
 
 extern _malloc
+extern hash_sha256_init
+extern hash_sha256_update
+extern hash_sha256_final
+extern __frameset0
