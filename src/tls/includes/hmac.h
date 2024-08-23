@@ -8,6 +8,8 @@
 #ifndef tls_hmac_h
 #define tls_hmac_h
 
+#include <stdint.h>
+
 enum {
 	TLS_HMAC_SHA256
 	// TLS_HASH_SHA384 ??

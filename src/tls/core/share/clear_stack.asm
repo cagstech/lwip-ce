@@ -1,4 +1,7 @@
-export stack_clear
+assume adl=1
+
+section .text
+public stack_clear
 
 ?stackBot		:= 0D1987Eh
 ; use to erase the stack to prevent buffer leak side-channel attack

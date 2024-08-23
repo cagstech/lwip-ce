@@ -3,21 +3,12 @@
 ; Author: acagliano
 ;--------------------------------------------
 ; include to supported algorithms
-include "sha256.asm"
+include "share/virtuals.inc"
+include "share/helpers.asm"
+include "share/clear_stack.asm"
+include "share/kill_interrupts.inc"
+include "hash/sha256.asm"
 
-;------------------------------------
-; Public Functions
-export _tls_hmac_context_create
-export _tls_hmac_update
-export _tls_hmac_digest
-
-;-------------------------
-; call hl
-_indcallhl:
-; Calls HL
-; Inputs:
-;  HL : Address to call
-	jp	(hl)
 
 ; ------------------------------------------------------
 ; Define total size of hash context (including state)

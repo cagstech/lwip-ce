@@ -1,34 +1,16 @@
 ;--------------------------------------------
-include "../helpers/bigint.asm"
-include "../helpers/clear_stack.asm
-include "../helpers/kill_interrupts.asm"
-;--------------------------------------------
 ; SHA-256 EZ80 implementation
 ; Author: beckadamtheinventor
 ;--------------------------------------------
-; export hash_sha256_init
-; export hash_sha256_update
-; export hash_sha256_final
 
-;------------------------------------------
-; defines
+include "../share/virtuals.inc"
+include "../share/helpers.asm"
+include "../share/clear_stack.asm"
+include "../share/kill_interrupts.inc"
 
-_indcallhl:
-; Calls HL
-; Inputs:
-;  HL : Address to call
-	jp	(hl)
+sha256_m_buffer := _sprng_sha_mbuffer
 
-;--------------------------------
-; SHA256_CTX
-virtual at 0
-	sha256_offset_data     rb 64
-	sha256_offset_datalen  rb 1
-	sha256_offset_bitlen   rb 8
-	sha256_offset_state    rb 4*8
-	_sha256ctx_size:
-end virtual
-
+section .text
 ; reverse b longs endianness from iy to hl
 _sha256_reverse_endianness:
 	ld a, (iy + 0)
@@ -276,6 +258,8 @@ _ROTRIGHT:
 	djnz .
 	ret
 
+section .text
+public hash_sha256_init
 ; initialize sha256 hash state
 hash_sha256_init:
 	pop iy,de
@@ -289,6 +273,8 @@ hash_sha256_init:
 	ld a, 1
 	jp (iy)
 
+section .text
+public hash_sha256_update
 hash_sha256_update:
 	save_interrupts
 	call ti._frameset0
@@ -342,6 +328,8 @@ _sha256_update_apply_transform:
 	ld de, (ix + 6)
 	ret
  
+ section .text
+ public hash_sha256_final
  hash_sha256_final:
 	save_interrupts
 	ld hl,-_sha256ctx_size
@@ -785,12 +773,3 @@ _sha256_transform:
 	ld sp,ix
 	pop ix
 	ret
-
-
-; nothing in here needs to be state-guarded
-virtual at $E30800
-	_tls_random_reserved0   rb 119
-	_tls_random_reserved1   rb 32
-	_sha256_m_buffer        rb (64*4)
-	; tls_random_reservedN
-end virtual

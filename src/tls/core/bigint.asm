@@ -1,4 +1,8 @@
 
+assume adl=1
+
+section .text
+public u64_addi
 ; void u64_addi(uint64_t *a, uint64_t *b);
 u64_addi:
 	pop bc,hl,de
