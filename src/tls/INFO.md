@@ -3,7 +3,7 @@
 
 ## True Random Number Generator ##
 
-#### Source-Finding Algorithm ####
+### Source-Finding Algorithm ###
 - Poll 513 bytes starting at $D65800 - unmapped memory.
 - Repeat 256 times per byte:
     - Xor two consecutive reads from byte together
@@ -13,7 +13,7 @@
 - If selected score less than `256 * 8 / 3`, return false.
 - Else return true.
 
-#### Entropy Extraction Algorithm ####
+### Entropy Extraction Algorithm ###
 - For each byte in a 119-byte entropy pool:
     - Read from selected source address once
     - Read 16 more times xoring into cumulative result
@@ -22,7 +22,7 @@
 - Compress output hash into a `uint64_t` by xoring 4 bytes of the digest into a each byte of the `uint64_t`.
 - Return the resulting `uint64_t`.
 
-#### Approximate Entropy of Generator ####
+### Approximate Entropy of Generator ###
 - I will approximate minimum entropy for the source using the minimum score like so:
     - P0 = probability 0s = `(256 * 8 / 3) / (256 * 8)` = 0.333
     - P1 = probability 1s = `1 - P0` = 0.667
