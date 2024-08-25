@@ -11,7 +11,7 @@ True Random Number Generator
     - Xor two consecutive reads from byte together
     - Add number of set bits to a "score".
     - If new score better than current, set new score.
-- If selected score less than `256 * 8 / 3`.
+- If selected score less than `256 * 8 / 3`, return error.
 - I will approximate minimum entropy for the source using the minimum score like so:
     - P0 = probability 0s = `(256 * 8 / 3) / (256 * 8)` = 0.333
     - P1 = probability 1s = `1 - P0` = 0.667
