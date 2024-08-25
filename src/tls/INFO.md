@@ -24,7 +24,7 @@ True Random Number Generator
     - H[low-high] = `[0.842-0.994] bits/byte`
     - H[low] on a 119-byte pool yields 100.2 bits of entropy, sufficient for a u64.
     - *This is an estimate based on minimum allowed score. Actual source may be higher.*
-    - *It should be noted that Cemetech user `Zeroko` ran Dieharders on 1G of data extracted directly from an entropic source in the unmapped region (using our extraction process and it passed all tests.*
+    - *It should be noted that Cemetech user `Zeroko` ran Dieharders on 1G of data extracted directly from an entropic source in the unmapped region (using our extraction process) and it passed all tests.*
 
 
 https://www.rfc-editor.org/rfc/pdfrfc/rfc8446.txt.pdf
