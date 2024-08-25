@@ -3,10 +3,13 @@
 
 ## True Random Number Generator ##
 
+### Source of Randomness ###
+Unmapped memory is a region of memory that lacks memory cells and exhibits fluctuations in voltage affecting the value of bits caused by bus noise (Cemetech user `Zeroko` suggests this is quantum in nature). Because there are no memory cells, the controller attempts to pull the voltage on the lines closer to neutral but not necessarily reaching it (which can result in some correlation across subsequent reads).
+
 ### Source-Finding Algorithm ###
 - Poll 513 bytes starting at $D65800 - unmapped memory.
 - Repeat 256 times per byte:
-    - Xor two consecutive reads from byte together
+    - Xor two consecutive reads from byte together.
     - Add number of set bits to a "score".
     - If new score better than current, set new score.
 - Save address with highest score.
@@ -15,8 +18,8 @@
 
 ### Entropy Extraction Algorithm ###
 - For each byte in a 119-byte entropy pool:
-    - Read from selected source address once
-    - Read 16 more times xoring into cumulative result
+    - Read from selected source address once.
+    - Read 16 more times xoring into cumulative result (to offset correlation).
     - Write to current location in pool.
 - Feed entropy pool to SHA-256 hash.
 - Compress output hash into a `uint64_t` by xoring 4 bytes of the digest into a each byte of the `uint64_t`.
