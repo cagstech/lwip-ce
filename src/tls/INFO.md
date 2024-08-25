@@ -19,9 +19,9 @@ True Random Number Generator
     - H = `(P0 * log2(1/P0)) + (P1 * log2(1/P1))`
     - H = `(0.333 * log2(1/0.333)) + (0.667 * log2(1/0.667))`
     - H = `(0.333 * 1.586) + (0.667 * 0.584)`
-    - E = `1.9 * sqrt((0.333 * (1 - 0.333)) / 512) = 0.040`
-    - H = 0.918 +/- 0.040 bits/byte
-    - H(low-high) = [0.878-0.958] bits/byte
+    - E = `1.9 * sqrt((0.333 * (1 - 0.333)) / 256) = 0.056`
+    - H = 0.918 +/- 0.056 bits/byte
+    - H(low-high) = [0.862-0.974] bits/byte
     - *this is an estimate based on minimum allowed score. Actual source may be higher.*
 
 
