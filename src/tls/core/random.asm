@@ -126,19 +126,19 @@ _tls_random:
 ; hash the entropy pool sha256
     ld hl, _sprng_hash_ctx
     push hl
-    call hash_sha256_init
+    call _tls_sha256_init
     pop bc
     ld hl, 119
     push hl
     ld hl, _sprng_entropy_pool
     push hl
     push bc
-    call hash_sha256_update
+    call _tls_sha256_update
     pop bc, hl, hl
     ld hl, _sprng_sha_digest
     push hl
     push bc
-    call hash_sha256_final
+    call _tls_sha256_digest
     pop bc, hl
 
 ; xor hash cyclically into uint64_t
@@ -217,7 +217,7 @@ _tls_random_bytes:
     ret
 
 
-extern hash_sha256_init
-extern hash_sha256_update
-extern hash_sha256_final
+extern _tls_sha256_init
+extern _tls_sha256_update
+extern _tls_sha256_digest
 extern __frameset

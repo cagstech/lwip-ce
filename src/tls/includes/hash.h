@@ -10,24 +10,40 @@
 
 #include <stdint.h>
 
-enum {
-	TLS_HASH_SHA256
-	// TLS_HASH_SHA384 ??
+/// @def Defines digest length of SHA-256
+#define TLS_SHA256_DIGEST_LEN   32
+
+/// @struct Defines context structure for SHA-256
+struct tls_context_sha256 {
+    uint8_t data[64];
+    uint8_t datalen;
+    uint64_t bitlen;
+    uint32_t state[8];
 };
 
-struct tls_hash {
-	uint8_t algorithm_id;
-	uint8_t digest_len;
-	uint8_t state[];
-};
+/*********************************************
+ * @brief Initializes SHA-256 context.
+ * @param context Pointer to a @b tls_context_sha256.
+ * @returns Always @b true. This should never fail.
+ */
+bool tls_sha256_init(struct tls_context_sha256 *context);
 
-// avoiding static allocation for contexts in lwip where possible
-struct tls_hash *tls_hash_context_create(uint8_t algorithm_id);
-bool tls_hash_update(struct tls_hash *context, const void *data, size_t len);
-bool tls_hash_digest(struct tls_hash *context, void *digest);
+/*********************************************
+ * @brief Updates the SHA-256 context for given data.
+ * @param context Pointer to a @b tls_context_sha256.
+ * @param data    Pointer to data to hash.
+ * @param len      Length of data to hash.
+ * @returns \p context is updated.
+ */
+void tls_sha256_update(struct tls_context_sha256 *context, const void *data, size_t len);
 
+/*********************************************
+ * @brief Returns a digest from the current context state.
+ * @param context       Pointer to a @b tls_context_sha256.
+ * @param digest        Pointer to buffer to write digest to.
+ */
+void tls_sha256_digest(struct tls_context_sha256 *context, void *digest);
 
-// moving this to an hmac module
 
 
 

@@ -6,12 +6,12 @@
 assume adl=1
 section .text
 
-include "../share/virtuals.inc"
-include "../share/nointerrupts.inc"
+include "share/virtuals.inc"
+include "share/nointerrupts.inc"
 
-public hash_sha256_init
-public hash_sha256_update
-public hash_sha256_final
+public _tls_sha256_init
+public _tls_sha256_update
+public _tls_sha256_digest
 
 _sha256_m_buffer := _sprng_sha_mbuffer
 
@@ -264,7 +264,7 @@ _ROTRIGHT:
 
 
 ; initialize sha256 hash state
-hash_sha256_init:
+_tls_sha256_init:
 	pop iy,de
 	push de
 	ld hl,$FF0000
@@ -276,8 +276,8 @@ hash_sha256_init:
 	ld a, 1
 	jp (iy)
 
-
-hash_sha256_update:
+; update sha256 hash state
+_tls_sha256_update:
 	save_interrupts
 	call __frameset0
 	; (ix + 0) RV
@@ -305,7 +305,7 @@ hash_sha256_update:
 	ld iy, (ix + 6)
 	ld (iy + sha256_offset_datalen), a		   ;save current datalen
 	pop ix
-	restore_interrupts hash_sha256_update
+	restore_interrupts _tls_sha256_update
 	ret
  
  _sha256_update_loop:
@@ -330,8 +330,8 @@ _sha256_update_apply_transform:
 	ld de, (ix + 6)
 	ret
  
-
- hash_sha256_final:
+; return sha256 digest
+_tls_sha256_digest:
 	save_interrupts
 	ld hl,-_sha256ctx_size
 	call __frameset
@@ -405,7 +405,7 @@ _sha256_final_pad_message_len_loop:
 	call _sha256_reverse_endianness
 	ld sp,ix
 	pop ix
-	restore_interrupts hash_sha256_final
+	restore_interrupts _tls_sha256_digest
 	ret
  
  ; #define SIG0(x) (ROTRIGHT(x,7) ^ ROTRIGHT(x,18) ^ ((x) >> 3))
@@ -858,8 +858,6 @@ _sha256_state_init:
 	dd	2756734187
 	dd	3204031479
 	dd	3329325298
-
-
 
 extern u64_addi
 extern __frameset0
