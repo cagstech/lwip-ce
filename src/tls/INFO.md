@@ -19,9 +19,10 @@ True Random Number Generator
     - H = `(P0 * log2(1/P0)) + (P1 * log2(1/P1))`
     - H = `(0.333 * log2(1/0.333)) + (0.667 * log2(1/0.667))`
     - H = `(0.333 * 1.586) + (0.667 * 0.584) = 0.918`
-    - E = `1.96 * sqrt((0.333 * (1 - 0.333)) / 256) = 0.058` margin of error at 95% confidence
-    - H = `0.918 +/- 0.058 bits/byte`
-    - H(low-high) = `[0.860-0.976] bits/byte`
+    - E = `2.576 * sqrt((0.333 * (1 - 0.333)) / 256) = 0.076` margin of error at 99% confidence
+    - H = `0.918 +/- 0.076 bits/byte`
+    - H[low-high] = `[0.842-0.994] bits/byte`
+    - H[low] on a 119-byte pool yields 100.2 bits of entropy, sufficient for a u64.
     - *this is an estimate based on minimum allowed score. Actual source may be higher.*
 
 
