@@ -1,0 +1,71 @@
+name: Unit Tests
+
+on:
+  push:
+    branches:
+      - tls
+    paths:
+      - src/tls/*
+  workflow_dispatch:
+
+env:
+  AUTOTESTER_ROM: ${{github.workspace}}/secrets/CE.rom
+  SECRETS_PATH: ${{github.workspace}}/secrets
+  LWIP_TESTS: ${{github.workspace}}/lwip-ce/tests
+  CEMU_PATH: ${{github.workspace}}/CEmu
+  HOST_DOMAIN: "http://cagstech.com"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp' ]
+        
+    steps:
+      - name: Checkout TLS branch
+        uses: actions/checkout@tls
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y make tar
+        
+      - name: Download and extract CEdev
+        run: |
+          curl -sL github.com/CE-Programming/toolchain/releases/download/v11.2/CEdev-Linux.tar.gz | tar xz
+          
+      - name: Add CEdev to PATH
+        run: |
+          echo "CEdev/bin" >> $GITHUB_PATH
+          echo $GITHUB_PATH
+
+      - name: Download and extract CEmu
+        run: |
+          curl -sL https://download.opensuse.org/repositories/home:/adriweb:/CEmu/xUbuntu_24.04/amd64/cemu_1.3-0_amd64.deb | sudo dpkg -i
+      - name: Build Autotester CLI
+        run: make -j4 -C ${{env.CEMU_PATH}}/tests/autotester
+      - name: Install Autotester CLI
+        run: cmake -E copy ${{env.CEMU_PATH}}/tests/autotester/autotester ${{env.CEDEV_BIN}}/cemu-autotester
+
+      - name: Download CEmu Rom
+        id: download-secrets
+        uses: carlosperate/download-file-action@v1.0.3
+        with:
+          file-url: ${{env.HOST_DOMAIN}}/resources/CE.rom
+          location: ${{env.SECRETS_PATH}}
+
+      - name: Run Unit Tests
+        run: |
+          find ${{env.LWIP_TESTS}} -name autotest.json -print0 | {
+            failed=0
+            while read -d '' test; do
+              make -C $(dirname $test) test || cmake -E true $((failed += $?))
+            done
+            cmake -E echo "$failed tests failed"
+            exit $failed
+          }
+
+      - name: Remove CEmu Rom
+        if: always()
+        run: cmake -E rm -rf ${{env.SECRETS_PATH}}
