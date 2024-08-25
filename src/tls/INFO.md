@@ -18,10 +18,10 @@ True Random Number Generator
     - *vice versa doesn't affect the computation*
     - H = `(P0 * log2(1/P0)) + (P1 * log2(1/P1))`
     - H = `(0.333 * log2(1/0.333)) + (0.667 * log2(1/0.667))`
-    - H = `(0.333 * 1.586) + (0.667 * 0.584)`
+    - H = `(0.333 * 1.586) + (0.667 * 0.584) = 0.918`
     - E = `1.96 * sqrt((0.333 * (1 - 0.333)) / 256) = 0.058` margin of error at 95% confidence
-    - H = 0.918 +/- 0.058 bits/byte
-    - H(low-high) = [0.860-0.976] bits/byte
+    - H = `0.918 +/- 0.058 bits/byte`
+    - H(low-high) = `[0.860-0.976] bits/byte`
     - *this is an estimate based on minimum allowed score. Actual source may be higher.*
 
 
