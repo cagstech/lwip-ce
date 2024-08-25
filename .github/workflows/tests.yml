@@ -22,11 +22,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'c' ]
+        language: [ 'cpp' ]
         
     steps:
       - name: Checkout TLS branch
-        uses: actions/checkout@tls
+        uses: actions/checkout@v4
+        with:
+          ref: 'tls'
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y make tar
@@ -42,7 +44,9 @@ jobs:
 
       - name: Download and extract CEmu
         run: |
-          curl -sL https://download.opensuse.org/repositories/home:/adriweb:/CEmu/xUbuntu_24.04/amd64/cemu_1.3-0_amd64.deb | sudo dpkg -i
+          curl -O https://download.opensuse.org/repositories/home:/adriweb:/CEmu/xUbuntu_24.04/amd64/cemu_1.3-0_amd64.deb
+          dpkg -i cemu_1.3-0_amd64.deb
+          
       - name: Build Autotester CLI
         run: make -j4 -C ${{env.CEMU_PATH}}/tests/autotester
       - name: Install Autotester CLI
