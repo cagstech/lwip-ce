@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'c' ]
+        language: [ 'cpp' ]
         
     steps:
       - name: Checkout TLS branch
