@@ -2,9 +2,17 @@
 ; tls_Hash frontend EZ80 implementation
 ; Author: acagliano
 ;--------------------------------------------
+assume adl=1
+
+section .text
+
 ; include to supported algorithms
 include "share/virtuals.inc"
-include "share/kill_interrupts.inc"
+include "share/nointerrupts.inc"
+
+public _tls_hash_context_create
+public _tls_hash_update
+public _tls_hash_digest
 
 ; ------------------------------------------------------
 ; Define total size of hash context (including state)
@@ -22,7 +30,7 @@ end virtual
 
 ;----------------------------------------------------------------------
 ; struct tls_Hash *tls_hash_context_create(uint8_t algorithm_id);
-_tls_hash_context_create;
+_tls_hash_context_create:
 ; dynamically allocates a tls_Hash context for use with the Hash api.
 ; in = algorithm_id
 ; out = *tls_Hash

@@ -7,7 +7,7 @@ assume adl=1
 section .text
 
 include "../share/virtuals.inc"
-include "../share/kill_interrupts.inc"
+include "../share/nointerrupts.inc"
 
 public hash_sha256_init
 public hash_sha256_update
@@ -279,7 +279,7 @@ hash_sha256_init:
 
 hash_sha256_update:
 	save_interrupts
-	call ti._frameset0
+	call __frameset0
 	; (ix + 0) RV
 	; (ix + 3) old IX
 	; (ix + 6) arg1: ctx
@@ -334,7 +334,7 @@ _sha256_update_apply_transform:
  hash_sha256_final:
 	save_interrupts
 	ld hl,-_sha256ctx_size
-	call ti._frameset
+	call __frameset
 	; ix-_sha256ctx_size to ix-1
 	; (ix + 0) Return address
 	; (ix + 3) saved IX
@@ -485,7 +485,7 @@ _sha256_transform:
 ._i := -41
 ._frame_offset := -41
 	ld hl,._frame_offset
-	call ti._frameset
+	call __frameset
 	ld hl,_sha256_m_buffer
 	add hl,bc
 	or a,a
@@ -775,10 +775,92 @@ _sha256_transform:
 	pop ix
 	ret
 
+_sha256_state_init:
+	dl 648807
+	db 106
+	dl 6794885
+	db -69
+	dl 7271282
+	db 60
+	dl 5240122
+	db -91
+	dl 938623
+	db 81
+	dl 354444
+	db -101
+	dl -8136277
+	db 31
+	dl -2044647
+	db 91
+ 
+ _sha256_k:
+	dd	1116352408
+	dd	1899447441
+	dd	3049323471
+	dd	3921009573
+	dd	961987163
+	dd	1508970993
+	dd	2453635748
+	dd	2870763221
+	dd	3624381080
+	dd	310598401
+	dd	607225278
+	dd	1426881987
+	dd	1925078388
+	dd	2162078206
+	dd	2614888103
+	dd	3248222580
+	dd	3835390401
+	dd	4022224774
+	dd	264347078
+	dd	604807628
+	dd	770255983
+	dd	1249150122
+	dd	1555081692
+	dd	1996064986
+	dd	2554220882
+	dd	2821834349
+	dd	2952996808
+	dd	3210313671
+	dd	3336571891
+	dd	3584528711
+	dd	113926993
+	dd	338241895
+	dd	666307205
+	dd	773529912
+	dd	1294757372
+	dd	1396182291
+	dd	1695183700
+	dd	1986661051
+	dd	2177026350
+	dd	2456956037
+	dd	2730485921
+	dd	2820302411
+	dd	3259730800
+	dd	3345764771
+	dd	3516065817
+	dd	3600352804
+	dd	4094571909
+	dd	275423344
+	dd	430227734
+	dd	506948616
+	dd	659060556
+	dd	883997877
+	dd	958139571
+	dd	1322822218
+	dd	1537002063
+	dd	1747873779
+	dd	1955562222
+	dd	2024104815
+	dd	2227730452
+	dd	2361852424
+	dd	2428436474
+	dd	2756734187
+	dd	3204031479
+	dd	3329325298
+
+
 
 extern u64_addi
-extern hash_sha256_init
-extern hash_sha256_update
-extern hash_sha256_final
-extern clear_stack
+extern __frameset0
 extern __frameset

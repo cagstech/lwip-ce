@@ -1,3 +1,10 @@
+; -----------------------------------
+; ===== Side-Channel Resistance =====
+; -- saves and disables interrupts --
+; macros to disable system interrupts in code
+; prevents the possible use of USB sideloading
+; to view memory during encryption/decryption
+
 ;------------------------------------------
 ; helper macro for saving the interrupt state, then disabling interrupts
 macro save_interrupts?

@@ -1,11 +1,16 @@
+; -----------------------------
+; == Side-Channel Resistance ==
+; ------- erases stack --------
+; guarantees stack erasure before returning to caller if
+; called at the end of a function that encrypts/decrypts.
+
 assume adl=1
 
 section .text
-public stack_clear
+public erase_stack
 
 ?stackBot		:= 0D1987Eh
-; use to erase the stack to prevent buffer leak side-channel attack
-stack_clear:
+erase_stack:
 	
 	; save a, hl, e
 	ld (.smc_a), a

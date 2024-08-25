@@ -16,7 +16,8 @@ virtual at $E30800
     _sprng_entropy_pool     rb _sprng_entropy_pool.size
     _sprng_sha_digest       rb 32
     _sprng_sha_mbuffer      rb (64*4)
+    _sprng_rand             rb 8
     _sprng_hash_ctx         rb _sha256ctx_size
     _sprng_read_addr        rb 3
-    _sprng_rand             rb 8
+
 end virtual

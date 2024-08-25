@@ -9,7 +9,7 @@ assume adl=1
 section .text
 
 include "share/virtuals.inc"
-include "share/kill_interrupts.inc"
+include "share/nointerrupts.inc"
 
 public _tls_random_init_entropy
 public _tls_random
@@ -20,7 +20,7 @@ public _tls_random_bytes
 _tls_random_init_entropy:
     ld hl, $D65800
     ld iy, 0
-    ld de,$FFFFFF
+    lea de,iy
     ld c, l
 .loop1: ; loops 256 times
     call .test_byte
@@ -31,8 +31,17 @@ _tls_random_init_entropy:
     dec c
     jr nz,.loop2
     call .test_byte ; run a total of 513 times
+
+    ex hl,de
+    ld bc,256*8/3 ; change the 31 if the number of tests changes
+    xor a,a
+    sbc hl,bc
+    ret nc
+    add hl,bc
+
     lea hl, iy+0
     ld (_sprng_read_addr), hl
+
     add hl, bc
     xor a, a
     sbc hl, bc  ; set the z flag if HL is 0
@@ -40,11 +49,12 @@ _tls_random_init_entropy:
     inc a
     ret
 
+
 ; test byte at hl, set iy=hl if entropy is better
 .test_byte:
     push de
     ld de,0
-    ld b,7 ; probably enough tests
+    ld b,0 ; probably enough tests
 .test_byte_outer_loop:
 ; sample byte twice and bitwise-xor
     ld a,(hl) ; sample 1
@@ -210,5 +220,4 @@ _tls_random_bytes:
 extern hash_sha256_init
 extern hash_sha256_update
 extern hash_sha256_final
-extern clear_stack
 extern __frameset
