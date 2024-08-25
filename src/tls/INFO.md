@@ -1,5 +1,29 @@
-QUICKNOTES - Implementing TLS
-==============================
+TLS IMPLEMENTATION NOTES
+=========================
+
+True Random Number Generator
+----------------------------
+
+** Sources Entropy Derived from Bus Noise **
+
+- Poll 513 bytes starting at $D65800.
+- Repeat 256 times per byte:
+    - Xor two consecutive reads from byte together
+    - Add number of set bits to a "score".
+    - If new score better than current, set new score.
+- If selected score less than `256 * 8 / 3`.
+- I will approximate minimum entropy for the source using the minimum score like so:
+    - P0 = probability 0s = `(256 * 8 / 3) / (256 * 8)` = 0.333
+    - P1 = probability 1s = `1 - P0` = 0.667
+    - *vice versa doesn't affect the computation*
+    - H = `(P0 * log2(1/P0)) + (P1 * log2(1/P1))`
+    - H = `(0.333 * log2(1/0.333)) + (0.667 * log2(1/0.667))`
+    - H = `(0.333 * 1.586) + (0.667 * 0.584)`
+    - E = `1.9 * sqrt((0.333 * (1 - 0.333)) / 512) = 0.040`
+    - H = 0.918 +/- 0.040 bits/byte
+    - H(low-high) = [0.878-0.958] bits/byte
+    - *this is an estimate based on minimum allowed score. Actual source may be higher.*
+
 
 https://www.rfc-editor.org/rfc/pdfrfc/rfc8446.txt.pdf
 
