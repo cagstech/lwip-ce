@@ -2,6 +2,8 @@
 
 ![AUTOBUILD](https://github.com/cagstech/lwip-ce/actions/workflows/build.yml/badge.svg)
 
+![AUTOBUILD](https://github.com/cagstech/lwip-ce/actions/workflows/tests.yml/badge.svg)
+
 ## What are lwIP and lwIP-CE ##
 
 **lwIP** is a full networking stack for low-resource device like embedded systems. This makes it perfect for something as ridiclous as a graphing calculator.
