@@ -3,9 +3,11 @@
 ## Stability Reports ##
 
 Status of lwIP application build from branch `master`.
+
 ![AUTOBUILD](https://github.com/cagstech/lwip-ce/actions/workflows/build.yml/badge.svg)
 
 Status of TLS unit tests.
+
 ![AUTOBUILD](https://github.com/cagstech/lwip-ce/actions/workflows/tests.yml/badge.svg)
 
 ## What are lwIP and lwIP-CE ##
