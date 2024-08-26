@@ -1,7 +1,7 @@
 {
     "transfer_files":
     [
-        "tests/hash/bin/DEMO.8xp"
+        "bin/DEMO.8xp"
     ],
     "target":
     {
