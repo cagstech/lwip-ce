@@ -4,6 +4,7 @@
 
 NAME = DEMO
 ICON = icon.png
+ARCHIVED = NO
 DESCRIPTION = "CE C Toolchain Demo"
 COMPRESSED = NO
 
