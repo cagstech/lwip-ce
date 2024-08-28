@@ -1,0 +1,43 @@
+{
+    "transfer_files":
+    [
+        "bin/DEMO.8xp"
+    ],
+    "target":
+    {
+        "name": "DEMO",
+        "isASM": true
+    },
+    "sequence":
+    [
+        "action|launch",
+        "delay|1000",
+        "hash|1",
+        "key|enter"
+    ],
+    "hashes":
+    {
+        "1":
+        {
+            "description": "encryption match",
+            "start": "vram_start",
+            "size": "vram_16_size",
+            "expected_CRCs": [ "D1F2869F" ]
+        },
+        "2":
+        {
+            "description": "tag match",
+            "start": "vram_start",
+            "size": "vram_16_size",
+            "expected_CRCs": [ "D1F2869F" ]
+        },
+        "3":
+        {
+            "description": "decryption match",
+            "start": "vram_start",
+            "size": "vram_16_size",
+            "expected_CRCs": [ "D1F2869F" ]
+        }
+    }
+}
+

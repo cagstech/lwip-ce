@@ -1,0 +1,130 @@
+name: Unit Tests
+
+on:
+  push:
+    branches:
+      - tls
+    paths:
+      - src/tls/*
+      - tests/*
+  workflow_dispatch:
+
+env:
+  AUTOTESTER_ROM: ${{github.workspace}}/CE.rom
+  LWIP_TESTS: ${{github.workspace}}/tests
+  CEMU_PATH: ${{github.workspace}}/CEmu
+  HOST_DOMAIN: "https://cagstech.com"
+  CEDEV_BIN: ${{github.workspace}}/CEdev/bin
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment: test
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp' ]
+        
+    steps:
+      - name: Checkout TLS branch
+        uses: actions/checkout@v4
+        with:
+          ref: 'tls'
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y make tar wget
+        
+      - name: Download and extract CEdev
+        run: |
+          curl -sL github.com/CE-Programming/toolchain/releases/download/v11.2/CEdev-Linux.tar.gz | tar xz
+          
+      - name: Add CEdev to PATH
+        run: |
+          echo "${{github.workspace}}/CEdev/bin" >> $GITHUB_PATH
+          echo $GITHUB_PATH
+
+      - name: Download CEmu Rom
+        run: |
+          curl -A "github/workflows" -H "Authorization: Bearer ${{ secrets.CEMU_ACCESS }}" -sL ${{ secrets.CEMU_PATH }} -o ${{ env.AUTOTESTER_ROM }}
+
+      - name: Checkout CEmu
+        uses: actions/checkout@v3
+        with:
+          repository: CE-Programming/CEmu
+          ref: master
+          path: ${{env.CEMU_PATH}}
+          persist-credentials: false
+          
+      - name: Build CEmu
+        run: make -j4 -C ${{env.CEMU_PATH}}/core
+        
+      - name: Build Autotester CLI
+        run: make -j4 -C ${{env.CEMU_PATH}}/tests/autotester ${{matrix.ldflags}}
+        
+      - name: Install Autotester CLI
+        run: cmake -E copy ${{env.CEMU_PATH}}/tests/autotester/autotester${{matrix.exe}} ${{env.CEDEV_BIN}}/cemu-autotester${{matrix.exe}}
+
+      - name: Run Unit Tests
+        run: |
+          find ${{env.LWIP_TESTS}} -name autotest.json -print0 | {
+            # Initialize variables
+            total_tests=0
+            total_passed=0
+            total_failed=0
+            start_time=$(date +%s)
+
+            while read -rd '' test; do
+              status=0
+              test_start=$(date +%s)
+              test_dir=$(dirname "$test")
+              make -C "$test_dir" clean
+              make -C "$test_dir" all test || ((status=$?))
+              test_done=$(date +%s)
+              test_duration=$((test_done - test_start))
+              (( total_tests += 1 ))
+              if [ $status -eq 0 ]; then
+                (( total_passed += 1 ))
+                test_status="passed"
+              else
+                (( total_failed += 1 ))
+                test_status="failed"
+              fi
+              echo -e "{\"name\":\"$(basename $test_dir)\",\"status\":\"$test_status\",\"duration\":\"$test_duration\"}" >> "$test_dir/result.json"
+            done
+            echo -e "\"summary\":{\"tests\":\"$total_tests\",\"passed\":\"$total_passed\",\"failed\":\"$total_failed\",\"pending\":\"0\",\"skipped\":\"0\",\"other\":\"0\",\"start\":\"$start_time\",\"stop\":\"$(date +%s)\"}" >> ${{github.workspace}}/summary.json
+            cmake -E echo "$total_failed tests failed"
+            exit $total_failed
+          }
+
+      - name: Generate JSON Results
+        run: |
+          echo -e "{\"results\":{" > ${{github.workspace}}/results.json
+          cat ${{github.workspace}}/summary.json >> ${{github.workspace}}/results.json
+          echo -e ",\"tests\":[" >> ${{github.workspace}}/results.json
+          find ${{env.LWIP_TESTS}} -name result.json -print0 | {
+            tmp_json=""
+            while read -rd '' test; do
+              test_dir=$(dirname "$test")
+              tmp_json="$tmp_json,$(cat $test_dir/result.json)" 
+              rm $test_dir/result.json
+            done
+            tmp_json="${tmp_json:1}"
+            echo $tmp_json >> ${{github.workspace}}/results.json
+          }
+          echo -e "]" >> ${{github.workspace}}/results.json
+          echo -e "}}" >> ${{github.workspace}}/results.json
+          rm ${{github.workspace}}/summary.json
+
+      - name: Publish CTRF Detailed Test Summary Results
+        run: npx github-actions-ctrf tests ${{github.workspace}}/results.json
+        if: always()
+
+      - name: Upload Results Logfile
+        uses: actions/upload-artifact@v3
+        with:
+          name: results.json
+          path: ${{github.workspace}}/results.json
+          
+      - name: Remove CEmu Rom
+        if: always()
+        run: rm ${{env.AUTOTESTER_ROM}}
