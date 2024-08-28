@@ -13,3 +13,4 @@ bin
 # httpd server example filesystem includes
 *makefsdata.c.*
 *.fsdata
+.venv
