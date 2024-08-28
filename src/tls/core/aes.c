@@ -714,7 +714,7 @@ void aes_decrypt_block(const uint8_t *in, uint8_t *out, struct tls_aes_context *
 
 void increment_iv(uint8_t iv[], size_t counter_start, size_t counter_size)
 {
-    int idx;
+    uint24_t idx;
     
     // Use counter_size bytes at the end of the IV as the big-endian integer to increment.
     for (idx = counter_start + counter_size - 1; idx >= counter_start; idx--) {
