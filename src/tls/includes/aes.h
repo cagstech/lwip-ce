@@ -28,9 +28,9 @@ struct tls_aes_context {
 };
 
 
-#define TLS_AES_BLOCKSIZE   16
-#define TLS_AES_IV_SIZE     TLS_AES_BLOCKSIZE
-#define TLS_AES_AUTH_TAG_SIZE   TLS_AES_BLOCKSIZE
+#define TLS_AES_BLOCK_SIZE   16
+#define TLS_AES_IV_SIZE     TLS_AES_BLOCK_SIZE
+#define TLS_AES_AUTH_TAG_SIZE   TLS_AES_BLOCK_SIZE
 
 bool tls_aes_init(struct tls_aes_context *ctx,
                   const uint8_t *key, size_t keysize,

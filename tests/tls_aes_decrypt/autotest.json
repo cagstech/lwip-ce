@@ -13,12 +13,6 @@
         "action|launch",
         "delay|1000",
         "hash|1",
-        "key|enter",
-        "delay|1000",
-        "hash|2",
-        "key|enter",
-        "delay|1000",
-        "hash|3",
         "key|enter"
     ],
     "hashes":
