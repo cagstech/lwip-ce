@@ -1,5 +1,6 @@
 #include <ti/screen.h>
 #include <ti/getkey.h>
+#include <sys/timers.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -11,12 +12,14 @@ int main(void)
 {
     /* Clear the homescreen */
     os_ClrHome();
+    bool rand_inited = false;
+    uint24_t retries=100;
+    do {
+        rand_inited |= tls_random_init_entropy();
+        boot_WaitShort();
+    } while(retries && (!rand_inited));
     
-    bool tls_random_inited = false;
-    for(int i=0; i<5; i++)  // run a few times bc cemu isn't truly random
-        tls_random_inited |= tls_random_init_entropy();
-    
-    if(tls_random_inited)
+    if(rand_inited)
         printf("success");
     else printf("failed");
     os_GetKey();
