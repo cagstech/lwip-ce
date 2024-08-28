@@ -33,12 +33,14 @@ int main(void)
         printf("success");
     else printf("failed");
     os_GetKey();
-    
+    os_ClrHome();
     tls_sha256_init(&ctx);
     tls_sha256_update(&ctx, test2, strlen(test2));
     tls_sha256_digest(&ctx, digest);
     if(memcmp(digest, expected2, TLS_SHA256_DIGEST_LEN)==0)
         printf("success");
     else printf("failed");
+    os_GetKey();
+    os_ClrHome();
     return 0;
 }
