@@ -913,7 +913,7 @@ enum GCM_OPS_ALLOWED {
 };
 
 
-bool tls_aes_update_aad(struct tls_aes_context* ctx, uint8_t *aad, size_t aad_len){
+bool tls_aes_update_aad(struct tls_aes_context* ctx, const void *aad, size_t aad_len){
     if(ctx->_private.lock > LOCK_ALLOW_ALL) return false;
     
     // update the tag for full blocks of aad in input, cache any partial blocks
@@ -947,7 +947,7 @@ bool tls_aes_digest(struct tls_aes_context* ctx, uint8_t* digest){
 }
 
 #define AES_BLOCKSIZE 16
-bool tls_aes_encrypt(struct tls_aes_context* ctx, const uint8_t *in, size_t in_len, uint8_t *out)
+bool tls_aes_encrypt(struct tls_aes_context* ctx, const void *in, size_t in_len, void *out)
 {
     uint8_t buf[AES_BLOCK_SIZE];
     //int keysize = key->keysize;
@@ -1008,7 +1008,7 @@ bool tls_aes_encrypt(struct tls_aes_context* ctx, const uint8_t *in, size_t in_l
 }
 
 bool decrypt_call_from_verify = false;
-bool tls_aes_decrypt(struct tls_aes_context* ctx, const uint8_t *in, size_t in_len, uint8_t *out)
+bool tls_aes_decrypt(struct tls_aes_context* ctx, const void *in, size_t in_len, void *out)
 {
     
     if((ctx==NULL) ||
@@ -1067,7 +1067,7 @@ bool tls_aes_decrypt(struct tls_aes_context* ctx, const uint8_t *in, size_t in_l
 }
 
 
-bool tls_aes_verify(struct tls_aes_context *ctx, uint8_t *aad, size_t aad_len, uint8_t *ciphertext, size_t ciphertext_len, uint8_t *tag){
+bool tls_aes_verify(struct tls_aes_context *ctx, const void *aad, size_t aad_len, const void *ciphertext, size_t ciphertext_len, const uint8_t *tag){
     
     if((ctx==NULL) ||
        (ciphertext==NULL) ||

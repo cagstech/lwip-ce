@@ -37,19 +37,19 @@ bool tls_aes_init(struct tls_aes_context *ctx,
                   uint8_t* iv, size_t iv_len);
 
 bool tls_aes_update_aad(struct tls_aes_context *ctx,
-                        uint8_t *aad, size_t aad_len);
+                        const void *aad, size_t aad_len);
 
 bool tls_aes_encrypt(struct tls_aes_context *ctx,
-                     const uint8_t *in, size_t in_len,
-                     uint8_t *out);
+                     const void *in, size_t in_len,
+                     void *out);
 
 bool tls_aes_digest(struct tls_aes_context *ctx, uint8_t *digest);
 
-bool tls_aes_decrypt(struct tls_aes_context* ctx, const uint8_t *in, size_t in_len, uint8_t *out);
+bool tls_aes_decrypt(struct tls_aes_context* ctx, const void *in, size_t in_len, void *out);
 
 bool tls_aes_verify(struct tls_aes_context *ctx,
-                    uint8_t *aad, size_t aad_len,
-                    uint8_t *ciphertext, size_t ciphertext_len,
-                    uint8_t *tag);
+                    const void *aad, size_t aad_len,
+                    const void *ciphertext, size_t ciphertext_len,
+                    const uint8_t *tag);
 
 #endif
