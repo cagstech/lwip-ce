@@ -19,7 +19,7 @@
     {
         "1":
         {
-            "description": "SHA-256 match",
+            "description": "tls_rand init successful",
             "start": "vram_start",
             "size": "vram_16_size",
             "expected_CRCs": [ "D1F2869F" ]
