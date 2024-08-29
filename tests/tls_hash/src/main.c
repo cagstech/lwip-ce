@@ -28,12 +28,12 @@ int main(void)
     /* Clear the homescreen */
     os_ClrHome();
     uint8_t digest[TLS_SHA256_DIGEST_LEN];
-    struct tls_context_sha256 ctx;
+    struct tls_hash_context ctx;
     
     // test 1
-    tls_sha256_init(&ctx);
-    tls_sha256_update(&ctx, test1, strlen(test1));
-    tls_sha256_digest(&ctx, digest);
+    if(!tls_hash_context_init(&ctx, TLS_SHA256)) return 1;
+    tls_hash_update(&ctx, test1, strlen(test1));
+    tls_hash_digest(&ctx, digest);
     if(memcmp(digest, expected1, TLS_SHA256_DIGEST_LEN)==0)
         printf("success");
     else printf("failed");
@@ -41,9 +41,9 @@ int main(void)
     os_ClrHome();
     
     // test 2
-    tls_sha256_init(&ctx);
-    tls_sha256_update(&ctx, test2, strlen(test2));
-    tls_sha256_digest(&ctx, digest);
+    tls_hash_context_init(&ctx, TLS_SHA256);
+    ctx.update(&ctx._private, test2, strlen(test2));
+    ctx.digest(&ctx._private, digest);
     if(memcmp(digest, expected2, TLS_SHA256_DIGEST_LEN)==0)
         printf("success");
     else printf("failed");
@@ -51,9 +51,9 @@ int main(void)
     os_ClrHome();
     
     // test 3
-    tls_sha256_init(&ctx);
-    tls_sha256_update(&ctx, test3, strlen(test3));
-    tls_sha256_digest(&ctx, digest);
+    tls_hash_context_init(&ctx, TLS_SHA256);
+    ctx.update(&ctx._private, test3, strlen(test3));
+    ctx.digest(&ctx._private, digest);
     if(memcmp(digest, expected3, TLS_SHA256_DIGEST_LEN)==0)
         printf("success");
     else printf("failed");

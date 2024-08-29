@@ -33,23 +33,25 @@ struct tls_aes_context {
 #define TLS_AES_AUTH_TAG_SIZE   TLS_AES_BLOCK_SIZE
 
 bool tls_aes_init(struct tls_aes_context *ctx,
-                  const uint8_t *key, size_t keysize,
-                  uint8_t* iv, size_t iv_len);
+                  const uint8_t *key, size_t key_len,
+                  const uint8_t *iv, size_t iv_len);
 
 bool tls_aes_update_aad(struct tls_aes_context *ctx,
-                        const void *aad, size_t aad_len);
+                        const uint8_t *aad, size_t aad_len);
 
 bool tls_aes_encrypt(struct tls_aes_context *ctx,
-                     const void *in, size_t in_len,
-                     void *out);
+                     const uint8_t *inbuf, size_t in_len,
+                     uint8_t *outbuf);
 
 bool tls_aes_digest(struct tls_aes_context *ctx, uint8_t *digest);
 
-bool tls_aes_decrypt(struct tls_aes_context* ctx, const void *in, size_t in_len, void *out);
+bool tls_aes_decrypt(struct tls_aes_context* ctx, 
+                     const uint8_t *inbuf, size_t in_len,
+                     uint8_t *outbuf);
 
 bool tls_aes_verify(struct tls_aes_context *ctx,
-                    const void *aad, size_t aad_len,
-                    const void *ciphertext, size_t ciphertext_len,
+                    const uint8_t *aad, size_t aad_len,
+                    const uint8_t *ciphertext, size_t ciphertext_len,
                     const uint8_t *tag);
 
 #endif

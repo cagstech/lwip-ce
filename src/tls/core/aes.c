@@ -856,7 +856,7 @@ void aes_gcm_prepare_iv(struct tls_aes_context *ctx, const uint8_t *iv, size_t i
 // Performs the action of generating the keys that will be used in every round of
 // encryption. "key" is the user-supplied input key, "w" is the output key schedule,
 // "keysize" is the length in bits of "key", must be 128, 192, or 256.
-bool tls_aes_init(struct tls_aes_context *ctx, const uint8_t *key, size_t keysize, uint8_t* iv, size_t iv_len)
+bool tls_aes_init(struct tls_aes_context *ctx, const uint8_t *key, size_t key_len, const uint8_t* iv, size_t iv_len)
 {
     if((ctx==NULL) ||
        (key==NULL) ||
@@ -868,8 +868,8 @@ bool tls_aes_init(struct tls_aes_context *ctx, const uint8_t *key, size_t keysiz
     
     if(iv_len>AES_BLOCK_SIZE) return false;
     memset(ctx, 0, sizeof(struct tls_aes_context));
-    keysize<<=3;
-    switch (keysize) {
+    key_len<<=3;
+    switch (key_len) {
         case 128: Nr = 10; Nk = 4; break;
         case 192: Nr = 12; Nk = 6; break;
         case 256: Nr = 14; Nk = 8; break;
@@ -878,7 +878,7 @@ bool tls_aes_init(struct tls_aes_context *ctx, const uint8_t *key, size_t keysiz
     
     memcpy(ctx->iv, iv, iv_len);
     //memset(&ctx->iv[iv_len], 0, 16-iv_len);
-    ctx->keysize = keysize;
+    ctx->keysize = key_len;
     for (idx=0; idx < Nk; ++idx) {
         ctx->round_keys[idx] = ((uint32_t)(key[4 * idx]) << 24) | ((uint32_t)(key[4 * idx + 1]) << 16) |
         ((uint32_t)(key[4 * idx + 2]) << 8) | ((uint32_t)(key[4 * idx + 3]));
@@ -913,7 +913,7 @@ enum GCM_OPS_ALLOWED {
 };
 
 
-bool tls_aes_update_aad(struct tls_aes_context* ctx, const void *aad, size_t aad_len){
+bool tls_aes_update_aad(struct tls_aes_context* ctx, const uint8_t *aad, size_t aad_len){
     if(ctx->_private.lock > LOCK_ALLOW_ALL) return false;
     
     // update the tag for full blocks of aad in input, cache any partial blocks
@@ -947,14 +947,14 @@ bool tls_aes_digest(struct tls_aes_context* ctx, uint8_t* digest){
 }
 
 #define AES_BLOCKSIZE 16
-bool tls_aes_encrypt(struct tls_aes_context* ctx, const void *in, size_t in_len, void *out)
+bool tls_aes_encrypt(struct tls_aes_context* ctx, const uint8_t *inbuf, size_t in_len, uint8_t *outbuf)
 {
     uint8_t buf[AES_BLOCK_SIZE];
     //int keysize = key->keysize;
     //uint32_t *round_keys = key->round_keys;
     int blocks, idx;
     
-    if(in==NULL || out==NULL || ctx==NULL) return false;
+    if(inbuf==NULL || outbuf==NULL || ctx==NULL) return false;
     if(in_len == 0) return false;
     if(ctx->op_assoc == AES_OP_DECRYPT) return false;
     if(ctx->_private.lock > LOCK_ALLOW_ENCRYPT) return false;
@@ -977,8 +977,8 @@ bool tls_aes_encrypt(struct tls_aes_context* ctx, const void *in, size_t in_len,
     // xor last bytes of encryption buf w/ new plaintext for new ciphertext
     if(bytes_to_copy%AES_BLOCK_SIZE){
         bytes_offset = AES_BLOCK_SIZE - bytes_to_copy;
-        memcpy(out, in, bytes_offset);
-        xor_buf(&ctx->_private.last_block[bytes_to_copy], out, bytes_offset);
+        memcpy(outbuf, inbuf, bytes_offset);
+        xor_buf(&ctx->_private.last_block[bytes_to_copy], outbuf, bytes_offset);
         blocks = ((in_len - bytes_offset) / AES_BLOCK_SIZE);
     }
             
@@ -986,11 +986,11 @@ bool tls_aes_encrypt(struct tls_aes_context* ctx, const void *in, size_t in_len,
     for(idx = 0; idx <= blocks; idx++){
         bytes_to_copy = MIN(AES_BLOCK_SIZE, in_len - bytes_offset - (idx * AES_BLOCK_SIZE));
         //bytes_to_pad = AES_BLOCK_SIZE-bytes_to_copy;
-        memcpy(&out[idx*AES_BLOCK_SIZE+bytes_offset], &in[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
+        memcpy(&outbuf[idx*AES_BLOCK_SIZE+bytes_offset], &inbuf[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
         // memset(&buf[bytes_to_copy], 0, bytes_to_pad);
         // if bytes_to_copy is less than blocksize, do nothing, since msg is truncated anyway
         aes_encrypt_block(iv, buf, ctx);
-        xor_buf(buf, &out[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
+        xor_buf(buf, &outbuf[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
         increment_iv(iv, AES_GCM_NONCE_LEN, AES_GCM_CTR_LEN);        // increment iv for continued use
         if(idx==blocks){
             memcpy(ctx->_private.last_block, buf, AES_BLOCK_SIZE);
@@ -999,7 +999,7 @@ bool tls_aes_encrypt(struct tls_aes_context* ctx, const void *in, size_t in_len,
     }
             
     // authenticate the ciphertext
-    ghash(ctx, tag, out, in_len);
+    ghash(ctx, tag, outbuf, in_len);
     ctx->_private.ct_len += in_len;
             
           
@@ -1008,20 +1008,20 @@ bool tls_aes_encrypt(struct tls_aes_context* ctx, const void *in, size_t in_len,
 }
 
 bool decrypt_call_from_verify = false;
-bool tls_aes_decrypt(struct tls_aes_context* ctx, const void *in, size_t in_len, void *out)
+bool tls_aes_decrypt(struct tls_aes_context* ctx, const uint8_t *inbuf, size_t in_len, uint8_t *outbuf)
 {
     
     if((ctx==NULL) ||
-       (in==NULL) ||
+       (inbuf==NULL) ||
        (in_len==0)) return false;
 
-    if(!decrypt_call_from_verify && (out==NULL)) return false;
+    if(!decrypt_call_from_verify && (outbuf==NULL)) return false;
     if(ctx->op_assoc == AES_OP_ENCRYPT) return false;
     if(ctx->_private.lock > LOCK_ALLOW_ENCRYPT) return false;
     ctx->op_assoc = AES_OP_DECRYPT;
     
     
-    uint8_t* iv = ctx->iv;
+    uint8_t *iv = ctx->iv;
     uint8_t *tag = ctx->_private.auth_tag;
     uint8_t buf_in[AES_BLOCK_SIZE], buf_out[AES_BLOCK_SIZE];
     int blocks = in_len / AES_BLOCK_SIZE, idx;
@@ -1034,15 +1034,15 @@ bool tls_aes_decrypt(struct tls_aes_context* ctx, const void *in, size_t in_len,
         memset(buf_in, 0, AES_BLOCK_SIZE);
         ghash(ctx, tag, buf_in, AES_BLOCK_SIZE - ctx->_private.aad_cache_len);
     }
-    ghash(ctx, tag, in, in_len);
+    ghash(ctx, tag, inbuf, in_len);
     ctx->_private.ct_len += in_len;
             
-    if(out){
+    if(outbuf){
         ctx->_private.lock = LOCK_ALLOW_ENCRYPT;
         if(bytes_to_copy%AES_BLOCK_SIZE){
             bytes_offset = AES_BLOCK_SIZE - bytes_to_copy;
-            memcpy(out, in, bytes_offset);
-            xor_buf(&ctx->_private.last_block[bytes_to_copy], out, bytes_offset);
+            memcpy(outbuf, inbuf, bytes_offset);
+            xor_buf(&ctx->_private.last_block[bytes_to_copy], outbuf, bytes_offset);
             blocks = ((in_len - bytes_offset) / AES_BLOCK_SIZE);
         }
                 
@@ -1050,10 +1050,10 @@ bool tls_aes_decrypt(struct tls_aes_context* ctx, const void *in, size_t in_len,
         for(idx = 0; idx <= blocks; idx++){
             bytes_to_copy = MIN(AES_BLOCK_SIZE, in_len - bytes_offset - (idx * AES_BLOCK_SIZE));
             //bytes_to_pad = AES_BLOCK_SIZE-bytes_to_copy;
-            memcpy(&out[idx*AES_BLOCK_SIZE+bytes_offset], &in[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
+            memcpy(&outbuf[idx*AES_BLOCK_SIZE+bytes_offset], &inbuf[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
             // memset(&buf[bytes_to_copy], 0, bytes_to_pad);        // if bytes_to_copy is less than blocksize, do nothing, since msg is truncated anyway
             aes_encrypt_block(iv, buf_in, ctx);
-            xor_buf(buf_in, &out[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
+            xor_buf(buf_in, &outbuf[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
             increment_iv(iv, AES_GCM_NONCE_LEN, AES_GCM_CTR_LEN);        // increment iv for continued use
             if(idx==blocks){
                 memcpy(ctx->_private.last_block, buf_in, AES_BLOCK_SIZE);
@@ -1067,7 +1067,7 @@ bool tls_aes_decrypt(struct tls_aes_context* ctx, const void *in, size_t in_len,
 }
 
 
-bool tls_aes_verify(struct tls_aes_context *ctx, const void *aad, size_t aad_len, const void *ciphertext, size_t ciphertext_len, const uint8_t *tag){
+bool tls_aes_verify(struct tls_aes_context *ctx, const uint8_t *aad, size_t aad_len, const uint8_t *ciphertext, size_t ciphertext_len, const uint8_t *tag){
     
     if((ctx==NULL) ||
        (ciphertext==NULL) ||
