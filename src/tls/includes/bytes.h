@@ -1,5 +1,5 @@
-#ifndef bytes_h
-#define bytes_h
+#ifndef tls_bytes_h
+#define tls_bytes_h
 
 #include <stdbool.h>
 #include <stdint.h>

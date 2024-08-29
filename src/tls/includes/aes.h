@@ -1,6 +1,6 @@
 
-#ifndef aes_h
-#define aes_h
+#ifndef tls_aes_h
+#define tls_aes_h
 
 #include <stdbool.h>
 #include <stdint.h>
