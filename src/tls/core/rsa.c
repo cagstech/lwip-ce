@@ -113,3 +113,22 @@ size_t tls_rsa_decode_oaep(const uint8_t *in, size_t len, uint8_t* out, const ui
     
     return len-i;
 }
+
+void powmod_exp_u24(uint8_t size, uint8_t *restrict base, uint24_t exp, const uint8_t *restrict mod);
+#define RSA_PUBLIC_EXP  65537
+bool tls_rsa_encrypt(const void* msg, size_t msglen, uint8_t *out,
+                     const uint8_t* pubkey, size_t keylen){
+    size_t spos = 0;
+    if((msg==NULL) ||
+       (pubkey==NULL) ||
+       (out==NULL) ||
+       (msglen==0) ||
+       (keylen<RSA_MODULUS_MAX_SUPPORTED) ||
+       (keylen>RSA_MODULUS_MIN_SUPPORTED) ||
+       (!(pubkey[keylen-1]&1))) return false;
+    
+    while(pubkey[spos]==0) {out[spos++] = 0;}
+    if(!tls_rsa_encode_oaep(msg, msglen, &out[spos], keylen-spos, NULL)) return false;
+    powmod_exp_u24((uint8_t)keylen, ct, RSA_PUBLIC_EXP, pubkey);
+    return true;
+}
