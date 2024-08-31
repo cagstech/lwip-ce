@@ -1,0 +1,62 @@
+#include <ti/screen.h>
+#include <ti/getkey.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+#include "tls/includes/hmac.h"
+
+// input vectors
+const char *test1 = "The fox jumped over the dog!";
+const char *test2 = "Leading the way to the future!";
+const char *test3 = "What is the answer to this question?";
+
+const uint8_t key[] = {0x3d,0x93,0x98,0x80,0x3e,0x06,0xae,0x7d,0x7c,0x36,0x78,0xc7,0x5e,0x95,0xe7,0x2a};
+
+// test vectors
+const uint8_t expected1[] = {0xa9,0xb9,0xa1,0x41,0x0d,0xff,0xff,0x34,0x0d,0x34,0x44,0x32,0xd9,0x8d,0xef,0x81,0x48,0xe6,0x80,0x41,0x5a,0x19,0x8e,0x8f,0xdd,0xdc,0xf8,0xb3,0x30,0x90,0x68,0xde};
+
+const uint8_t expected2[] = {0x33,0x10,0x20,0x30,0x8f,0xb5,0xea,0x68,0xa9,0x9b,0x29,0xdc,0xee,0x05,0x1b,0x3f,0x30,0xef,0xb4,0xb8,0x1e,0x95,0x74,0xd3,0x8d,0xfd,0xa8,0x68,0xe0,0xc2,0x5e,0xe5};
+
+const uint8_t expected3[] = {0x27,0xd3,0x81,0xd4,0xfb,0x44,0x2a,0x72,0xff,0xf2,0x69,0x9a,0x49,0xca,0x3d,0x0b,0x08,0x13,0x83,0xbd,0x6d,0x50,0xfa,0x2c,0x96,0x2a,0x71,0x16,0x7c,0x4c,0xec,0xcf};
+
+
+/* Main function, called first */
+int main(void)
+{
+    /* Clear the homescreen */
+    os_ClrHome();
+    uint8_t digest[TLS_SHA256_DIGEST_LEN];
+    struct tls_hmac_context ctx;
+    
+    // test 1
+    if(!tls_hmac_context_init(&ctx, TLS_SHA256, key, sizeof key)) return 1;
+    ctx.update(&ctx, test1, strlen(test1));
+    ctx.digest(&ctx, digest);
+    if(memcmp(digest, expected1, TLS_SHA256_DIGEST_LEN)==0)
+        printf("success");
+    else printf("failed");
+    os_GetKey();
+    os_ClrHome();
+    
+    // test 2
+    if(!tls_hmac_context_init(&ctx, TLS_SHA256, key, sizeof key)) return 1;
+    ctx.update(&ctx, test2, strlen(test2));
+    ctx.digest(&ctx, digest);
+    if(memcmp(digest, expected2, TLS_SHA256_DIGEST_LEN)==0)
+        printf("success");
+    else printf("failed");
+    os_GetKey();
+    os_ClrHome();
+    
+    // test 3
+    if(!tls_hmac_context_init(&ctx, TLS_SHA256, key, sizeof key)) return 1;
+    ctx.update(&ctx, test3, strlen(test3));
+    ctx.digest(&ctx, digest);
+    if(memcmp(digest, expected3, TLS_SHA256_DIGEST_LEN)==0)
+        printf("success");
+    else printf("failed");
+    os_GetKey();
+    os_ClrHome();
+    return 0;
+}

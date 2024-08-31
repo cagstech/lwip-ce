@@ -15,7 +15,8 @@
 #define TLS_SHA256_DIGEST_LEN   32
 
 enum _hash_algorithms {
-    TLS_SHA256
+    TLS_SHA256,
+    TLS_SHA256_HW
 };
 
 /// @struct Defines context structure for SHA-256
@@ -25,9 +26,14 @@ struct tls_sha256_context {
     uint64_t bitlen;
     uint32_t state[8];
 };
+
 bool tls_sha256_init(struct tls_sha256_context *ctx);
 void tls_sha256_update(struct tls_sha256_context *ctx, const uint8_t *data, size_t len);
 void tls_sha256_digest(struct tls_sha256_context *ctx, uint8_t *digest);
+
+bool tls_sha256hw_init(struct tls_sha256_context *ctx);
+void tls_sha256hw_update(struct tls_sha256_context *ctx, const uint8_t *data, size_t len);
+void tls_sha256hw_digest(struct tls_sha256_context *ctx, uint8_t *digest);
 
 struct tls_hash_context {
     uint8_t digestlen;

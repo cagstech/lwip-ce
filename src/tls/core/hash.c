@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include "../includes/hash.h"
 
-
 bool tls_hash_context_init(struct tls_hash_context *ctx, uint8_t algorithm){
     if(ctx==NULL) return false;
     switch(algorithm){
@@ -10,7 +9,13 @@ bool tls_hash_context_init(struct tls_hash_context *ctx, uint8_t algorithm){
             ctx->init = tls_sha256_init;
             ctx->update = tls_sha256_update;
             ctx->digest = tls_sha256_digest;
-            break;
+            break; /*
+        case TLS_SHA256_HW:
+            ctx->digestlen = TLS_SHA256_DIGEST_LEN;
+            ctx->init = tls_sha256hw_init;
+            ctx->update = tls_sha256hw_update;
+            ctx->digest = tls_sha256hw_digest;
+            break;      */
         default:
             return false;
     }
