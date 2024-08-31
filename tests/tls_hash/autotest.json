@@ -11,14 +11,11 @@
     "sequence":
     [
         "action|launch",
-        "delay|200",
-        "hash|1",
+        "hashWait|1",
         "key|enter",
-        "delay|200",
-        "hash|1",
+        "hashWait|1",
         "key|enter",
-        "delay|200",
-        "hash|1",
+        "hashWait|1",
         "key|enter"
     ],
     "hashes":
@@ -28,7 +25,8 @@
             "description": "SHA-256 match",
             "start": "vram_start",
             "size": "vram_16_size",
-            "expected_CRCs": [ "D1F2869F" ]
+            "expected_CRCs": [ "D1F2869F" ],
+            "timeout": 1000
         }
     }
 }

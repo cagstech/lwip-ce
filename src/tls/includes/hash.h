@@ -15,8 +15,8 @@
 #define TLS_SHA256_DIGEST_LEN   32
 
 enum _hash_algorithms {
-    TLS_SHA256,
-    TLS_SHA256_HW
+    TLS_HASH_SHA256,
+    TLS_HASH_SHA256HW
 };
 
 /// @struct Defines context structure for SHA-256

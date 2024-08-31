@@ -4,7 +4,7 @@
 bool tls_hash_context_init(struct tls_hash_context *ctx, uint8_t algorithm){
     if(ctx==NULL) return false;
     switch(algorithm){
-        case TLS_SHA256:
+        case TLS_HASH_SHA256:
             ctx->digestlen = TLS_SHA256_DIGEST_LEN;
             ctx->init = tls_sha256_init;
             ctx->update = tls_sha256_update;

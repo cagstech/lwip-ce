@@ -30,7 +30,7 @@ int main(void)
     struct tls_hmac_context ctx;
     
     // test 1
-    if(!tls_hmac_context_init(&ctx, TLS_SHA256, key, sizeof key)) return 1;
+    if(!tls_hmac_context_init(&ctx, TLS_HASH_SHA256, key, sizeof key)) return 1;
     ctx.update(&ctx, test1, strlen(test1));
     ctx.digest(&ctx, digest);
     if(memcmp(digest, expected1, TLS_SHA256_DIGEST_LEN)==0)
@@ -40,7 +40,7 @@ int main(void)
     os_ClrHome();
     
     // test 2
-    if(!tls_hmac_context_init(&ctx, TLS_SHA256, key, sizeof key)) return 1;
+    if(!tls_hmac_context_init(&ctx, TLS_HASH_SHA256, key, sizeof key)) return 1;
     ctx.update(&ctx, test2, strlen(test2));
     ctx.digest(&ctx, digest);
     if(memcmp(digest, expected2, TLS_SHA256_DIGEST_LEN)==0)
@@ -50,7 +50,7 @@ int main(void)
     os_ClrHome();
     
     // test 3
-    if(!tls_hmac_context_init(&ctx, TLS_SHA256, key, sizeof key)) return 1;
+    if(!tls_hmac_context_init(&ctx, TLS_HASH_SHA256, key, sizeof key)) return 1;
     ctx.update(&ctx, test3, strlen(test3));
     ctx.digest(&ctx, digest);
     if(memcmp(digest, expected3, TLS_SHA256_DIGEST_LEN)==0)

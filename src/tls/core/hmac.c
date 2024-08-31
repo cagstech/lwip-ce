@@ -28,7 +28,7 @@ bool tls_hmac_context_init(struct tls_hmac_context *ctx, uint8_t algorithm, cons
     }
     
     switch(algorithm){
-        case TLS_SHA256:
+        case TLS_HASH_SHA256:
             ctx->digestlen = TLS_SHA256_DIGEST_LEN;
             ctx->update = tls_hmac_update;
             ctx->digest = tls_hmac_digest;
