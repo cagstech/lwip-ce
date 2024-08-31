@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <string.h>
 #include "../includes/hash.h"
 
 bool tls_hash_context_init(struct tls_hash_context *ctx, uint8_t algorithm){
