@@ -77,7 +77,7 @@ jobs:
               make -C "$test_dir" clean
               make -C "$test_dir" all test || ((status=$?))
               test_done=$(($(date +%s%N)/1000000))
-              test_duration=$(((test_done - test_start)*1000))
+              test_duration=$((test_done - test_start))
               (( total_tests += 1 ))
               if [ $status -eq 0 ]; then
                 (( total_passed += 1 ))
