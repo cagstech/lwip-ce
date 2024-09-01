@@ -68,7 +68,7 @@ jobs:
             total_tests=0
             total_passed=0
             total_failed=0
-            start_time=$(date +%s)
+            start_time=$(date +%s.%3N)
 
             while read -rd '' test; do
               status=0
@@ -76,7 +76,7 @@ jobs:
               test_dir=$(dirname "$test")
               make -C "$test_dir" clean
               make -C "$test_dir" all test || ((status=$?))
-              test_done=$(date +%s)
+              test_done=$(date +%s.%3N)
               test_duration=$(((test_done - test_start)*1000))
               (( total_tests += 1 ))
               if [ $status -eq 0 ]; then
@@ -88,7 +88,7 @@ jobs:
               fi
               echo -e "{\"name\":\"$(basename $test_dir)\",\"status\":\"$test_status\",\"duration\":\"$test_duration\"}" >> "$test_dir/result.json"
             done
-            end_time=$(date +%s)
+            end_time=$(date +%s.%3N)
             echo -e "\"summary\":{\"tests\":\"$total_tests\",\"passed\":\"$total_passed\",\"failed\":\"$total_failed\",\"pending\":\"0\",\"skipped\":\"0\",\"other\":\"0\",\"start\":\"$start_time\",\"stop\":\"$end_time\"}" >> ${{github.workspace}}/summary.json
             cmake -E echo "$total_tests tests ran, $total_passed passed, $total_failed failed!"
             exit $total_failed
