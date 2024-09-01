@@ -11,6 +11,7 @@ struct _asn1_node {
 
 struct tls_asn1_context {
     uint8_t depth;
+    struct _asn1_node root;
     struct _asn1_node node[ASN1_MAX_DEPTH];
 };
 
