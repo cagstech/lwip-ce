@@ -68,16 +68,16 @@ jobs:
             total_tests=0
             total_passed=0
             total_failed=0
-            start_time=$(date +%s)
+            start_time=$(($(date +%s%N)/1000000))
 
             while read -rd '' test; do
               status=0
-              test_start=$(date +%s)
+              test_start=$(($(date +%s%N)/1000000))
               test_dir=$(dirname "$test")
               make -C "$test_dir" clean
               make -C "$test_dir" all test || ((status=$?))
-              test_done=$(date +%s)
-              test_duration=$(((test_done - test_start)*1000))
+              test_done=$(($(date +%s%N)/1000000))
+              test_duration=$((test_done - test_start))
               (( total_tests += 1 ))
               if [ $status -eq 0 ]; then
                 (( total_passed += 1 ))
@@ -88,9 +88,9 @@ jobs:
               fi
               echo -e "{\"name\":\"$(basename $test_dir)\",\"status\":\"$test_status\",\"duration\":\"$test_duration\"}" >> "$test_dir/result.json"
             done
-            end_time=$(date +%s)
+            end_time=$(($(date +%s%N)/1000000))
             echo -e "\"summary\":{\"tests\":\"$total_tests\",\"passed\":\"$total_passed\",\"failed\":\"$total_failed\",\"pending\":\"0\",\"skipped\":\"0\",\"other\":\"0\",\"start\":\"$start_time\",\"stop\":\"$end_time\"}" >> ${{github.workspace}}/summary.json
-            cmake -E echo "$total_tests tests ran, $total_passed passed, $total_failed failed!"
+            cmake -E echo "$total_tests modules tested, $total_passed passed, $total_failed failed!"
             exit $total_failed
           }
 
@@ -119,7 +119,7 @@ jobs:
         if: always()
 
       - name: Upload Results Logfile
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: results.json
           path: ${{github.workspace}}/results.json
