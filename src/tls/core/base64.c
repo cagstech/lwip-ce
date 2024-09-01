@@ -29,8 +29,6 @@ size_t tls_base64_encode(const uint8_t *in, size_t len, uint8_t *out){
 
 size_t tls_base64_decode(const uint8_t *in, size_t len, uint8_t *out){
     
-    if (len % 4) return 0;
-    
     size_t olen = len / 4 * 3;
     size_t j = 0;
     if (in[len - 1] == '=') olen--;
