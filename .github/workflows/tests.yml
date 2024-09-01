@@ -119,7 +119,7 @@ jobs:
         if: always()
 
       - name: Upload Results Logfile
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: results.json
           path: ${{github.workspace}}/results.json
