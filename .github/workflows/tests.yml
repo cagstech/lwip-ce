@@ -90,7 +90,7 @@ jobs:
             done
             end_time=$(($(date +%s%N)/1000000))
             echo -e "\"summary\":{\"tests\":\"$total_tests\",\"passed\":\"$total_passed\",\"failed\":\"$total_failed\",\"pending\":\"0\",\"skipped\":\"0\",\"other\":\"0\",\"start\":\"$start_time\",\"stop\":\"$end_time\"}" >> ${{github.workspace}}/summary.json
-            cmake -E echo "$total_tests tests ran, $total_passed passed, $total_failed failed!"
+            cmake -E echo "$total_tests modules tested, $total_passed passed, $total_failed failed!"
             exit $total_failed
           }
 
