@@ -29,7 +29,7 @@ jobs:
           ref: 'tls'
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y make tar wget coreutils
+        run: sudo apt-get update && sudo apt-get install -y make tar wget gdate
         
       - name: Download and extract CEdev
         run: |
