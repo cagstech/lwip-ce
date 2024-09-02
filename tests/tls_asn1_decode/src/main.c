@@ -35,7 +35,7 @@ int main(void)
     
     if(!tls_asn1_decoder_init(&ctx, asn1_test, olen)) return 0;
     
-    while(tls_asn1_decoder_next(&ctx, &tag, &ptr, &len, &depth)){
+    while(tls_asn1_decode_next(&ctx, &tag, &ptr, &len, &depth)){
         printf("%u:d=%u l=%u %s:%u\n", (ptr-asn1_test), depth, len, (tls_asn1_getform(tag)) ? "cons" : "prim", tls_asn1_gettag(tag));
     }
     
@@ -49,7 +49,7 @@ int main(void)
     
     if(!tls_asn1_decoder_init(&ctx, asn1_test, olen)) return 0;
     uint8_t count = 0;
-    while(tls_asn1_decoder_next(&ctx, &tag, &ptr, &len, &depth)){
+    while(tls_asn1_decode_next(&ctx, &tag, &ptr, &len, &depth)){
         printf("%u:d=%u l=%u %s:%u\n", (ptr-asn1_test), depth, len, (tls_asn1_getform(tag)) ? "cons" : "prim", tls_asn1_gettag(tag));
         if(count++ == 5) {
             os_GetKey();
