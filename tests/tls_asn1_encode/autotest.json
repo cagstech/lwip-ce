@@ -12,28 +12,16 @@
     [
         "action|launch",
         "hashWait|1",
-        "key|enter",
-        "hashWait|2",
-        "key|enter",
-        "hashWait|2",
         "key|enter"
     ],
     "hashes":
     {
         "1":
         {
-            "description": "ASN.1 u2048 pubkey decode",
+            "description": "ASN.1 encode sequence",
             "start": "vram_start",
             "size": "vram_16_size",
             "expected_CRCs": [ "D1F2869F" ],
-            "timeout": 2000
-        },
-        "2":
-        {
-            "description": "ASN.1 u4096 privkey decode pt1",
-            "start": "vram_start",
-            "size": "vram_16_size",
-            "expected_CRCs": [ "966ED4C8", "93738B6E" ],
             "timeout": 2000
         }
     }

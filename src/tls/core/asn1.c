@@ -17,7 +17,7 @@ bool tls_asn1_decoder_init(struct tls_asn1_context *ctx, const uint8_t *data, si
 }
 
 
-bool tls_asn1_decoder_next(struct tls_asn1_context *ctx, uint8_t *tag, uint8_t **data, size_t *len, uint8_t *depth){
+bool tls_asn1_decode_next(struct tls_asn1_context *ctx, uint8_t *tag, uint8_t **data, size_t *len, uint8_t *depth){
    
 
     if(ctx==NULL) return false;
@@ -26,7 +26,7 @@ bool tls_asn1_decoder_next(struct tls_asn1_context *ctx, uint8_t *tag, uint8_t *
     uint8_t *asn1_current;
     
 restart:
-    asn1_current = ctx->node[ctx->depth].start;
+    asn1_current = (uint8_t*)ctx->node[ctx->depth].start;
     this_len = 0;
         
     while(*asn1_current == 0){
@@ -34,10 +34,7 @@ restart:
         asn1_current++;
     }
         
-    if(ctx->depth == ASN1_MAX_DEPTH) {
-        printf("max depth reached");
-        return false;
-    }
+    if(ctx->depth >= ASN1_MAX_DEPTH) return false;
         
     // get tag of element
     this_tag = *asn1_current++;
@@ -73,3 +70,29 @@ restart:
     return true;
 }
 
+size_t tls_asn1_encode_segment(uint8_t tag, const uint8_t *data, size_t len, uint8_t *output){
+    if((data==NULL) ||
+       (len==0) ||
+       (output==NULL)) return 0;
+    
+    // if sequence or set, constructed should be set
+    if(((tag & 0b11111) == ASN1_SEQUENCE) ||
+        ((tag & 0b11111) == ASN1_SET))
+        tag |= ASN1_CONSTRUCTED;
+    
+    
+    size_t pos = 0;
+    output[pos++] = tag;
+    if(len > (0b1111111)){
+        // generate weird length format
+        uint8_t size_len = (len > 0xffff) + (len > 0xFF) + 1;
+        output[pos++] = size_len | 0b10000000;
+        rmemcpy((uint8_t*)&output[pos], (uint8_t*)&len, size_len);
+        pos += size_len;
+    }
+    else
+        output[pos++] = len;
+    
+    memcpy(&output[pos], data, len);
+    return pos+len;
+}
