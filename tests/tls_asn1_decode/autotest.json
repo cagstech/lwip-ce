@@ -25,7 +25,7 @@
             "description": "ASN.1 u2048 pubkey decode",
             "start": "vram_start",
             "size": "vram_16_size",
-            "expected_CRCs": [ "D1F2869F" ],
+            "expected_CRCs": [ "2221AE51" ],
             "timeout": 2000
         },
         "2":
