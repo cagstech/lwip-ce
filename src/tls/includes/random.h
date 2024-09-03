@@ -12,7 +12,7 @@
 
 /*************************************************************************************
  * @brief Initializes the cryptographic TRNG within this module.
- * @returns [bool] True if generator initialization succeeded or False if failed.
+ * @returns @b true if generator initialization succeeded, @b false if failed.
  * @warning DO NOT USE the toolchain @b rand functions with the TLS functions of lwIP-CE. They are not secure
  * for cryptography. Use this module instead.
  */
@@ -20,15 +20,15 @@ bool tls_random_init_entropy(void);
 
 /*************************************************************************************
  * @brief Returns a secure 64-bit random integer.
- * @returns [uint64_t]    A secure 64-bit random integer.
+ * @returns A secure 64-bit random integer.
  */
 uint64_t tls_random(void);
 
 /*************************************************************************************
  * @brief Fills a buffer with securely random bytes.
- * @param[in,out] buffer    Pointer to a buffer to fill with random bytes.
- * @param[in] len    Length of buffer to fill.
- * @returns [void*]    Pointer to random buffer. Should be equal to @p buffer .
+ * @param buffer    Pointer to a buffer to fill with random bytes.
+ * @param len    Length of buffer to fill.
+ * @returns Pointer to random buffer. Should be equal to @p buffer .
  */
 void* tls_random_bytes(void* buffer, size_t len);
 

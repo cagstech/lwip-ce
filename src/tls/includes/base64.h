@@ -3,7 +3,22 @@
 
 #include <stdint.h>
 
-size_t tls_base64_encode(const uint8_t *in, size_t len, uint8_t *out);
-size_t tls_base64_decode(const uint8_t *in, size_t len, uint8_t *out);
+/***********************************************************************
+ * @brief Encodes octets into sextets.
+ * @param inbuf     Pointer to data to encode.
+ * @param len       Size of data to encode.
+ * @param outbuf    Pointer to buffer to write encoded data.
+ * @returns Output size of encoded data.
+ */
+size_t tls_base64_encode(const uint8_t *inbuf, size_t len, uint8_t *outbuf);
+
+/***********************************************************************
+ * @brief Decodes sextets into octets.
+ * @param inbuf     Pointer to data to decode.
+ * @param len       Size of data to decode.
+ * @param outbuf    Pointer to buffer to write decoded data.
+ * @returns Output size of decoded data.
+ */
+size_t tls_base64_decode(const uint8_t *inbuf, size_t len, uint8_t *outbuf);
 
 #endif

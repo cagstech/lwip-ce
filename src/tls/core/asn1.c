@@ -6,7 +6,7 @@
 
 void rmemcpy(void *dest, void *src, size_t len);
 
-bool tls_asn1_decoder_init(struct tls_asn1_context *ctx, const uint8_t *data, size_t len){
+bool tls_asn1_decoder_init(struct tls_asn1_decodeer_context *ctx, const uint8_t *data, size_t len){
     if((ctx==NULL) ||
        (data==NULL) ||
        (len==0)) return false;
@@ -17,7 +17,7 @@ bool tls_asn1_decoder_init(struct tls_asn1_context *ctx, const uint8_t *data, si
 }
 
 
-bool tls_asn1_decode_next(struct tls_asn1_context *ctx, uint8_t *tag, uint8_t **data, size_t *len, uint8_t *depth){
+bool tls_asn1_decode_next(struct tls_asn1_decoder_context *ctx, uint8_t *tag, uint8_t **data, size_t *len, uint8_t *depth){
    
 
     if(ctx==NULL) return false;
@@ -70,7 +70,7 @@ restart:
     return true;
 }
 
-size_t tls_asn1_encode_segment(uint8_t tag, const uint8_t *data, size_t len, uint8_t *output){
+size_t tls_asn1_encode(uint8_t tag, const uint8_t *data, size_t len, uint8_t *output){
     if((data==NULL) ||
        (len==0) ||
        (output==NULL)) return 0;

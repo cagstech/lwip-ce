@@ -25,10 +25,10 @@ int main(void)
     os_ClrHome();
     size_t offset = 0;
     
-    offset += tls_asn1_encode_segment(ASN1_INTEGER, key, sizeof key, &asn1_buf[offset]);
-    offset += tls_asn1_encode_segment(ASN1_INTEGER, (uint8_t*)&pub_exponent, sizeof pub_exponent, &asn1_buf[offset]);
+    offset += tls_asn1_encode(ASN1_INTEGER, key, sizeof key, &asn1_buf[offset]);
+    offset += tls_asn1_encode(ASN1_INTEGER, (uint8_t*)&pub_exponent, sizeof pub_exponent, &asn1_buf[offset]);
     
-    tls_asn1_encode_segment(ASN1_SEQUENCE, asn1_buf, offset, asn1_buf2);
+    tls_asn1_encode(ASN1_SEQUENCE, asn1_buf, offset, asn1_buf2);
    
     if(memcmp(asn1_buf2, expected, sizeof expected)==0)
         printf("success");
