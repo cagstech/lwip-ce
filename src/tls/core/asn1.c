@@ -6,11 +6,11 @@
 
 void rmemcpy(void *dest, void *src, size_t len);
 
-bool tls_asn1_decoder_init(struct tls_asn1_decodeer_context *ctx, const uint8_t *data, size_t len){
+bool tls_asn1_decoder_init(struct tls_asn1_decoder_context *ctx, const uint8_t *data, size_t len){
     if((ctx==NULL) ||
        (data==NULL) ||
        (len==0)) return false;
-    memset(ctx, 0, sizeof(struct tls_asn1_context));
+    memset(ctx, 0, sizeof(struct tls_asn1_decoder_context));
     ctx->node[0].start = data;
     ctx->node[0].next = data + len;
     return true;
