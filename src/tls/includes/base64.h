@@ -1,3 +1,7 @@
+/// @file base64.h
+/// @author ACagliano
+/// @brief Module providing a Base64 encoder and decoder.
+
 #ifndef tls_base64_t
 #define tls_base64_t
 

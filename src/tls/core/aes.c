@@ -868,7 +868,7 @@ bool tls_aes_init(struct tls_aes_context *ctx, const uint8_t *key, size_t key_le
     
     if(iv_len>AES_BLOCK_SIZE) return false;
     memset(ctx, 0, sizeof(struct tls_aes_context));
-    keylen<<=3;
+    key_len<<=3;
     switch (key_len) {
         case 128: Nr = 10; Nk = 4; break;
         case 192: Nr = 12; Nk = 6; break;
@@ -918,7 +918,7 @@ bool tls_aes_update_aad(struct tls_aes_context* ctx, const uint8_t *aad, size_t 
     
     // update the tag for full blocks of aad in input, cache any partial blocks
     ghash(ctx, ctx->_private.auth_tag, aad, aad_len);
-    ctx->_private.aadlen += aad_len;
+    ctx->_private.aad_len += aad_len;
     return true;
 }
 
