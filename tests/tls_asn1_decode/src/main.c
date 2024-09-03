@@ -21,7 +21,7 @@ int main(void)
 {
     /* Clear the homescreen */
     os_ClrHome();
-    struct tls_asn1_context ctx;
+    struct tls_asn1_decoder_context ctx;
     size_t olen = 0;
     
     uint8_t *ptr;
