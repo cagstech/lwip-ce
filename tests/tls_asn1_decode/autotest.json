@@ -11,8 +11,6 @@
     "sequence":
     [
         "action|launch",
-        "hashWait|1",
-        "key|enter",
         "hashWait|2",
         "key|enter",
         "hashWait|2",
