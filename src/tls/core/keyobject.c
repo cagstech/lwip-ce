@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-#include "../../include/lwip/mem.h"
+#include "lwip/mem.h"
 
 #include "../includes/base64.h"
 #include "../includes/asn1.h"

@@ -13,6 +13,6 @@ CXXFLAGS = -Wall -Wextra -Oz -I src/include
 
 # ----------------------------
 
-HEADER_DIRS := src/include
+HEADER_DIRS := src/include/lwip
 
 include $(shell cedev-config --makefile)
