@@ -12,7 +12,7 @@
     [
         "action|launch",
         "hashWait|1",
-        "key|enter",
+        "key|enter"
     ],
     "hashes":
     {
