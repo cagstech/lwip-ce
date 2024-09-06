@@ -13,19 +13,15 @@
         "action|launch",
         "hashWait|1",
         "key|enter",
-        "hashWait|2",
-        "key|enter",
-        "hashWait|2",
-        "key|enter"
     ],
     "hashes":
     {
         "1":
         {
-            "description": "ASN.1 u2048 pubkey decode",
+            "description": "PKCS1 private decode",
             "start": "vram_start",
             "size": "vram_16_size",
-            "expected_CRCs": [ "2221AE51" ],
+            "expected_CRCs": [ "C4CA6097" ],
             "timeout": 2000
         },
         "2":
