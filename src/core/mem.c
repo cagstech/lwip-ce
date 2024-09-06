@@ -91,7 +91,7 @@
 
 bool mem_inited = false;
 
-void *function_unset(size_t size __attribute__((unsued))){
+void *function_unset(size_t size __attribute__((unused))){
     LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("internal_error: user malloc/free unset\n"));
     return NULL;
 }

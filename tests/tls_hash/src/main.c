@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
+#include <debug.h>
 
 #include "tls/includes/hash.h"
 
@@ -59,5 +61,6 @@ int main(void)
     else printf("failed");
     os_GetKey();
     os_ClrHome();
+    
     return 0;
 }

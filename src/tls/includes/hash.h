@@ -17,7 +17,7 @@
 /** @enum Implemented hash algorithms. */
 enum _hash_algorithms {
     TLS_HASH_SHA256,
-    TLS_HASH_SHA256HW
+  //  TLS_HASH_SHA256HW
 };
 
 /** @struct Defines context structure for SHA-256. */
@@ -34,9 +34,11 @@ void tls_sha256_update(struct tls_sha256_context *ctx, const uint8_t *data, size
 void tls_sha256_digest(struct tls_sha256_context *ctx, uint8_t *digest);
 
 /** init, update, and digest functions for the TI-84+ SHA-256 accelerator. */
+/*
 bool tls_sha256hw_init(struct tls_sha256_context *ctx);
 void tls_sha256hw_update(struct tls_sha256_context *ctx, const uint8_t *data, size_t len);
 void tls_sha256hw_digest(struct tls_sha256_context *ctx, uint8_t *digest);
+ */
 
 /** @struct Defines generic hash context. */
 struct tls_hash_context {
