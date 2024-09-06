@@ -12,13 +12,15 @@
     [
         "action|launch",
         "hashWait|1",
+        "key|enter",
+        "hashWait|2",
         "key|enter"
     ],
     "hashes":
     {
         "1":
         {
-            "description": "PKCS1 private decode",
+            "description": "PKCS1 RSA private decode",
             "start": "vram_start",
             "size": "vram_16_size",
             "expected_CRCs": [ "C4CA6097" ],
@@ -26,10 +28,10 @@
         },
         "2":
         {
-            "description": "ASN.1 u4096 privkey decode pt1",
+            "description": "PKCS8 EC private decode",
             "start": "vram_start",
             "size": "vram_16_size",
-            "expected_CRCs": [ "966ED4C8", "93738B6E" ],
+            "expected_CRCs": [ "FC5A3D51" ],
             "timeout": 2000
         }
     }

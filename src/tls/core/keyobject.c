@@ -257,10 +257,13 @@ file_type_ok:
     if(memcmp(tmp_serialize[0].data, tls_objectids[TLS_OID_RSA_ENCRYPTION], tmp_serialize[0].len)==0)
         goto is_rsa;
     else if(
-            (memcmp(tmp_serialize[0].data, tls_objectids[TLS_OID_EC_PRIVATEKEY], tmp_serialize[0].len)==0) &&
+            (memcmp(tmp_serialize[0].data, tls_objectids[TLS_OID_EC_PUBLICKEY], tmp_serialize[0].len)==0) &&
             (memcmp(tmp_serialize[1].data, tls_objectids[TLS_OID_EC_SECP256R1], tmp_serialize[1].len)==0))
         goto is_ecc;
-    else goto error;
+    else {
+        printf("invalid object id");
+        goto error;
+    }
     
 is_rsa:
     kf->type |= TLS_KEY_RSA;
