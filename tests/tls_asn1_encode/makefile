@@ -8,9 +8,11 @@ ARCHIVED = NO
 DESCRIPTION = "tls_asn1_encode test"
 COMPRESSED = NO
 
-CFLAGS = -Wall -Wextra -Oz
-CXXFLAGS = -Wall -Wextra -Oz
+CFLAGS = -Wall -Wextra -Oz -Isrc/include
+CXXFLAGS = -Wall -Wextra -Oz -Isrc/include
 
 # ----------------------------
+
+HEADER_DIRS := src/include $(HEADER_DIRS)
 
 include $(shell cedev-config --makefile)
