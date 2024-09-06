@@ -9,10 +9,10 @@ DESCRIPTION = "CE C Toolchain Demo"
 COMPRESSED = NO
 
 CFLAGS = -Wall -Wextra -Oz -I src/include
-CXXFLAGS = -Wall -Wextra -Oz -Isrc/include
+CXXFLAGS = -Wall -Wextra -Oz -I src/include
 
 # ----------------------------
 
-HEADER_DIRS := src/include/
+HEADER_DIRS := src/include
 
 include $(shell cedev-config --makefile)
