@@ -1,15 +1,17 @@
-/// @file keyfiles.h
+/// @file keyobject.h
 /// @author ACagliano
 /// @brief Module providing import and export of keyfiles.
 
-#ifndef tls_keyfiles_h
-#define tls_keyfiles_h
+#ifndef tls_keyobject_h
+#define tls_keyobject_h
 
 #include "asn1.h"
 
-enum _tls_key_types {
-    TLS_KEY_PRIVATE,
-    TLS_KEY_PUBLIC
+enum tls_key_type_flags {
+    TLS_KEY_PRIVATE = 0,
+    TLS_KEY_PUBLIC = 1,
+    TLS_KEY_RSA = (0<<1),
+    TLS_KEY_ECC = (1<<1),
 };
 
 enum tls_object_ids {
@@ -53,40 +55,46 @@ uint8_t tls_oid_bytes[][10] = {
 
 
 /// @struct Output struct for private key files.
-struct tls_privatekey_context {
+struct tls_private_key_context {
     size_t length;
     size_t type;
     union {
-        struct {
-            struct tls_asn1_serialization version;
-            struct tls_asn1_serialization modulus;
-            struct tls_asn1_serialization public_exponent;
-            struct tls_asn1_serialization exponent;
-            struct tls_asn1_serialization p;
-            struct tls_asn1_serialization q;
-            struct tls_asn1_serialization exp1;
-            struct tls_asn1_serialization exp2;
-            struct tls_asn1_serialization coeff;
+        union {
+            struct tls_asn1_serialization fields[8];
+            struct {
+                struct tls_asn1_serialization modulus;
+                struct tls_asn1_serialization public_exponent;
+                struct tls_asn1_serialization exponent;
+                struct tls_asn1_serialization p;
+                struct tls_asn1_serialization q;
+                struct tls_asn1_serialization exp1;
+                struct tls_asn1_serialization exp2;
+                struct tls_asn1_serialization coeff;
+            } field;
         } rsa;
-        struct {
-            struct tls_asn1_serialization version;
-            struct tls_asn1_serialization privkey;
-            struct tls_asn1_serialization curve_id;
-            struct tls_asn1_serialization pubkey;
+        union {
+            struct tls_asn1_serialization fields[4];
+            struct {
+                struct tls_asn1_serialization privkey;
+                struct tls_asn1_serialization curve_id;
+                struct tls_asn1_serialization pubkey;
+            } field;
         } ec;
-       
     } meta;
     uint8_t data[];
 };
 
 /// @struct Output struct for public key files.
-struct tls_publickey_context {
+struct tls_public_key_context {
     size_t length;
     size_t type;
     union {
-        struct {
-            struct tls_asn1_serialization modulus;
-            struct tls_asn1_serialization exponent;
+        union {
+            struct tls_asn1_serialization fields[8];
+            struct {
+                struct tls_asn1_serialization modulus;
+                struct tls_asn1_serialization exponent;
+            } field;
         } rsa;
         struct {
             struct tls_asn1_serialization pubkey;
@@ -98,5 +106,8 @@ struct tls_publickey_context {
 struct tls_certificate_context {
   // no idea??
 };
+
+
+struct tls_private_key_context *tls_private_key_import(const uint8_t *pem_data, size_t size);
 
 #endif

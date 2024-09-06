@@ -68,17 +68,19 @@ restart:
         if(data) *data = NULL;
         if(tag) *tag = 0;
         if(len) *len = 0;
-        if(depth) depth = -1;
+        if(depth) *depth = -1;
         return true;
         // if schema doesn't match, this may match the next field in the schema
         // so exit without updating the context state
     }
 
 skip_checks:
-    if(data) *data = asn1_current;
-    if(tag) *tag = this_tag;
-    if(len) *len = this_len;
-    if(depth) *depth = ctx->depth;
+    if((schema==NULL) || (schema && schema->output)){
+        if(data) *data = asn1_current;
+        if(tag) *tag = this_tag;
+        if(len) *len = this_len;
+        if(depth) *depth = ctx->depth;
+    }
         
     ctx->node[ctx->depth].start = asn1_current + this_len;
     if(tls_asn1_getform(this_tag)){
