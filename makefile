@@ -10,7 +10,7 @@ APP_NAME = lwIP
 APP_VERSION = 0
 
 CFLAGS = -Wall -Wextra -Oz -I src/include
-CXXFLAGS = -Wall -Wextra -Oz -Isrc/include
+CXXFLAGS = -Wall -Wextra -Oz -I src/include
 OUTPUT_MAP = YES
 
 BSSHEAP_LOW ?= D052C6

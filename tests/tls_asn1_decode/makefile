@@ -5,7 +5,7 @@
 NAME = DEMO
 ICON = icon.png
 ARCHIVED = NO
-DESCRIPTION = "CE C Toolchain Demo"
+DESCRIPTION = "tls_asn1_decode test"
 COMPRESSED = NO
 
 CFLAGS = -Wall -Wextra -Oz

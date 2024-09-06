@@ -5,7 +5,7 @@
 NAME = DEMO
 ICON = icon.png
 ARCHIVED = NO
-DESCRIPTION = "CE C Toolchain Demo"
+DESCRIPTION = "tls_pbkdf2 test"
 COMPRESSED = NO
 
 CFLAGS = -Wall -Wextra -Oz

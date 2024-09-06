@@ -5,14 +5,14 @@
 NAME = DEMO
 ICON = icon.png
 ARCHIVED = NO
-DESCRIPTION = "CE C Toolchain Demo"
+DESCRIPTION = "tls_private_key_object test"
 COMPRESSED = NO
 
-CFLAGS = -Wall -Wextra -Oz -I ../../src/include
-CXXFLAGS = -Wall -Wextra -Oz -I ../../src/include
+CFLAGS = -Wall -Wextra -Oz -Isrc/include
+CXXFLAGS = -Wall -Wextra -Oz -Isrc/include
 
 # ----------------------------
 
-HEADER_DIRS := ../../src/include/lwip
+HEADER_DIRS := src/include $(HEADER_DIRS)
 
 include $(shell cedev-config --makefile)
