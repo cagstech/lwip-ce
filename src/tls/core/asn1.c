@@ -17,7 +17,8 @@ bool tls_asn1_decoder_init(struct tls_asn1_decoder_context *ctx, const uint8_t *
 }
 
 
-bool tls_asn1_decode_next(struct tls_asn1_decoder_context *ctx, uint8_t *tag, uint8_t **data, size_t *len, uint8_t *depth){
+bool tls_asn1_decode_next(struct tls_asn1_decoder_context *ctx, const struct tls_asn1_schema *schema,
+                          uint8_t *tag, uint8_t **data, size_t *len, uint8_t *depth){
    
 
     if(ctx==NULL) return false;
@@ -55,6 +56,22 @@ restart:
     else
         this_len = byte_2nd;
             
+    if(schema == NULL) goto skip_checks;   // if no schema passed just return what we have
+     
+    if(!((schema->tag == this_tag) && (schema->depth == ctx->depth))){
+        // if the tag and depth does not match schema provided
+        if(schema->optional==false) return false;    // stop with error if schema mismatch
+        // if tag is optional
+        if(data) *data = NULL;
+        if(tag) *tag = 0;
+        if(len) *len = 0;
+        if(depth) depth = -1;
+        return true;
+        // if schema doesn't match, this may match the next field in the schema
+        // so exit without updating the context state
+    }
+
+skip_checks:
     if(data) *data = asn1_current;
     if(tag) *tag = this_tag;
     if(len) *len = this_len;

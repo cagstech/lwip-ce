@@ -50,12 +50,29 @@ enum tls_asn1_forms {
     ASN1_CONSTRUCTED    = (1<<5)        /**< this element contains nested elements. */
 };
 
+
+/// @struct Can be chained to create schemas for decoding ASN.1 structures. See keyfiles.c.
+struct tls_asn1_schema {
+    char *name;
+    uint8_t tag;
+    uint8_t depth;
+    bool optional;
+}
+
+/// @struct Can be chained in parallel to schema to create an output chain for decoding ANS.1 structures. See keyfiles.c
+struct tls_asn1_serialization {
+    uint8_t tag;
+    size_t len;
+    uint8_t *data;
+}
+
+
 struct _asn1_node {
     const uint8_t *start;
     const uint8_t *next;
 };
 
-#define ASN1_MAX_DEPTH  10
+#define ASN1_MAX_DEPTH  16
 
 /** @struct ASN.1 decoder state. */
 struct tls_asn1_decoder_context {
@@ -90,7 +107,8 @@ bool tls_asn1_decoder_init(struct tls_asn1_decoder_context *ctx, const uint8_t *
  * @note This call handles the tree structure of ASN.1 properly. If the previous call returned a @b constructed
  * object, then the subsequent calls parse the contents of that object until the end is reached.
  */
-bool tls_asn1_decode_next(struct tls_asn1_decoder_context *ctx, uint8_t *tag, uint8_t **data, size_t *len, uint8_t *depth);
+bool tls_asn1_decode_next(struct tls_asn1_decoder_context *ctx, const struct tls_asn1_schema *schema,
+                          uint8_t *tag, uint8_t **data, size_t *len, uint8_t *depth);
 
 /********************************************************************************
  * @brief ASN.1 encodes data.

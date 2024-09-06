@@ -89,6 +89,7 @@ struct mem_configurator {
     void (*in_free)(void *ptr);
     size_t heap_max;
 };
+extern struct mem_configurator mem_conf;
 
 #define MEM_CONFIGURATOR_V1     sizeof(struct mem_configurator)
 
