@@ -23,6 +23,7 @@ enum tls_object_ids {
     TLS_OID_AES_128_GCM,                /**< AES-128-GCM => 2.16.840.1.101.3.4.1.2 */
     TLS_OID_AES_256_GCM,                /**< AES-256-GCM => 2.16.840.1.101.3.4.2.1 */
     TLS_OID_PBKDF2,                     /**< PBKDF2 => 1.2.840.113549.1.5.12 */
+    TLS_OID_PBES2,                      /**< PBES2 => 1.2.840.113549.1.5.13 */
     TLS_OID_HMAC_SHA256,                /**< HMAC-SHA256 => 1.2.840.113549.2.9 */
     
     // X.509 identifiers
@@ -41,6 +42,7 @@ uint8_t tls_oid_bytes[][10] = {
     {0x60,0x86,0x48,0x01,0x65,0x03,0x04,0x01,0x06},     // TLS_OID_AES_128_GCM
     {0x60,0x86,0x48,0x01,0x65,0x03,0x04,0x02,0x01},     // TLS_OID_AES_256_GCM
     {0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x05,0x0C},     // TLS_OID_PBKDF2
+    {0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x05,0x0D},     // TLS_OID_PBES2
     {0x2A,0x86,0x48,0x86,0xF7,0x0D,0x02,0x09},          // TLS_OID_HMAC_SHA256
     
     // X.509 identifiers
@@ -49,10 +51,11 @@ uint8_t tls_oid_bytes[][10] = {
     
 };
 
+
 /// @struct Output struct for private key files.
 struct tls_privatekey_context {
-    size_t wLength;
-    size_t bType;
+    size_t length;
+    size_t type;
     union {
         struct {
             struct tls_asn1_serialization version;

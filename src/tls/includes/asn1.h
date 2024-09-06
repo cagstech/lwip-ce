@@ -57,14 +57,15 @@ struct tls_asn1_schema {
     uint8_t tag;
     uint8_t depth;
     bool optional;
-}
+    bool allow_null;
+};
 
 /// @struct Can be chained in parallel to schema to create an output chain for decoding ANS.1 structures. See keyfiles.c
 struct tls_asn1_serialization {
     uint8_t tag;
     size_t len;
     uint8_t *data;
-}
+};
 
 
 struct _asn1_node {

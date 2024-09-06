@@ -59,6 +59,9 @@ restart:
     if(schema == NULL) goto skip_checks;   // if no schema passed just return what we have
      
     if(!((schema->tag == this_tag) && (schema->depth == ctx->depth))){
+        // if the tag is null, depth is expected, and null is allowed
+        if(schema->allow_null && (this_tag==ASN1_NULL) && (schema->depth == ctx->depth))
+            goto skip_checks;
         // if the tag and depth does not match schema provided
         if(schema->optional==false) return false;    // stop with error if schema mismatch
         // if tag is optional
