@@ -49,11 +49,8 @@ int main(void)
     
     // encrypt and digest 1
     status &= tls_aes_init(&ctx, TLS_AES_GCM, key1, sizeof key1, iv1, sizeof iv1);
-    printf("%u", status);
     status &= tls_aes_verify(&ctx, aad1, strlen(aad1), ciphertext1, sizeof ciphertext1, tag1);
-    printf("%u", status);
     status &= tls_aes_decrypt(&ctx, ciphertext1, sizeof ciphertext1, tbuf);
-    printf("%u", status);
     
     // await message match string
     if(status && strncmp(tbuf, msg1, sizeof ciphertext1)==0)
@@ -65,9 +62,7 @@ int main(void)
     
     // encrypt and digest 2
     status &= tls_aes_init(&ctx, TLS_AES_CBC, key2, sizeof key2, iv2, sizeof iv2);
-    printf("%u", status);
     status &= tls_aes_decrypt(&ctx, ciphertext2, sizeof ciphertext2, tbuf);
-    printf("%u", status);
     
     // await message match string
     if(status && strncmp(tbuf, msg2, strlen(msg2))==0)
