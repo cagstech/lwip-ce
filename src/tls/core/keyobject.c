@@ -327,54 +327,156 @@ file_type_ok:
         }
         // set decoder to start at private key bit/octet string
         if(!tls_asn1_decoder_init(&asn1_ctx, tmp_serialize[2].data, tmp_serialize[2].len)) goto error;
+        
+        if(memcmp(tmp_serialize[0].data, tls_objectids[TLS_OID_RSA_ENCRYPTION], tmp_serialize[0].len)==0)
+            decoder_schema = tls_pkcs1_privkey_schema;
+        else if(
+                (memcmp(tmp_serialize[0].data, tls_objectids[TLS_OID_EC_PUBLICKEY], tmp_serialize[0].len)==0) &&
+                (memcmp(tmp_serialize[1].data, tls_objectids[TLS_OID_EC_SECP256R1], tmp_serialize[1].len)==0))
+            decoder_schema = tls_sec1_privkey_schema;
+        else
+            goto error;
+    }
+    if(decoder_schema == tls_pkcs1_privkey_schema){
+        kf->type |= TLS_KEY_RSA;
+        decoder_schema = tls_pkcs1_privkey_schema;
+        serialized_count = 0;
+        for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
+            if(!tls_asn1_decode_next(&asn1_ctx,
+                                     &decoder_schema[i],
+                                     &kf->meta.rsa.fields[serialized_count].tag,
+                                     &kf->meta.rsa.fields[serialized_count].data,
+                                     &kf->meta.rsa.fields[serialized_count].len,
+                                     NULL))
+                goto error;
+            if(decoder_schema[i].output) {
+                kf->meta.rsa.fields[serialized_count].name = decoder_schema[i].name;
+                serialized_count++;
+            }
+        }
+        return kf;
+    }
+    if(decoder_schema == tls_sec1_privkey_schema ){
+        kf->type |= TLS_KEY_ECC;
+        serialized_count = 0;
+        for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
+            if(!tls_asn1_decode_next(&asn1_ctx,
+                                     &decoder_schema[i],
+                                     &kf->meta.ec.fields[serialized_count].tag,
+                                     &kf->meta.ec.fields[serialized_count].data,
+                                     &kf->meta.ec.fields[serialized_count].len,
+                                     NULL))
+                goto error;
+            if(decoder_schema[i].output) {
+                kf->meta.ec.fields[serialized_count].name = decoder_schema[i].name;
+                serialized_count++;
+            }
+        }
+        return kf;
+    }
+    
+error:
+    memset(kf, 0, kf->length);
+    mem_free(kf);
+    return NULL;
+}
+
+struct tls_public_key_context *tls_public_key_import(const char *pem_data, size_t size){
+    if((pem_data==NULL) || (size==0)) return NULL;
+    struct tls_asn1_schema *decoder_schema;
+    struct tls_asn1_serialization tmp_serialize[9] = {0};
+    uint8_t serialized_count = 0;
+    struct tls_asn1_decoder_context asn1_ctx;
+    uint8_t *b64_start = (uint8_t*)(strchr((char*)pem_data, '\n') + 1);
+    uint8_t *b64_end = (uint8_t*)strchr((char*)b64_start, '\n');
+    size_t b64_size = b64_end - b64_start;
+    
+    // locate banner, load schema for format
+    for(int i=0; pkcs_lookups[i].banner != NULL; i++)
+        if(strncmp((char*)pem_data, pkcs_lookups[i].banner, strlen(pkcs_lookups[i].banner)) == 0){
+            decoder_schema = pkcs_lookups[i].decoder_schema;
+            goto file_type_ok;
+        }
+    return NULL;        // if no matching banner found, fail
+    
+file_type_ok:
+    // compute start/end of base64 section, sanity checks on size
+    if(b64_size > size)
+        return NULL;
+    
+    // decode base64 into DER
+    uint8_t *asn1_buf = mem_malloc(b64_size / 3 * 4);
+    if(asn1_buf==NULL)
+        return NULL;
+    
+    size_t asn1_size = tls_base64_decode(b64_start, b64_size, asn1_buf);
+    size_t tot_len = sizeof(struct tls_public_key_context) + asn1_size;
+    // allocate context
+    struct tls_public_key_context *kf = mem_malloc(tot_len);
+    if(kf==NULL)
+        return NULL;
+    
+    kf->length = tot_len;
+    // copy ASN.1 data to struct data field
+    memcpy(kf->data, asn1_buf, asn1_size);
+    mem_free(asn1_buf);
+    if(!tls_asn1_decoder_init(&asn1_ctx, kf->data, asn1_size))
+        goto error;
+    
+    kf->type = 0 | TLS_KEY_PUBLIC;
+    
+    if(decoder_schema ==  tls_pkcs8_pubkey_schema){
+        serialized_count = 0;
+        for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
+            if(!tls_asn1_decode_next(&asn1_ctx,
+                                     &decoder_schema[i],
+                                     &tmp_serialize[serialized_count].tag,
+                                     &tmp_serialize[serialized_count].data,
+                                     &tmp_serialize[serialized_count].len,
+                                     NULL))
+                goto error;
+            if(decoder_schema[i].output)
+                serialized_count++;
+        }
+        // set decoder to start at private key bit/octet string
+        if(!tls_asn1_decoder_init(&asn1_ctx, tmp_serialize[2].data, tmp_serialize[2].len)) goto error;
     }
     
     if(memcmp(tmp_serialize[0].data, tls_objectids[TLS_OID_RSA_ENCRYPTION], tmp_serialize[0].len)==0)
-        goto is_rsa;
+        decoder_schema = tls_pkcs1_pubkey_schema;
     else if(
             (memcmp(tmp_serialize[0].data, tls_objectids[TLS_OID_EC_PUBLICKEY], tmp_serialize[0].len)==0) &&
-            (memcmp(tmp_serialize[1].data, tls_objectids[TLS_OID_EC_SECP256R1], tmp_serialize[1].len)==0))
-        goto is_ecc;
-    else
+            (memcmp(tmp_serialize[1].data, tls_objectids[TLS_OID_EC_SECP256R1], tmp_serialize[1].len)==0)){
+                kf->type |= TLS_KEY_ECC;
+                kf->meta.ec.field.pubkey.tag = tmp_serialize[2].tag;
+                kf->meta.ec.field.pubkey.data = tmp_serialize[2].data;
+                kf->meta.ec.field.pubkey.len = tmp_serialize[2].len;
+                kf->meta.ec.field.pubkey.name = tls_sec1_pubkey_schema[0].name;
+                return kf;
+            }
+    else {
+        printf("invalid object id");
         goto error;
-    
-is_rsa:
-    kf->type |= TLS_KEY_RSA;
-    decoder_schema = tls_pkcs1_privkey_schema;
-    serialized_count = 0;
-    for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
-        if(!tls_asn1_decode_next(&asn1_ctx,
-                                 &decoder_schema[i],
-                                 &kf->meta.rsa.fields[serialized_count].tag,
-                                 &kf->meta.rsa.fields[serialized_count].data,
-                                 &kf->meta.rsa.fields[serialized_count].len,
-                                 NULL))
-            goto error;
-        if(decoder_schema[i].output) {
-            kf->meta.rsa.fields[serialized_count].name = decoder_schema[i].name;
-            serialized_count++;
-        }
     }
-    return kf;
     
-is_ecc:
-    kf->type |= TLS_KEY_ECC;
-    decoder_schema = tls_sec1_privkey_schema;
-    serialized_count = 0;
-    for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
-        if(!tls_asn1_decode_next(&asn1_ctx,
-                                 &decoder_schema[i],
-                                 &kf->meta.ec.fields[serialized_count].tag,
-                                 &kf->meta.ec.fields[serialized_count].data,
-                                 &kf->meta.ec.fields[serialized_count].len,
-                                 NULL))
-            goto error;
-        if(decoder_schema[i].output) {
-            kf->meta.ec.fields[serialized_count].name = decoder_schema[i].name;
-            serialized_count++;
+    if(decoder_schema == tls_pkcs1_pubkey_schema){
+        kf->type |= TLS_KEY_RSA;
+        serialized_count = 0;
+        for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
+            if(!tls_asn1_decode_next(&asn1_ctx,
+                                     &decoder_schema[i],
+                                     &kf->meta.rsa.fields[serialized_count].tag,
+                                     &kf->meta.rsa.fields[serialized_count].data,
+                                     &kf->meta.rsa.fields[serialized_count].len,
+                                     NULL))
+                goto error;
+            if(decoder_schema[i].output) {
+                kf->meta.rsa.fields[serialized_count].name = decoder_schema[i].name;
+                serialized_count++;
+            }
         }
+        return kf;
     }
-    return kf;
     
 error:
     memset(kf, 0, kf->length);

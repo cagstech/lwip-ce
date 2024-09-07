@@ -80,8 +80,11 @@ struct tls_public_key_context {
                 struct tls_asn1_serialization exponent;
             } field;
         } rsa;
-        struct {
-            struct tls_asn1_serialization pubkey;
+        union {
+            struct tls_asn1_serialization fields[1];
+            struct {
+                struct tls_asn1_serialization pubkey;
+            } field;
         } ec;
     } meta;
     uint8_t data[];
@@ -93,5 +96,6 @@ struct tls_certificate_context {
 
 
 struct tls_private_key_context *tls_private_key_import(const char *pem_data, size_t size, const char *password);
+struct tls_public_key_context *tls_public_key_import(const char *pem_data, size_t size);
 
 #endif
