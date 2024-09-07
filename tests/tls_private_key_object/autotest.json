@@ -16,6 +16,8 @@
         "hashWait|2",
         "key|enter",
         "hashWait|3",
+        "key|enter",
+        "hashWait|4",
         "key|enter"
     ],
     "hashes":
@@ -25,7 +27,7 @@
             "description": "PKCS1 RSA private decode",
             "start": "vram_start",
             "size": "vram_16_size",
-            "expected_CRCs": [ "C4CA6097" ],
+            "expected_CRCs": [ "2AD9C7F8" ],
             "timeout": 2000
         },
         "2":
@@ -33,7 +35,7 @@
             "description": "PKCS8 EC private decode",
             "start": "vram_start",
             "size": "vram_16_size",
-            "expected_CRCs": [ "FC5A3D51" ],
+            "expected_CRCs": [ "4BDB2881" ],
             "timeout": 2000
         },
         "3":
@@ -41,8 +43,16 @@
             "description": "PKCS8 RSA private decode",
             "start": "vram_start",
             "size": "vram_16_size",
-            "expected_CRCs": [ "300AF19D" ],
+            "expected_CRCs": [ "19E37AFB" ],
             "timeout": 2000
+        },
+        "4":
+        {
+            "description": "PKCS8 RSA encrypted private decode",
+            "start": "vram_start",
+            "size": "vram_16_size",
+            "expected_CRCs": [ "E75016E9" ],
+            "timeout": 15000
         }
     }
 }

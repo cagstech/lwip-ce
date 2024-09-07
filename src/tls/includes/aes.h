@@ -5,6 +5,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+enum tls_aes_modes {
+    TLS_AES_GCM,
+    TLS_AES_CBC
+};
+
 /** @struct private internal structure for GCM. */
 struct _gcm_private {
     uint8_t ghash_key[16];
@@ -21,6 +26,7 @@ struct _gcm_private {
 
 /** @struct AES state context. */
 struct tls_aes_context {
+    uint8_t mode;
     uint24_t keysize;
     uint32_t round_keys[60];
     uint8_t iv[16];
@@ -36,13 +42,14 @@ struct tls_aes_context {
 /********************************************************************
  * @brief Initializes an AES context.
  * @param ctx       Pointer to an AES context.
+ * @param mode      AES mode identifier
  * @param key       Pointer to an AES key.
  * @param key_len        Length of AES key.
  * @param iv        Pointer to initialization vector.
  * @param iv_len     Length of initialization vector.
  * @returns @b true if success, @b false if error.
  */
-bool tls_aes_init(struct tls_aes_context *ctx,
+bool tls_aes_init(struct tls_aes_context *ctx, uint8_t mode,
                   const uint8_t *key, size_t key_len,
                   const uint8_t *iv, size_t iv_len);
 

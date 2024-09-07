@@ -856,7 +856,7 @@ void aes_gcm_prepare_iv(struct tls_aes_context *ctx, const uint8_t *iv, size_t i
 // Performs the action of generating the keys that will be used in every round of
 // encryption. "key" is the user-supplied input key, "w" is the output key schedule,
 // "keysize" is the length in bits of "key", must be 128, 192, or 256.
-bool tls_aes_init(struct tls_aes_context *ctx, const uint8_t *key, size_t key_len, const uint8_t* iv, size_t iv_len)
+bool tls_aes_init(struct tls_aes_context *ctx, uint8_t mode, const uint8_t *key, size_t key_len, const uint8_t* iv, size_t iv_len)
 {
     if((ctx==NULL) ||
        (key==NULL) ||
@@ -893,15 +893,29 @@ bool tls_aes_init(struct tls_aes_context *ctx, const uint8_t *key, size_t key_le
         ctx->round_keys[idx] = ctx->round_keys[idx-Nk] ^ temp;
     }
     
-    // generate ghash key
-    uint8_t tmp[16] = {0};
-    aes_encrypt_block(tmp, ctx->_private.ghash_key, ctx);
+    switch(mode){
+        case TLS_AES_GCM:
+        {
+            // generate ghash key
+            uint8_t tmp[16] = {0};
+            aes_encrypt_block(tmp, ctx->_private.ghash_key, ctx);
+            // sort out IV wonkiness in GCM mode
+            aes_gcm_prepare_iv(ctx, iv, iv_len);
+            memset(ctx->_private.auth_tag, 0, AES_BLOCK_SIZE);
+            memcpy(ctx->_private.auth_j0, ctx->iv, AES_BLOCK_SIZE);
+            increment_iv(ctx->iv, AES_GCM_NONCE_LEN, AES_GCM_CTR_LEN);
+            break;
+        }
+        case TLS_AES_CBC:
+            // i don't thing anything needs setup here
+            break;
+        default:
+            return false;
+    }
+    ctx->mode = mode;
+    
         
-    // sort out IV wonkiness in GCM mode
-    aes_gcm_prepare_iv(ctx, iv, iv_len);
-    memset(ctx->_private.auth_tag, 0, AES_BLOCK_SIZE);
-    memcpy(ctx->_private.auth_j0, ctx->iv, AES_BLOCK_SIZE);
-    increment_iv(ctx->iv, AES_GCM_NONCE_LEN, AES_GCM_CTR_LEN);
+    
     
     return true;
 }
@@ -914,6 +928,7 @@ enum GCM_OPS_ALLOWED {
 
 
 bool tls_aes_update_aad(struct tls_aes_context* ctx, const uint8_t *aad, size_t aad_len){
+    if(ctx->mode != TLS_AES_GCM) return false;
     if(ctx->_private.lock > LOCK_ALLOW_ALL) return false;
     
     // update the tag for full blocks of aad in input, cache any partial blocks
@@ -923,6 +938,7 @@ bool tls_aes_update_aad(struct tls_aes_context* ctx, const uint8_t *aad, size_t 
 }
 
 bool tls_aes_digest(struct tls_aes_context* ctx, uint8_t* digest){
+    if(ctx->mode != TLS_AES_GCM) return false;
     if((ctx == NULL) || (digest == NULL)) return false;
     ctx->_private.lock = LOCK_ALLOW_NONE;
     uint8_t tbuf[AES_BLOCK_SIZE];
@@ -958,52 +974,70 @@ bool tls_aes_encrypt(struct tls_aes_context* ctx, const uint8_t *inbuf, size_t i
     if(in_len == 0) return false;
     if(ctx->op_assoc == AES_OP_DECRYPT) return false;
     if(ctx->_private.lock > LOCK_ALLOW_ENCRYPT) return false;
-    
-    uint8_t* iv = ctx->iv;
-    uint8_t *tag = ctx->_private.auth_tag;
     ctx->op_assoc = AES_OP_ENCRYPT;
+    uint8_t* iv = ctx->iv;
     
-    blocks = (in_len / AES_BLOCK_SIZE);
-    
-    size_t bytes_to_copy = ctx->_private.last_block_len;
-    size_t bytes_offset = 0;
-    if((ctx->_private.lock == LOCK_ALLOW_ALL) &&
-        (ctx->_private.aad_cache_len)){
-        // pad rest of aad cache with 0's
-        memset(buf, 0, AES_BLOCK_SIZE);
-        ghash(ctx, tag, buf, AES_BLOCK_SIZE - ctx->_private.aad_cache_len);
-    }
-    ctx->_private.lock = LOCK_ALLOW_ENCRYPT;
-    // xor last bytes of encryption buf w/ new plaintext for new ciphertext
-    if(bytes_to_copy%AES_BLOCK_SIZE){
-        bytes_offset = AES_BLOCK_SIZE - bytes_to_copy;
-        memcpy(outbuf, inbuf, bytes_offset);
-        xor_buf(&ctx->_private.last_block[bytes_to_copy], outbuf, bytes_offset);
-        blocks = ((in_len - bytes_offset) / AES_BLOCK_SIZE);
-    }
+    switch(ctx->mode){
+        case TLS_AES_GCM:
+        {
             
-    // encrypt remaining plaintext
-    for(idx = 0; idx <= blocks; idx++){
-        bytes_to_copy = MIN(AES_BLOCK_SIZE, in_len - bytes_offset - (idx * AES_BLOCK_SIZE));
-        //bytes_to_pad = AES_BLOCK_SIZE-bytes_to_copy;
-        memcpy(&outbuf[idx*AES_BLOCK_SIZE+bytes_offset], &inbuf[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
-        // memset(&buf[bytes_to_copy], 0, bytes_to_pad);
-        // if bytes_to_copy is less than blocksize, do nothing, since msg is truncated anyway
-        aes_encrypt_block(iv, buf, ctx);
-        xor_buf(buf, &outbuf[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
-        increment_iv(iv, AES_GCM_NONCE_LEN, AES_GCM_CTR_LEN);        // increment iv for continued use
-        if(idx==blocks){
-            memcpy(ctx->_private.last_block, buf, AES_BLOCK_SIZE);
-            ctx->_private.last_block_len = bytes_to_copy;
+            uint8_t *tag = ctx->_private.auth_tag;
+            
+            blocks = (in_len / AES_BLOCK_SIZE);
+            
+            size_t bytes_to_copy = ctx->_private.last_block_len;
+            size_t bytes_offset = 0;
+            if((ctx->_private.lock == LOCK_ALLOW_ALL) &&
+               (ctx->_private.aad_cache_len)){
+                // pad rest of aad cache with 0's
+                memset(buf, 0, AES_BLOCK_SIZE);
+                ghash(ctx, tag, buf, AES_BLOCK_SIZE - ctx->_private.aad_cache_len);
+            }
+            ctx->_private.lock = LOCK_ALLOW_ENCRYPT;
+            // xor last bytes of encryption buf w/ new plaintext for new ciphertext
+            if(bytes_to_copy%AES_BLOCK_SIZE){
+                bytes_offset = AES_BLOCK_SIZE - bytes_to_copy;
+                memcpy(outbuf, inbuf, bytes_offset);
+                xor_buf(&ctx->_private.last_block[bytes_to_copy], outbuf, bytes_offset);
+                blocks = ((in_len - bytes_offset) / AES_BLOCK_SIZE);
+            }
+            
+            // encrypt remaining plaintext
+            for(idx = 0; idx <= blocks; idx++){
+                bytes_to_copy = MIN(AES_BLOCK_SIZE, in_len - bytes_offset - (idx * AES_BLOCK_SIZE));
+                //bytes_to_pad = AES_BLOCK_SIZE-bytes_to_copy;
+                memcpy(&outbuf[idx*AES_BLOCK_SIZE+bytes_offset], &inbuf[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
+                // memset(&buf[bytes_to_copy], 0, bytes_to_pad);
+                // if bytes_to_copy is less than blocksize, do nothing, since msg is truncated anyway
+                aes_encrypt_block(iv, buf, ctx);
+                xor_buf(buf, &outbuf[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
+                increment_iv(iv, AES_GCM_NONCE_LEN, AES_GCM_CTR_LEN);        // increment iv for continued use
+                if(idx==blocks){
+                    memcpy(ctx->_private.last_block, buf, AES_BLOCK_SIZE);
+                    ctx->_private.last_block_len = bytes_to_copy;
+                }
+            }
+            
+            // authenticate the ciphertext
+            ghash(ctx, tag, outbuf, in_len);
+            ctx->_private.ct_len += in_len;
+            break;
+        }
+        case TLS_AES_CBC:
+        {
+            blocks = (in_len / AES_BLOCK_SIZE) + (!(in_len % AES_BLOCK_SIZE));
+            for(idx = 0; idx <= blocks; idx++){
+                size_t bytes_to_copy = MIN(AES_BLOCK_SIZE, in_len - (idx * AES_BLOCK_SIZE));
+                size_t bytes_to_pad = AES_BLOCK_SIZE-bytes_to_copy;
+                memcpy(buf, &inbuf[idx*AES_BLOCK_SIZE], bytes_to_copy);
+                memset(&buf[bytes_to_copy], bytes_to_pad, bytes_to_pad);
+                xor_buf(iv, buf, AES_BLOCK_SIZE);
+                aes_encrypt_block(buf, &outbuf[idx * AES_BLOCK_SIZE], ctx);
+                memcpy(iv, &outbuf[idx * AES_BLOCK_SIZE], AES_BLOCK_SIZE);
+            }
         }
     }
-            
-    // authenticate the ciphertext
-    ghash(ctx, tag, outbuf, in_len);
-    ctx->_private.ct_len += in_len;
-            
-          
-    //memcpy(iv, iv_buf, sizeof iv_buf);
+    memset(buf, 0, AES_BLOCK_SIZE);
     return true;
 }
 
@@ -1014,51 +1048,68 @@ bool tls_aes_decrypt(struct tls_aes_context* ctx, const uint8_t *inbuf, size_t i
     if((ctx==NULL) ||
        (inbuf==NULL) ||
        (in_len==0)) return false;
+    uint8_t buf_in[AES_BLOCK_SIZE], buf_out[AES_BLOCK_SIZE];
+    int idx, blocks = in_len / AES_BLOCK_SIZE;
 
     if(!decrypt_call_from_verify && (outbuf==NULL)) return false;
     if(ctx->op_assoc == AES_OP_ENCRYPT) return false;
     if(ctx->_private.lock > LOCK_ALLOW_ENCRYPT) return false;
     ctx->op_assoc = AES_OP_DECRYPT;
-    
-    
     uint8_t *iv = ctx->iv;
-    uint8_t *tag = ctx->_private.auth_tag;
-    uint8_t buf_in[AES_BLOCK_SIZE], buf_out[AES_BLOCK_SIZE];
-    int blocks = in_len / AES_BLOCK_SIZE, idx;
     
-    size_t bytes_to_copy = ctx->_private.last_block_len;
-    size_t bytes_offset = 0;
-    if((ctx->_private.lock == LOCK_ALLOW_ALL) &&
-        (ctx->_private.aad_cache_len)){
-        // pad rest of aad cache with 0's
-        memset(buf_in, 0, AES_BLOCK_SIZE);
-        ghash(ctx, tag, buf_in, AES_BLOCK_SIZE - ctx->_private.aad_cache_len);
-    }
-    ghash(ctx, tag, inbuf, in_len);
-    ctx->_private.ct_len += in_len;
-            
-    if(outbuf){
-        ctx->_private.lock = LOCK_ALLOW_ENCRYPT;
-        if(bytes_to_copy%AES_BLOCK_SIZE){
-            bytes_offset = AES_BLOCK_SIZE - bytes_to_copy;
-            memcpy(outbuf, inbuf, bytes_offset);
-            xor_buf(&ctx->_private.last_block[bytes_to_copy], outbuf, bytes_offset);
-            blocks = ((in_len - bytes_offset) / AES_BLOCK_SIZE);
-        }
-                
-        // encrypt remaining plaintext
-        for(idx = 0; idx <= blocks; idx++){
-            bytes_to_copy = MIN(AES_BLOCK_SIZE, in_len - bytes_offset - (idx * AES_BLOCK_SIZE));
-            //bytes_to_pad = AES_BLOCK_SIZE-bytes_to_copy;
-            memcpy(&outbuf[idx*AES_BLOCK_SIZE+bytes_offset], &inbuf[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
-            // memset(&buf[bytes_to_copy], 0, bytes_to_pad);        // if bytes_to_copy is less than blocksize, do nothing, since msg is truncated anyway
-            aes_encrypt_block(iv, buf_in, ctx);
-            xor_buf(buf_in, &outbuf[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
-            increment_iv(iv, AES_GCM_NONCE_LEN, AES_GCM_CTR_LEN);        // increment iv for continued use
-            if(idx==blocks){
-                memcpy(ctx->_private.last_block, buf_in, AES_BLOCK_SIZE);
-                ctx->_private.last_block_len = bytes_to_copy;
+    switch(ctx->mode){
+        case TLS_AES_GCM: 
+        {
+            uint8_t *tag = ctx->_private.auth_tag;
+            size_t bytes_to_copy = ctx->_private.last_block_len;
+            size_t bytes_offset = 0;
+            if((ctx->_private.lock == LOCK_ALLOW_ALL) &&
+               (ctx->_private.aad_cache_len)){
+                // pad rest of aad cache with 0's
+                memset(buf_in, 0, AES_BLOCK_SIZE);
+                ghash(ctx, tag, buf_in, AES_BLOCK_SIZE - ctx->_private.aad_cache_len);
             }
+            ghash(ctx, tag, inbuf, in_len);
+            ctx->_private.ct_len += in_len;
+            
+            if(outbuf){
+                ctx->_private.lock = LOCK_ALLOW_ENCRYPT;
+                if(bytes_to_copy%AES_BLOCK_SIZE){
+                    bytes_offset = AES_BLOCK_SIZE - bytes_to_copy;
+                    memcpy(outbuf, inbuf, bytes_offset);
+                    xor_buf(&ctx->_private.last_block[bytes_to_copy], outbuf, bytes_offset);
+                    blocks = ((in_len - bytes_offset) / AES_BLOCK_SIZE);
+                }
+                
+                // encrypt remaining plaintext
+                for(idx = 0; idx <= blocks; idx++){
+                    bytes_to_copy = MIN(AES_BLOCK_SIZE, in_len - bytes_offset - (idx * AES_BLOCK_SIZE));
+                    //bytes_to_pad = AES_BLOCK_SIZE-bytes_to_copy;
+                    memcpy(&outbuf[idx*AES_BLOCK_SIZE+bytes_offset], &inbuf[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
+                    // memset(&buf[bytes_to_copy], 0, bytes_to_pad);        // if bytes_to_copy is less than blocksize, do nothing, since msg is truncated anyway
+                    aes_encrypt_block(iv, buf_in, ctx);
+                    xor_buf(buf_in, &outbuf[idx*AES_BLOCK_SIZE+bytes_offset], bytes_to_copy);
+                    increment_iv(iv, AES_GCM_NONCE_LEN, AES_GCM_CTR_LEN);        // increment iv for continued use
+                    if(idx==blocks){
+                        memcpy(ctx->_private.last_block, buf_in, AES_BLOCK_SIZE);
+                        ctx->_private.last_block_len = bytes_to_copy;
+                    }
+                }
+            }
+            break;
+        }
+        case TLS_AES_CBC:
+        {
+            if((in_len % AES_BLOCK_SIZE) != 0) return false;
+            
+            for (idx = 0; idx < blocks; idx++) {
+                memcpy(buf_in, &inbuf[idx * AES_BLOCK_SIZE], AES_BLOCK_SIZE);
+                aes_decrypt_block(buf_in, buf_out, ctx);
+                xor_buf(iv, buf_out, AES_BLOCK_SIZE);
+                memcpy(&outbuf[idx * AES_BLOCK_SIZE], buf_out, AES_BLOCK_SIZE);
+                memcpy(iv, buf_in, AES_BLOCK_SIZE);
+            }
+            break;
         }
     }
     memset(buf_in, 0, sizeof buf_in);
@@ -1068,7 +1119,7 @@ bool tls_aes_decrypt(struct tls_aes_context* ctx, const uint8_t *inbuf, size_t i
 
 
 bool tls_aes_verify(struct tls_aes_context *ctx, const uint8_t *aad, size_t aad_len, const uint8_t *ciphertext, size_t ciphertext_len, const uint8_t *tag){
-    
+    if(ctx->mode != TLS_AES_GCM) return false;
     if((ctx==NULL) ||
        (ciphertext==NULL) ||
        (ciphertext_len==0) ||

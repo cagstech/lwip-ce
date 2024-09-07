@@ -6,7 +6,11 @@
 #include "../includes/base64.h"
 #include "../includes/asn1.h"
 #include "../includes/keyobject.h"
+#include "../includes/passwords.h"
+#include "../includes/aes.h"
+#include "../includes/hash.h"
 
+void rmemcpy(void *dest, void *src, size_t len);
 
 uint8_t tls_objectids[][10] = {
     // PKCS and SECG object ids
@@ -17,7 +21,9 @@ uint8_t tls_objectids[][10] = {
     
     // encryption algorithm identifiers (encrypted private key)
     {0x60,0x86,0x48,0x01,0x65,0x03,0x04,0x01,0x06},     // TLS_OID_AES_128_GCM
+    {0x60,0x86,0x48,0x01,0x65,0x03,0x04,0x01,0x02},     // TLS_OID_AES_128_CBC
     {0x60,0x86,0x48,0x01,0x65,0x03,0x04,0x02,0x01},     // TLS_OID_AES_256_GCM
+    {0x60,0x86,0x48,0x01,0x65,0x03,0x04,0x01,0x2A},     // TLS_OID_AES_256_CBC
     {0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x05,0x0C},     // TLS_OID_PBKDF2
     {0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x05,0x0D},     // TLS_OID_PBES2
     {0x2A,0x86,0x48,0x86,0xF7,0x0D,0x02,0x09},          // TLS_OID_HMAC_SHA256
@@ -153,6 +159,15 @@ struct tls_asn1_schema tls_pkcs8_encrypted_privkey_schema[] = {
     {NULL, 0, 0, false, false, false}
 };
 struct tls_asn1_serialization tls_pkcs8_encrypted_private_serialize[9];
+#define TLS_PKCS8_ENCRYPTED_IDX_PBES2   0
+#define TLS_PKCS8_ENCRYPTED_IDX_PBKDF2  1
+#define TLS_PKCS8_ENCRYPTED_IDX_SALT    2
+#define TLS_PKCS8_ENCRYPTED_IDX_ROUNDS  3
+#define TLS_PKCS8_ENCRYPTED_IDX_KEYLEN  4
+#define TLS_PKCS8_ENCRYPTED_IDX_HMAC    5
+#define TLS_PKCS8_ENCRYPTED_IDX_AES     6
+#define TLS_PKCS8_ENCRYPTED_IDX_IV      7
+#define TLS_PKCS8_ENCRYPTED_IDX_DATA    8
 
 /* -------------------------------------------------------------------------
  SubjectPublicKeyInfo ::= SEQUENCE {
@@ -192,7 +207,8 @@ struct tls_lookup_data pkcs_lookups[] = {
 };
 
 
-struct tls_private_key_context *tls_private_key_import(const char *pem_data, size_t size){
+struct tls_private_key_context *tls_private_key_import(const char *pem_data, size_t size, const char *password){
+    if((pem_data==NULL) || (size==0)) return NULL;
     struct tls_asn1_schema *decoder_schema;
     struct tls_asn1_serialization tmp_serialize[9] = {0};
     uint8_t serialized_count = 0;
@@ -236,9 +252,68 @@ file_type_ok:
     kf->type = 0 | TLS_KEY_PRIVATE;
     
     if(decoder_schema == tls_pkcs8_encrypted_privkey_schema){
-        goto error;
+        if(password==NULL) goto error;
+        for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
+            if(!tls_asn1_decode_next(&asn1_ctx,
+                                     &decoder_schema[i],
+                                     &tmp_serialize[serialized_count].tag,
+                                     &tmp_serialize[serialized_count].data,
+                                     &tmp_serialize[serialized_count].len,
+                                     NULL))
+                goto error;
+            if(decoder_schema[i].output)
+                serialized_count++;
+        }
+        if(
+           (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_PBES2].data, tls_objectids[TLS_OID_PBES2], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_PBES2].len)==0) &&
+           (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_PBKDF2].data, tls_objectids[TLS_OID_PBKDF2], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_PBKDF2].len)==0) &&
+           (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_HMAC].data, tls_objectids[TLS_OID_HMAC_SHA256], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_HMAC].len)==0) && 
+           ((memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].data, tls_objectids[TLS_OID_AES_128_CBC], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].len)==0) ||
+            (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].data, tls_objectids[TLS_OID_AES_256_CBC], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].len)==0))
+           ){
+               size_t keylen = 0, rounds = 0;
+               uint8_t derived_key[32];
+               struct tls_aes_context aes_ctx;
+               // try to get keylen from keylen field if present
+               if(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_KEYLEN].data)
+                   rmemcpy(&keylen, tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_KEYLEN].data, tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_KEYLEN].len);
+               else // else derive from AES algorithm
+                   keylen = (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].data, tls_objectids[TLS_OID_AES_128_CBC], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].len)==0) ? 16 : 32;
+               // get rounds from rounds field
+               rmemcpy(&rounds, tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_ROUNDS].data, tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_ROUNDS].len);
+               // derive key
+               if(!tls_pbkdf2(password, strlen(password),
+                              tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_SALT].data,
+                              tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_SALT].len,
+                              derived_key, keylen,
+                              rounds, TLS_HASH_SHA256))
+                   goto error;
+        
+               // AES context init
+               if(!tls_aes_init(&aes_ctx, TLS_AES_CBC, derived_key, keylen,
+                               tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_IV].data,
+                               tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_IV].len))
+                   goto error;
+                  
+               // decrypt
+               size_t cbc_len = tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_DATA].len;
+               if(!tls_aes_decrypt(&aes_ctx,
+                                   tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_DATA].data,
+                                   cbc_len,
+                                   kf->data))
+                   goto error;
+               
+               size_t cbc_actual_len = cbc_len - kf->data[cbc_len-1];
+               
+               decoder_schema = tls_pkcs8_privkey_schema;
+               // init decoder to end of decrypted content
+               if(!tls_asn1_decoder_init(&asn1_ctx, kf->data, cbc_actual_len)) goto error;
+           }
+        else
+            goto error;
     }
     if(decoder_schema ==  tls_pkcs8_privkey_schema){
+        serialized_count = 0;
         for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
             if(!tls_asn1_decode_next(&asn1_ctx,
                                      &decoder_schema[i],
@@ -260,10 +335,8 @@ file_type_ok:
             (memcmp(tmp_serialize[0].data, tls_objectids[TLS_OID_EC_PUBLICKEY], tmp_serialize[0].len)==0) &&
             (memcmp(tmp_serialize[1].data, tls_objectids[TLS_OID_EC_SECP256R1], tmp_serialize[1].len)==0))
         goto is_ecc;
-    else {
-        printf("invalid object id");
+    else
         goto error;
-    }
     
 is_rsa:
     kf->type |= TLS_KEY_RSA;

@@ -23,7 +23,9 @@ enum tls_object_ids {
     
     // encryption algorithm identifiers (encrypted private key)
     TLS_OID_AES_128_GCM,                /**< AES-128-GCM => 2.16.840.1.101.3.4.1.2 */
+    TLS_OID_AES_128_CBC,                /**< AES-128-CBC  => 2.16.840.1.101.3.4.1.2 */
     TLS_OID_AES_256_GCM,                /**< AES-256-GCM => 2.16.840.1.101.3.4.2.1 */
+    TLS_OID_AES_256_CBC,                /**< AES-256-CBC => 2.16.840.1.101.3.4.1.42 */
     TLS_OID_PBKDF2,                     /**< PBKDF2 => 1.2.840.113549.1.5.12 */
     TLS_OID_PBES2,                      /**< PBES2 => 1.2.840.113549.1.5.13 */
     TLS_OID_HMAC_SHA256,                /**< HMAC-SHA256 => 1.2.840.113549.2.9 */
@@ -90,6 +92,6 @@ struct tls_certificate_context {
 };
 
 
-struct tls_private_key_context *tls_private_key_import(const char *pem_data, size_t size);
+struct tls_private_key_context *tls_private_key_import(const char *pem_data, size_t size, const char *password);
 
 #endif
