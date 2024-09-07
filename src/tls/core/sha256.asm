@@ -17,17 +17,16 @@ _sha256_m_buffer := _sprng_sha_mbuffer
 
 ; reverse b longs endianness from iy to hl
 _sha256_reverse_endianness:
-	ld a, (iy + 0)
-	ld c, (iy + 1)
-	ld d, (iy + 2)
-	ld e, (iy + 3)
-	ld (hl), e
-	inc hl
-	ld (hl), d
+	ld de, (iy + 0)
+	ld c, (iy + 2)
+	ld a, (iy + 3)
+	ld (hl), a
 	inc hl
 	ld (hl), c
 	inc hl
-	ld (hl), a
+	ld (hl), d
+	inc hl
+	ld (hl), e
 	inc hl
 	lea iy, iy + 4
 	djnz _sha256_reverse_endianness
@@ -189,78 +188,16 @@ macro _adc? R1,R2,R3,R4
 	ld R2,a
 end macro
 
-; helper macro to add [B,C] with [R1,R2] storing into [R1,R2]
-; destroys: af
-; note: this will add including the carry flag, so be sure of what the carry flag is before this
-; note: if you're chaining this into a number longer than 16 bits, the order must be low->high
-macro _addbclow? R1,R2
-	ld a,c
-	add a,R2
-	ld R2,a
-	ld a,b
-	adc a,R1
-	ld R1,a
+; helper macro to rotate [a,uhl] left by the given amount
+; input: c=0
+; destroys: f
+macro _rotleft32? AMOUNT
+repeat AMOUNT
+	add a,a
+	adc hl,hl
+	adc a,c
+end repeat
 end macro
-macro _addbchigh? R1,R2
-	ld a,c
-	adc a,R2
-	ld R2,a
-	ld a,b
-	adc a,R1
-	ld R1,a
-end macro
-
-; helper macro to move [d,e,h,l] <- [l,e,d,h] therefore shifting 8 bits right.
-; destroys: af
-macro _rotright8?
-	ld a,l
-	ld l,h
-	ld h,e
-	ld e,d
-	ld d,a
-end macro
-
-; helper macro to move [d,e,h,l] <- [e,h,l,d] therefore shifting 8 bits left.
-; destroys: af
-macro _rotleft8?
-	ld a,d
-	ld d,e
-	ld e,h
-	ld h,l
-	ld l,a
-end macro
-
-
-; #define ROTLEFT(a,b) (((a) << (b)) | ((a) >> (32-(b))))
-;input: [d,e,h,l], b
-;output: [d,e,h,l]
-;destroys: af, b
-_ROTLEFT:
-	xor a,a
-	rl l
-	rl h
-	rl e
-	rl d
-	adc a,l
-	ld l,a
-	djnz .
-	ret
-
-; #define ROTRIGHT(a,b) (((a) >> (b)) | ((a) << (32-(b))))
-;input: [d,e,h,l], b
-;output: [d,e,h,l]
-;destroys: af, b
-_ROTRIGHT:
-	xor a,a
-	rr d
-	rr e
-	rr h
-	rr l
-	rra
-	or a,d
-	ld d,a
-	djnz .
-	ret
 
 
 ; initialize sha256 hash state
@@ -407,66 +344,6 @@ _sha256_final_pad_message_len_loop:
 	pop ix
 	restore_interrupts _tls_sha256_digest
 	ret
- 
- ; #define SIG0(x) (ROTRIGHT(x,7) ^ ROTRIGHT(x,18) ^ ((x) >> 3))
-;input [d,e,h,l]
-;output [d,e,h,l]
-;destroys af, bc
-_SIG0:
-	ld b,3
-	call _ROTRIGHT  ;rotate long accumulator 3 bits right
-	push hl,de	  ;save value for later
-	ld b,4
-	call _ROTRIGHT  ;rotate long accumulator another 4 bits right for a total of 7 bits right
-	push hl,de	  ;save value for later
-	_rotright8      ;rotate long accumulator 8 bits right
-	ld b,3
-	call _ROTRIGHT  ;rotate long accumulator another 3 bits right for a total of 18 bits right
-	pop bc
-	_xorbc d,e  ;xor third ROTRIGHT result with second ROTRIGHT result (upper 16 bits)
-	pop bc
-	_xorbc h,l  ;xor third ROTRIGHT result with second ROTRIGHT result (lower 16 bits)
-	pop bc
-	ld a,b
-	and a,$1F   ;cut off the upper 3 bits from the result of the first ROTRIGHT call
-	xor a,d	 ;xor first ROTRIGHT result with result of prior xor (upper upper 8 bits)
-	ld d,a
-	ld a,c
-	xor a,e	 ;xor first ROTRIGHT result with result of prior xor (lower upper 8 bits)
-	ld e,a
-	pop bc
-	_xorbc h,l  ;xor first ROTRIGHT result with result of prior xor (lower 16 bits)
-	ret
-
-; #define SIG1(x) (ROTRIGHT(x,17) ^ ROTRIGHT(x,19) ^ ((x) >> 10))
-;input: [d,e,h,l]
-;output: [d,e,h,l]
-;destroys: af, bc
-_SIG1:
-	_rotright8      ;rotate long accumulator 8 bits right
-	ld b,2
-	call _ROTRIGHT  ;rotate long accumulator 2 bits right for a total of 10 bits right
-	push hl,de	    ;save value for later
-	_rotright8      ;rotate long accumulator 8 bits right for a total of 18 bits right
-	ld b,1
-	call _ROTLEFT  ;rotate long accumulator a bit left for a total of 17 bits right
-	push hl,de	  ;save value for later
-	ld b,2
-	call _ROTRIGHT  ;rotate long accumulator another 2 bits right
-	pop bc
-	_xorbc d,e  ;xor third ROTRIGHT result with second ROTRIGHT result (upper 16 bits)
-	pop bc
-	_xorbc h,l  ;xor third ROTRIGHT result with second ROTRIGHT result (lower 16 bits)
-
-	;we're cutting off upper 10 bits of first ROTRIGHT result meaning we're xoring by zero, so we can just keep the value of d.
-	pop bc
-	ld a,c
-	and a,$3F   ;cut off the upper 2 bits from the lower upper byte of the first ROTRIGHT result.
-	xor a,e	 ;xor first ROTRIGHT result with result of prior xor (lower upper upper 8 bits)
-	ld e,a
-	pop bc
-	_xorbc h,l  ;xor first ROTRIGHT result with result of prior xor (lower 16 bits)
-	ret
 
 
 ; void _sha256_transform(SHA256_CTX *ctx);
@@ -480,63 +357,10 @@ _sha256_transform:
 ._b := -28
 ._a := -32
 ._state_vars := -32
-._tmp1 := -36
-._tmp2 := -40
-._i := -41
-._frame_offset := -41
-	ld hl,._frame_offset
+._i := -35
+._frame_offset := -35
+	ld hl,._state_vars              ; exclude the _i variable for now
 	call __frameset
-	ld hl,_sha256_m_buffer
-	add hl,bc
-	or a,a
-	sbc hl,bc
-	jq z,._exit
-	ld iy,(ix + 6)
-	ld b,16
-	call _sha256_reverse_endianness ;first loop is essentially just reversing the endian-ness of the data into m (both represented as 32-bit integers)
-
-	ld iy,_sha256_m_buffer
-	lea iy, iy + 16*4
-	ld b, 64-16
-._loop2:
-	push bc
-; m[i] = SIG1(m[i - 2]) + m[i - 7] + SIG0(m[i - 15]) + m[i - 16];
-	ld hl,(iy + -2*4 + 0)
-	ld de,(iy + -2*4 + 2)
-	call _SIG1
-	push de,hl
-	ld hl,(iy + -15*4 + 0)
-	ld de,(iy + -15*4 + 2)
-	call _SIG0
-
-; SIG0(m[i - 15]) + m[i - 16]
-	ld bc, (iy + -16*4 + 0)
-	_addbclow h,l
-	ld bc, (iy + -16*4 + 2)
-	_addbchigh d,e
-
-; + SIG1(m[i - 2])
-	pop bc
-	_addbclow h,l
-	pop bc
-	_addbchigh d,e
-
-; + m[i - 7]
-	ld bc, (iy + -7*4)
-	_addbclow h,l
-	ld bc, (iy + -7*4 + 2)
-	_addbchigh d,e
-
-; --> m[i]
-	ld (iy + 3), d
-	ld (iy + 2), e
-	ld (iy + 1), h
-	ld (iy + 0), l
-
-	lea iy, iy + 4
-	pop bc
-	djnz ._loop2
-
 
 	ld iy, (ix + 6)
 	lea hl, iy + sha256_offset_state
@@ -544,233 +368,360 @@ _sha256_transform:
 	ld bc, 8*4
 	ldir				; copy the ctx state to scratch stack memory (uint32_t a,b,c,d,e,f,g,h)
 
-	ld (ix + ._i), c
+	ld c, 64-16
+	push bc                         ; set the _i variable and finish stack frame setup
+
+	ld hl,_sha256_m_buffer
+	ld b,16
+	call _sha256_reverse_endianness ;first loop is essentially just reversing the endian-ness of the data into m (both represented as 32-bit integers)
+	push hl
+	pop iy
+
+._loop2:
+; m[i] = SIG1(m[i - 2]) + m[i - 7] + SIG0(m[i - 15]) + m[i - 16];
+
+; SIG0(m[i - 15])
+; #define SIG0(x) (ROTRIGHT(x,7) ^ ROTRIGHT(x,18) ^ ((x) >> 3))
+	ld hl,(iy + -15*4 + 0)
+	ld a, (iy + -15*4 + 3)
+	ld c,0     ; input to _rotleft32 macro
+	_rotleft32 1           ; x << 1
+	push hl    ; push (x << 1)[0:2]
+	ld b,a     ; (x << 1)[3]
+	ld e,h     ; (x << 1)[1]
+	_rotleft32 4           ; x << 5
+	push hl    ; push (x << 5)[0:2]
+	ld d,a     ; (x << 5)[3]
+	_rotleft32 1           ; x << 6
+	ld c,a     ; (x << 6)[3]
+	; SIG0[2] == (x >> 7)[2] ^ (x >> 18)[2] ^ (x >> 3)[2] == (x << 1)[3] ^ (x << 6)[1] ^ (x << 5)[3]
+	ld a,h     ; (x << 6)[1]
+	xor a,d    ; (x << 5)[3]
+	xor a,b    ; (x << 1)[3]
+	ld b,a     ; SIG0[2]
+	; SIG0[1] == (x >> 7)[1] ^ (x >> 18)[1] ^ (x >> 3)[1] == (x << 1)[2] ^ (x << 6)[0] ^ (x << 5)[2]
+	ld a,l     ; (x << 6)[0]
+	xor a, (ix + ._frame_offset - 3 + 2) ; (x << 1)[2]
+	xor a, (ix + ._frame_offset - 6 + 2) ; (x << 5)[2]
+	ld h,a     ; SIG0[1]
+	; SIG0[0] == (x >> 7)[0] ^ (x >> 18)[0] ^ (x >> 3)[0] == (x << 1)[1] ^ (x << 6)[3] ^ (x << 5)[1]
+	ld a,e     ; (x << 1)[1]
+	pop de     ; pop (x << 5)[0:1]
+	xor a,c    ; (x << 6)[3]
+	xor a,d    ; (x << 5)[1]
+	ld l,a     ; SIG0[0]
+	ex (sp),hl ; pop (x << 1)[0:1], push SIG0[0:1] and (x << 6)[2]
+	; SIG0[3] == (x >> 7)[3] ^ (x >> 18)[3] ^ (x >> 3)[3] == (x << 1)[0] ^ (x << 6)[2] ^ (x << 5)[0]
+	ld a,e     ; (x << 5)[0]
+	and a,$1F  ; cut off the upper 3 bits from (x >> 3)
+	xor a,l    ; (x << 1)[0]
+	lea hl, ix + ._frame_offset - 3 + 2
+	xor a,(hl) ; (x << 6)[2]
+	ld (hl),b  ; SIG0[2]
+	push af    ; push SIG0[3]
+
+; SIG1(m[i - 2])
+; #define SIG1(x) (ROTRIGHT(x,17) ^ ROTRIGHT(x,19) ^ ((x) >> 10))
+	ld hl,(iy + -2*4 + 0)
+	ld a, (iy + -2*4 + 3)
+	ld c,0     ; input to _rotleft32 macro
+	_rotleft32 5           ; x << 5
+	push hl    ; push (x << 5)[0:2]
+	ld e,a     ; (x << 5)[3]
+	ld b,l     ; (x << 5)[0]
+	_rotleft32 1           ; x << 6
+	push hl    ; push (x << 6)[0:2]
+	ld d,a     ; (x << 6)[3]
+	_rotleft32 1           ; x << 7
+	ld c,l     ; (x << 7)[0]
+	; SIG1[0] == (x >> 17)[0] ^ (x >> 19)[0] ^ (x >> 10)[0] == (x << 7)[3] ^ (x << 5)[3] ^ (x << 6)[2]
+	xor a,e    ; (x << 5)[3]
+	xor a, (ix + ._frame_offset - 12 + 2) ; (x << 6)[2]
+	ld l,a     ; SIG1[0]
+	; SIG1[1] == (x >> 17)[1] ^ (x >> 19)[1] ^ (x >> 10)[1] == (x << 7)[0] ^ (x << 5)[0] ^ (x << 6)[3]
+	ld a,d     ; (x << 6)[3]
+	xor a,b    ; (x << 5)[0]
+	xor a,c    ; (x << 7)[0]
+	ld c,h     ; (x << 7)[1]
+	ld h,a     ; SIG1[1]
+	; SIG1[3] == (x >> 17)[3] ^ (x >> 19)[3] ^ (x >> 10)[3] == (x << 7)[2] ^ (x << 5)[2] ^ 0
+	pop de     ; pop (x << 6)[0:1]
+	inc sp     ; safe to trash the flags from the prior push af
+	ex (sp),hl ; pop (x << 5)[1:2], push SIG1[0:1] and (x << 7)[2]
+	ld a, (ix + ._frame_offset - 8 + 2) ; (x << 7)[2]
+	xor a,h    ; (x << 5)[2]
+	ld b,a     ; SIG1[3]
+	; SIG1[2] == (x >> 17)[2] ^ (x >> 19)[2] ^ (x >> 10)[2] == (x << 7)[1] ^ (x << 5)[1] ^ (x << 6)[0]
+	ld a,e     ; (x << 6)[0]
+	and a,$3F  ; cut off the upper 10 bits of (x >> 10)
+	xor a,c    ; (x << 7)[1]
+	xor a,l    ; (x << 5)[1]
+	ld (ix + ._frame_offset - 8 + 2), a ; SIG1[2]
+	pop hl     ; pop SIG1[0:2]
+	dec sp     ; restore stack pointer for pop af
+
+; + SIG0(m[i - 15])
+	pop af, de
+	add hl,de
+	adc a,b
+
+; + m[i - 16]
+	ld de, (iy + -16*4 + 0)
+	add hl,de
+	adc a, (iy + -16*4 + 3)
+
+; + m[i - 7]
+	ld de, (iy + -7*4)
+	add hl,de
+	adc a, (iy + -7*4 + 3)
+
+; --> m[i]
+	ld (iy + 0), hl
+	ld (iy + 3), a
+
+	lea iy, iy + 4
+	dec (ix + ._i)
+	jq nz, ._loop2
+
 ._loop3:
 ; tmp1 = h + EP1(e) + CH(e,f,g) + k[i] + m[i];
+
 ; CH(e,f,g)
 ; #define CH(x,y,z) (((x) & (y)) ^ (~(x) & (z)))
-	lea iy,ix
-	ld b,4
-._loop3inner1:
-	ld a, (iy + ._e)
-	xor a,$FF
-	and a, (iy + ._g)
-	ld c,a
-	ld a, (iy + ._e)
-	and a, (iy + ._f)
+	ld hl, (ix + ._e + 0)
+	ld de, (ix + ._f + 0)
+	ld bc, (ix + ._g + 0)
+	ld a,e
 	xor a,c
-	ld (iy + ._tmp1),a
-	inc iy
-	djnz ._loop3inner1
+	and a,l
+	xor a,c
+	ld c,a
+	ld a,d
+	xor a,b
+	and a,h
+	xor a,b
+	ld b,a
+	push bc
 
-	; scf
-	; sbc hl,hl
-	; ld (hl),2
+	ld de, (ix + ._e + 2)
+	ld bc, (ix + ._g + 2)
+	ld a, (ix + ._f + 2)
+	xor a,c
+	and a,e
+	xor a,c
+	ld (ix + ._frame_offset - 3 + 2), a
+	ld a, (ix + ._f + 3)
+	xor a,b
+	and a,d
+	xor a,b
+	ld iyl,a
 
 ; EP1(e)
 ; #define EP1(x) (ROTRIGHT(x,6) ^ ROTRIGHT(x,11) ^ ROTRIGHT(x,25))
-	ld hl,(ix + ._e + 0)
-	ld de,(ix + ._e + 2)
-	ld b,6    ;rotate e 6 bits right
-	call _ROTRIGHT
-	push de,hl
-	ld b,5    ;rotate accumulator another 5 bits for a total of 11
-	call _ROTRIGHT
-	push de,hl
-	_rotright8 ;rotate accumulator another 8 bits for a total of 19
-	ld b,6
-	call _ROTRIGHT ;rotate accumulator another 6 bits for a total of 25
-	pop bc         ;ROTRIGHT(x,11) ^ ROTRIGHT(x,25)
-	_xorbc h,l
-	pop bc
-	_xorbc d,e
-	pop bc         ; ^ ROTRIGHT(x,6)
-	_xorbc h,l
-	pop bc
-	_xorbc d,e
+	ld a,d
+	ld c,0     ; input to _rotleft32 macro
+	_rotleft32 2         ; x << 2
+	push hl    ; push (x << 2)[0:2]
+	ld b,a     ; (x << 2)[3]
+	ld e,h     ; (x << 2)[1]
+	_rotleft32 3         ; x << 5
+	push hl    ; push (x << 5)[0:2]
+	ld d,a     ; (x << 5)[3]
+	_rotleft32 2         ; x << 7 == x >> 25
+	ld c,a     ; (x >> 25)[3]
+	; EP1[0] == (x >> 6)[0] ^ (x >> 11)[0] ^ (x >> 25)[0] == (x << 2)[1] ^ (x << 5)[2] ^ (x >> 25)[0]
+	ld a,l     ; (x >> 25)[0]
+	xor a, (ix + ._frame_offset - 9 + 2) ; (x << 5)[2]
+	xor a,e    ; (x << 2)[1]
+	ld l,a     ; EP1[0]
+	; EP1[1] == (x >> 6)[1] ^ (x >> 11)[1] ^ (x >> 25)[1] == (x << 2)[2] ^ (x << 5)[3] ^ (x >> 25)[1]
+	ld a,h     ; (x >> 25)[1]
+	xor a, (ix + ._frame_offset - 6 + 2) ; (x << 2)[2]
+	xor a,d    ; (x << 5)[3]
+	ld h,a     ; EP1[1]
+	; EP1[2] == (x >> 6)[2] ^ (x >> 11)[2] ^ (x >> 25)[2] == (x << 2)[3] ^ (x << 5)[0] ^ (x >> 25)[2]
+	ex (sp),hl ; pop (x << 5)[0:1], push EP1[0:1] and (x >> 25)[2]
+	lea de, ix + ._frame_offset - 9 + 2
+	ld a, (de) ; (x >> 25)[2]
+	xor a,b    ; (x << 2)[3]
+	xor a,l    ; (x << 5)[0]
+	ld (de), a ; EP1[2]
+	; EP1[3] == (x >> 6)[3] ^ (x >> 11)[3] ^ (x >> 25)[3] == (x << 2)[0] ^ (x << 5)[1] ^ (x >> 25)[3]
+	ld a,h     ; (x << 5)[1]
+	pop hl     ; pop EP1[0:2]
+	pop de     ; pop (x << 2)[0:1]
+	xor a,e    ; (x << 2)[0]
+	xor a,c    ; (x >> 25)[3]
 
-; EP1(e) + h
-	ld bc, (ix + ._h)
-	_addbclow h,l
-	ld bc, (ix + ._h + 2)
-	_addbchigh d,e
+; + h
+	ld de, (ix + ._h + 0)
+	add hl,de
+	adc a, (ix + ._h + 3)
 
-; h + EP1(e) + CH(e,f,g)
-	ld bc, (ix + ._tmp1)
-	_addbclow h,l
-	ld bc, (ix + ._tmp1 + 2)
-	_addbchigh d,e
+; + CH(e,f,g)
+	pop de
+	add hl,de
+	adc a,iyl
 
-; B0ED BDD0
-	push de,hl
-	ld hl,_sha256_m_buffer
-	ld b,4
-	ld c,(ix + ._i)
-	mlt bc
-	add hl,bc
-	ld de,(hl)
-	inc hl
-	inc hl
-	ld hl,(hl)
-	push hl,de
-	ld hl,_sha256_k
-	add hl,bc
-	ld de,(hl)
-	inc hl
-	inc hl
-	ld hl,(hl)
+; + m[i]
+	ld bc,(ix + ._i)
+	ld iy,_sha256_m_buffer
+	add iy,bc
+	ld de,(iy + 0)
+	add hl,de
+	adc a,(iy + 3)
 
-; m[i] + k[i]
-	pop bc
-	_addbclow d,e
-	pop bc
-	_addbchigh h,l
-
-; m[i] + k[i] + h + EP1(e) + CH(e,f,g)
-	pop bc
-	_addbclow d,e
-	pop bc
-	_addbchigh h,l
+; + k[i]
+	ld iy,_sha256_k
+	add iy,bc
+	ld de,(iy + 0)
+	add hl,de
+	adc a,(iy + 3)
 
 ; --> tmp1
-	ld (ix + ._tmp1 + 3),h
-	ld (ix + ._tmp1 + 2),l
-	ld (ix + ._tmp1 + 1),d
-	ld (ix + ._tmp1 + 0),e
+	push hl
+	ld iyl,a
+; d = d + tmp1
+	ld de, (ix + ._d + 0)
+	add hl,de
+	ld (ix + ._d + 0), hl
+	lea hl, ix + ._d + 3
+	adc a, (hl)
+	ld (hl), a
 
 ; tmp2 = EP0(a) + MAJ(a,b,c);
+
 ; MAJ(a,b,c)
 ; #define MAJ(x,y,z) (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
-	lea iy,ix
-	ld b,4
-._loop3inner2:
-	ld a, (iy + ._a)
-	and a, (iy + ._b)
+	ld hl, (ix + ._a + 0)
+	ld de, (ix + ._b + 0)
+	ld a,l
+	and a,e
 	ld c,a
-	ld a, (iy + ._a)
-	and a, (iy + ._c)
-	xor a,c
+	ld a,l
+	xor a,e
+	and a, (ix + ._c + 0)
+	or a,c
+	ld l,a
+	ld a,h
+	and a,d
 	ld c,a
-	ld a, (iy + ._b)
-	and a, (iy + ._c)
-	xor a,c
-	ld (iy + ._tmp2), a
-	inc iy
-	djnz ._loop3inner2
+	ld a,h
+	xor a,d
+	and a, (ix + ._c + 1)
+	or a,c
+	ld h,a
+	push hl
+
+	ld hl, (ix + ._a + 2)
+	ld de, (ix + ._b + 2)
+	ld a,l
+	and a,e
+	ld c,a
+	ld a,l
+	xor a,e
+	and a, (ix + ._c + 2)
+	or a,c
+	ld (ix + ._frame_offset - 6 + 2),a
+	ld a,h
+	and a,d
+	ld c,a
+	ld a,h
+	xor a,d
+	and a, (ix + ._c + 3)
+	or a,c
+	ld iyh,a
+
+; h = g;
+; g = f;
+; f = e;
+; e = d;
+; d = c;
+; c = b;
+; b = a;
+	lea hl, ix + ._g + 3
+	lea de, ix + ._h + 3
+	ld c, ._h - ._a - 1
+	lddr
+	ld a, (hl)
+	ld (de), a
 
 ; EP0(a)
 ; #define EP0(x) (ROTRIGHT(x,2) ^ ROTRIGHT(x,13) ^ ROTRIGHT(x,22))
-	ld hl,(ix + ._a + 0)
-	ld de,(ix + ._a + 2)
-	ld b,2
-	call _ROTRIGHT     ; x >> 2
-	push de,hl
-	_rotright8         ; x >> 10
-	ld b,3
-	call _ROTRIGHT     ; x >> 13
-	push de,hl
-	_rotright8         ; x >> 21
-	inc b ;_ROTRIGHT sets b to zero
-	call _ROTRIGHT     ; x >> 22
-	pop bc             ; (x >> 22) ^ (x >> 13)
-	_xorbc h,l
-	pop bc
-	_xorbc d,e
-	pop bc             ; (x >> 2) ^ (x >> 22) ^ (x >> 13)
-	_xorbc h,l
-	pop bc
-	_xorbc d,e
+	ld hl, (ix + ._a + 1) ; x >> 8
+	_rotleft32 2          ; x >> 6
+	push hl    ; push (x >> 6)[0:2]
+	ld e,a     ; (x >> 6)[3]
+	_rotleft32 1          ; x >> 5
+	push hl    ; push (x >> 5)[0:2]
+	ld d,a     ; (x >> 5)[3]
+	ld b,h     ; (x >> 5)[1]
+	_rotleft32 3          ; x >> 2
+	ld c,a     ; (x >> 2)[3]
+	; EP0[0] == (x >> 2)[0] ^ (x >> 13)[0] ^ (x >> 22)[0] == (x >> 2)[0] ^ (x >> 5)[1] ^ (x >> 6)[2]
+	ld a,l     ; (x >> 2)[0]
+	xor a, (ix + ._frame_offset - 9 + 2) ; (x >> 6)[2]
+	xor a,b    ; (x >> 5)[1]
+	ld l,a     ; EP0[0]
+	; EP0[1] == (x >> 2)[1] ^ (x >> 13)[1] ^ (x >> 22)[1] == (x >> 2)[1] ^ (x >> 5)[2] ^ (x >> 6)[3]
+	ld a,h     ; (x >> 2)[1]
+	xor a, (ix + ._frame_offset - 12 + 2) ; (x >> 5)[2]
+	xor a,e    ; (x >> 6)[3]
+	ld h,a     ; EP0[1]
+	; EP0[2] == (x >> 2)[2] ^ (x >> 13)[2] ^ (x >> 22)[2] == (x >> 2)[2] ^ (x >> 5)[3] ^ (x >> 6)[0]
+	ld a,d     ; (x >> 5)[3]
+	pop de     ; pop (x >> 5)[0:1]
+	ex (sp),hl ; pop (x >> 6)[0:1], push EP0[0:1] and (x >> 2)[2]
+	xor a,l    ; (x >> 6)[0]
+	xor a, (ix + ._frame_offset - 9 + 2) ; (x >> 2)[2]
+	ld (ix + ._frame_offset - 9 + 2), a ; EP0[2]
+	; EP0[3] == (x >> 2)[3] ^ (x >> 13)[3] ^ (x >> 22)[3] == (x >> 2)[3] ^ (x >> 5)[0] ^ (x >> 6)[1]
+	ld a,c     ; (x >> 2)[3]
+	xor a,h    ; (x >> 6)[1]
+	xor a,e    ; (x >> 5)[0]
+	pop hl     ; pop EP0[0:2]
 
-	ld bc, (ix + ._tmp2)  ; EP0(a) + MAJ(a,b,c)
-	_addbclow h,l
-	ld bc, (ix + ._tmp2 + 2)
-	_addbchigh d,e
-	ld (ix + ._tmp2 + 3), d
-	ld (ix + ._tmp2 + 2), e
-	ld (ix + ._tmp2 + 1), h
-	ld (ix + ._tmp2 + 0), l
+; + MAJ(a,b,c)
+	pop de
+	add hl,de
+	adc a,iyh
 
-; h = g;
-	ld hl, (ix + ._g + 0)
-	ld a,  (ix + ._g + 3)
-	ld (ix + ._h + 0), hl
-	ld (ix + ._h + 3), a
+; + tmp1
+	pop de
+	add hl,de
+	adc a,iyl
 
-; g = f;
-	ld hl, (ix + ._f + 0)
-	ld a,  (ix + ._f + 3)
-	ld (ix + ._g + 0), hl
-	ld (ix + ._g + 3), a
-
-; f = e;
-	ld hl, (ix + ._e + 0)
-	ld a,  (ix + ._e + 3)
-	ld (ix + ._f + 0), hl
-	ld (ix + ._f + 3), a
-
-; e = d + tmp1;
-	ld hl, (ix + ._d + 0)
-	ld a,  (ix + ._d + 3)
-	ld de, (ix + ._tmp1 + 0)
-	or a,a
-	adc hl,de
-	adc a, (ix + ._tmp1 + 3)
-	ld (ix + ._e + 0), hl
-	ld (ix + ._e + 3), a
-
-; d = c;
-	ld hl, (ix + ._c + 0)
-	ld a,  (ix + ._c + 3)
-	ld (ix + ._d + 0), hl
-	ld (ix + ._d + 3), a
-
-; c = b;
-	ld hl, (ix + ._b + 0)
-	ld a,  (ix + ._b + 3)
-	ld (ix + ._c + 0), hl
-	ld (ix + ._c + 3), a
-
-; b = a;
-	ld hl, (ix + ._a + 0)
-	ld a,  (ix + ._a + 3)
-	ld (ix + ._b + 0), hl
-	ld (ix + ._b + 3), a
-
-; a = tmp1 + tmp2;
-	ld hl, (ix + ._tmp1 + 0)
-	ld a,  (ix + ._tmp1 + 3)
-	ld de, (ix + ._tmp2 + 0)
-	or a,a
-	adc hl,de
-	adc a, (ix + ._tmp2 + 3)
+; --> a
 	ld (ix + ._a + 0), hl
 	ld (ix + ._a + 3), a
-	ld a,(ix + ._i)
-	inc a
-	ld (ix + ._i),a
-	cp a,64
-	jq c,._loop3
 
-	push ix
+	lea hl, ix + ._i
+	ld a, (hl)
+	add a,4
+	ld (hl), a
+	jq nc,._loop3
+
 	ld iy, (ix + 6)
-	lea iy, iy + sha256_offset_state
-	lea ix, ix + ._state_vars
+	lea hl, iy + sha256_offset_state
 	ld b,8
 ._loop4:
-	ld hl, (iy + 0)
-	ld de, (ix + 0)
-	ld a, (iy + 3)
-	or a,a
-	adc hl,de
-	adc a,(ix + 3)
-	ld (iy + 0), hl
-	ld (iy + 3), a
+	ld de, (ix + ._state_vars)
+	ld a,  (ix + ._state_vars + 3)
 	lea ix, ix + 4
-	lea iy, iy + 4
-	djnz ._loop4
 
-	pop ix
-._exit:
+	ld iy, (hl)
+	add iy, de
+	ld (hl), iy
+	inc hl
+	inc hl
+	inc hl
+	adc a, (hl)
+	ld (hl), a
+	inc hl
+
+	djnz ._loop4
+	lea ix, ix + -8*4
+
 	ld sp,ix
 	pop ix
 	ret
