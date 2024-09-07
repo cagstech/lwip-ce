@@ -14,6 +14,7 @@ uint8_t test1[] = "-----BEGIN RSA PRIVATE KEY-----\nMIIJJwIBAAKCAgEAkUFtIOY2k+g6
 
 uint8_t test2[] = "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE+iaNHQrugEeZSwfmIt5O0hwKeYk+VriH9XmcAvve62hRANCAATfWf2INnnKwVStFSrv7R0aTKiPljJhVxl9jpfAa/Nbl5W5zd5B6Q7A5byFE93ISfBURpYwLFRATfoPPmprOEDR\n-----END PRIVATE KEY-----";
 
+uint8_t test3[] = "-----BEGIN PRIVATE KEY-----\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDSyjGXPVTLIaUSP3/UtgZArt+LRy4IbREISzSmrGxa2HMCzz/i3+H2RgimflCVxBf3j8yNZ3y8O+9FouQirmU0oZs+7WkpuWMpGFkuJJGbWd5AO4UOdM3TGAorii0Y6f4bJg2SGK09hXzVhWQiXxbto3940/lpjsti804+0PhQKjgSOY0awb/GOfxw+2VEsjzXwPXx5p+bkje4mf35J9r5g9HjVDyZORQKrEy4E7TXADR49PNf7xWhAkZahNhbmKmwOeGReGokcVFujif+z/i9XvEUloU7rqbOdVv/3sTHPDjMPfir06jGHOSJhaHvzF+wNbYedIcIsRpAK/cm+j/dAgMBAAECggEAHIT0zrSim1UzA1QKFJqIIApI/owj40n2avvZ5M8hXe05KmEmEKkf5nU1SGmAt7KvV3RiRaOB0en+BpryaOrVkJho68utVdLaYr4DmuWhubYgBurGpt0Q2AXBooBwd5V5Ju0wGtsx3UgJSs5gbPIWpRJg9dUgQrLqO7oVlRQq9JVy2YLHQb0GWHHk8Ba3TJmGKjLbuOR/sUfCpJY7uiUP+CKPfPicPlNzBVai9X58Q5XI49QSrE9+8S+2YVFk9jyPrYbTfkkCC47WscPmU3lCCmf/EaciBVzRorbipI1R2AQsIox4P3oGL0cMKdbmSX924riTTHWjWhkPXoya0qu2dQKBgQDwPsa/nnmeFT863hYuHTl20eCABuLCbt/EQQz1eAriL8XJPR9ZWwzrAqMNSKQNGGjGDASq4XG+otGWu0igad0ERYc8K7kIzpycS7wPplM2hBJ4Sl0U7e/291xVA5cL2lrnBl7sUUaPLoWdSRm8GKp0sC6tAdvUYU2SlWweniEz8wKBgQDgnOvz1xojNTsoERJx+/87ptyB74M58Z0eFcwFWLMgibDhI2OJg2oMxdDTOQBV1c1ved+5voy4h1Z9pTBuWRrzvdUAilASlmPX2bsVCydX1/G+wTX0Z0zn696yhl8nfe2V1IU1EEILfo2QncntZKMMHCJ2aqpuHxr2oUBl6IpA7wKBgQC0TGicJjLfkNKDO2kp8oTNx3TUoFZN1SfaAXfYQN7qITAudtCwHsTzGmeD8KAts8Pt3dci506V41un46X9vXVBX2y+m5GiKm0eXzgkBo8surGh1S1GJ8uPbNS+eJNDMfxGpWFXuSdbDW75O4M0xs4mBJMDBAIWwW+WMs2RrNr+QQKBgQDL3+OTuuTwnDqLzaMubwtmu7hfAGXeTF7Olf5PxAkjOZehYxvQD8ZMvakkcBLL1nrX+omF8V2NiNqKxUvGfX6nSuFx0hmIJZWOsQTMvwkBBPNar8knhDQcNs42wRzRnc3vN62JUq5//GjGoVJN9hDAxzDIx1zXA8jXn9nyJjaHZQKBgQDL7po5d+AWArY98BYcaYlfUARJhDpcUlZraJYXdIZejLK6THsncTBv7+lH8cUuV6Hura2Fnwq/7lBsYyNcVQp6y4aygt2FDQS02+dE/ZWqGllxrxlwN46eYAbsV6Cjek+GQ1usOZcsThYWFnxYm3f9OQ/bjVm0Ao8DGtK70h699Q==\n-----END PRIVATE KEY-----";
 
 /* Main function, called first */
 int main(void)
@@ -62,6 +63,26 @@ int main(void)
         return 1;
     }
     for(int i=0; i < 3; i++){
+        sprintf(buf, "%s    tag=%u,  size=%u",
+                pk->meta.ec.fields[i].name,
+                pk->meta.ec.fields[i].tag,
+                pk->meta.ec.fields[i].len);
+        os_FontDrawText(buf, 5, 40+i*12);
+    }
+    free(pk);
+    
+    os_GetKey();
+    os_ClrHome();
+    
+    // PKCS#8 RSA key
+    pk = tls_private_key_import(test3, strlen(test3));
+    if(pk==NULL){
+        printf("error");
+        os_GetKey();
+        os_ClrHome();
+        return 1;
+    }
+    for(int i=0; i < 8; i++){
         sprintf(buf, "%s    tag=%u,  size=%u",
                 pk->meta.ec.fields[i].name,
                 pk->meta.ec.fields[i].tag,
