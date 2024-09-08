@@ -21,10 +21,13 @@ bool tls_asn1_decode_next(struct tls_asn1_decoder_context *ctx, const struct tls
                           uint8_t *tag, uint8_t **data, size_t *len, uint8_t *depth){
    
 
-    if(ctx==NULL) return false;
+    if(ctx==NULL)
+        return false;
+    
     uint8_t this_tag;
     size_t this_len;
     uint8_t *asn1_current;
+    bool has_result = false;
     
 restart:
     asn1_current = (uint8_t*)ctx->node[ctx->depth].start;
@@ -35,13 +38,17 @@ restart:
         asn1_current++;
     }
         
-    if(ctx->depth >= ASN1_MAX_DEPTH) return false;
+    if(ctx->depth >= ASN1_MAX_DEPTH){
+        printf("depth=%u\n", ctx->depth);
+        return false;
+    }
         
     // get tag of element
     this_tag = *asn1_current++;
 
     if(asn1_current > ctx->node[ctx->depth].next){
-        if(--ctx->depth==0) return false;
+        if(--ctx->depth==0)
+            return false;
         goto restart;
     }
     
@@ -63,9 +70,14 @@ restart:
         if(schema->allow_null && (this_tag==ASN1_NULL) && (schema->depth == ctx->depth))
             goto skip_checks;
         // if the tag and depth does not match schema provided
-        if(schema->optional==false)
-            return false;    // stop with error if schema mismatch
         
+        if(schema->mode == ASN1_SEEK)
+            goto seek_next;
+        
+        if(schema->optional==false){
+            printf("schema marked not optional");
+            return false;    // stop with error if schema mismatch
+        }
         // if tag is optional
         if(data) *data = NULL;
         if(tag) *tag = 0;
@@ -77,19 +89,22 @@ restart:
     }
 
 skip_checks:
+    has_result = true;
     if((schema==NULL) || (schema && schema->output)){
         if(data) *data = asn1_current;
         if(tag) *tag = this_tag;
         if(len) *len = this_len;
         if(depth) *depth = ctx->depth;
     }
-        
+seek_next:
     ctx->node[ctx->depth].start = asn1_current + this_len;
     if(tls_asn1_getform(this_tag)){
         ctx->depth++;
         ctx->node[ctx->depth].start = asn1_current;
         ctx->node[ctx->depth].next = asn1_current + this_len;
     }
+    if((!has_result) && (schema->mode == ASN1_SEEK))
+        goto restart;
     
     return true;
 }

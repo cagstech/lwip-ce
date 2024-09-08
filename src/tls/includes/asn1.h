@@ -50,15 +50,20 @@ enum tls_asn1_forms {
     ASN1_CONSTRUCTED    = (1<<5)        /**< this element contains nested elements. */
 };
 
+enum tls_asn1_parse_mode {
+    ASN1_MATCH = false,
+    ASN1_SEEK = true
+};
 
 /// @struct Can be chained to create schemas for decoding ASN.1 structures. See keyfiles.c.
 struct tls_asn1_schema {
     char *name;
     uint8_t tag;
     uint8_t depth;
-    bool optional;
-    bool allow_null;
-    bool output;
+    bool optional:1;
+    bool allow_null:1;
+    bool output:1;
+    bool mode:1;
 };
 
 /// @struct Can be chained in parallel to schema to create an output chain for decoding ANS.1 structures. See keyfiles.c

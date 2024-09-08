@@ -30,7 +30,8 @@ uint8_t tls_objectids[][10] = {
     
     // X.509 identifiers
     {0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x01,0x0B},     // TLS_OID_SHA256_RSA_ENCRYPTION
-    {0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x01,0x0C}      // TLS_OID_SHA384_RSA_ENCRYPTION
+    {0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x01,0x0C},     // TLS_OID_SHA384_RSA_ENCRYPTION
+    {0x2A,0x86,0x48,0xCE,0x3D,0x04,0x03,0x02}           // TLS_OID_SHA256_ECDSA
     
 };
 
@@ -49,17 +50,17 @@ uint8_t tls_objectids[][10] = {
  }
  */
 struct tls_asn1_schema tls_pkcs1_privkey_schema[] = {
-    {"RSAPrivateKey", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 0, false, false, false},
-    {"version", ASN1_INTEGER, 1, false, false, false},
-    {"modulus", ASN1_INTEGER, 1, false, false, true},
-    {"publicExponent", ASN1_INTEGER, 1, false, false, true},
-    {"privateExponent", ASN1_INTEGER, 1, false, false, true},
-    {"prime1", ASN1_INTEGER, 1, false, false, true},
-    {"prime2", ASN1_INTEGER, 1, false, false, true},
-    {"exponent1", ASN1_INTEGER, 1, false, false, true},
-    {"exponent2", ASN1_INTEGER, 1, false, false, true},
-    {"coefficient", ASN1_INTEGER, 1, false, false, true},
-    {NULL, 0, 0, false, false, false}
+    {"RSAPrivateKey", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 0, false, false, false, ASN1_MATCH},
+    {"version", ASN1_INTEGER, 1, false, false, false, ASN1_MATCH},
+    {"modulus", ASN1_INTEGER, 1, false, false, true, ASN1_MATCH},
+    {"publicExponent", ASN1_INTEGER, 1, false, false, true, ASN1_MATCH},
+    {"privateExponent", ASN1_INTEGER, 1, false, false, true, ASN1_MATCH},
+    {"prime1", ASN1_INTEGER, 1, false, false, true, ASN1_MATCH},
+    {"prime2", ASN1_INTEGER, 1, false, false, true, ASN1_MATCH},
+    {"exponent1", ASN1_INTEGER, 1, false, false, true, ASN1_MATCH},
+    {"exponent2", ASN1_INTEGER, 1, false, false, true, ASN1_MATCH},
+    {"coefficient", ASN1_INTEGER, 1, false, false, true, ASN1_MATCH},
+    {NULL, 0, 0, false, false, false, ASN1_MATCH}
 };
 
 
@@ -70,10 +71,10 @@ struct tls_asn1_schema tls_pkcs1_privkey_schema[] = {
  }
  */
 struct tls_asn1_schema tls_pkcs1_pubkey_schema[] = {
-    {"RSAPublicKey", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 0, false, false, false},
-    {"modulus", ASN1_INTEGER, 1, false, false, true},
-    {"publicExponent", ASN1_INTEGER, 1, false, false, true},
-    {NULL, 0, 0, false, false, false}
+    {"RSAPublicKey", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 0, false, false, false, ASN1_MATCH},
+    {"modulus", ASN1_INTEGER, 1, false, false, true, ASN1_MATCH},
+    {"publicExponent", ASN1_INTEGER, 1, false, false, true, ASN1_MATCH},
+    {NULL, 0, 0, false, false, false, ASN1_MATCH}
 };
 
 
@@ -86,14 +87,14 @@ struct tls_asn1_schema tls_pkcs1_pubkey_schema[] = {
  }
  */
 struct tls_asn1_schema tls_sec1_privkey_schema[] = {
-    {"ECPrivateKey", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 0, false, false, false},
-    {"version", ASN1_INTEGER, 1, false, false, false},
-    {"privateKey", ASN1_OCTETSTRING, 1, false, false, true},
-    {"parameters [0]", ASN1_CONTEXTSPEC | ASN1_CONSTRUCTED | 0, 1, true, false, false},
-    {"curve oid", ASN1_OBJECTID, 2, true, false, true},
-    {"parameters [1]", ASN1_CONTEXTSPEC | ASN1_CONSTRUCTED | 1, 1, true, false, false},
-    {"publicKey", ASN1_BITSTRING, 2, true, false, true},
-    {NULL, 0, 0, false, false, false}
+    {"ECPrivateKey", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 0, false, false, false, ASN1_MATCH},
+    {"version", ASN1_INTEGER, 1, false, false, false, ASN1_MATCH},
+    {"privateKey", ASN1_OCTETSTRING, 1, false, false, true, ASN1_MATCH},
+    {"parameters [0]", ASN1_CONTEXTSPEC | ASN1_CONSTRUCTED | 0, 1, true, false, false, ASN1_MATCH},
+    {"curve oid", ASN1_OBJECTID, 2, true, false, true, ASN1_MATCH},
+    {"parameters [1]", ASN1_CONTEXTSPEC | ASN1_CONSTRUCTED | 1, 1, true, false, false, ASN1_MATCH},
+    {"publicKey", ASN1_BITSTRING, 2, true, false, true, ASN1_MATCH},
+    {NULL, 0, 0, false, false, false, ASN1_MATCH}
 };
 
 
@@ -101,8 +102,8 @@ struct tls_asn1_schema tls_sec1_privkey_schema[] = {
  ECPoint ::= OCTET STRING    -- Represents the public key (Q = d * G)
  */
 struct tls_asn1_schema tls_sec1_pubkey_schema[] = {
-    {"EC Point", ASN1_OCTETSTRING, 0, false, false, true},
-    {NULL, 0, 0, false, false, false}
+    {"EC Point", ASN1_OCTETSTRING, 0, false, false, true, ASN1_MATCH},
+    {NULL, 0, 0, false, false, false, ASN1_MATCH}
 };
 
 
@@ -118,15 +119,14 @@ struct tls_asn1_schema tls_sec1_pubkey_schema[] = {
  }
  */
 struct tls_asn1_schema tls_pkcs8_privkey_schema[] = {
-    {"PrivateKeyInfo", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 0, false, false, false},
-    {"version", ASN1_INTEGER, 1, false, false, false},
-    {"PrivateKeyAlgorithm", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 1, false, false, false},
-    {"algorithm", ASN1_OBJECTID, 2, false, false, true},
-    {"parameters", ASN1_OBJECTID, 2, false, true, true},
-    {"privateKey", ASN1_OCTETSTRING, 1, false, false, true},
-    {NULL, 0, 0, false, false, false}
+    {"PrivateKeyInfo", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 0, false, false, false, ASN1_MATCH},
+    {"version", ASN1_INTEGER, 1, false, false, false, ASN1_MATCH},
+    {"PrivateKeyAlgorithm", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 1, false, false, false, ASN1_MATCH},
+    {"algorithm", ASN1_OBJECTID, 2, false, false, true, ASN1_MATCH},
+    {"parameters", ASN1_OBJECTID, 2, false, true, true, ASN1_MATCH},
+    {"privateKey", ASN1_OCTETSTRING, 1, false, false, true, ASN1_MATCH},
+    {NULL, 0, 0, false, false, false, ASN1_MATCH}
 };
-struct tls_asn1_serialization tls_pkcs8_private_serialize[3];
 
 
 /* -------------------------------------------------------------------------
@@ -139,26 +139,25 @@ struct tls_asn1_serialization tls_pkcs8_private_serialize[3];
  }
 */
 struct tls_asn1_schema tls_pkcs8_encrypted_privkey_schema[] = {
-    {"EncryptedPrivateKeyInfo", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 0, false, false, false},
-    {"EncryptionAlgorithmIdentifier", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 1, false, false, false},
-    {"algorithm", ASN1_OBJECTID, 2, false, false, true},
-    {"parameters", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 2, false, false, false},
-    {"keyDerivFunc", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 3, false, false, false},
-    {"algorithm", ASN1_OBJECTID, 4, false, false, true},
-    {"parameters", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 4, false, false, false},
-    {"salt", ASN1_OCTETSTRING, 5, false, false, true},
-    {"rounds", ASN1_INTEGER, 5, false, false, true},
-    {"keylen", ASN1_INTEGER, 5, true, false, true},
-    {"prf", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 5, false, false, false},
-    {"algorithm", ASN1_OBJECTID, 6, false, false, true},
-    {"parameters", ASN1_NULL, 6, false, false, false},
-    {"encryptionScheme", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 3, false, false, false},
-    {"algorithm", ASN1_OBJECTID, 4, false, false, true},
-    {"iv", ASN1_OCTETSTRING, 4, false, false, true},
-    {"encryptedData", ASN1_OCTETSTRING, 1, false, false, true},
-    {NULL, 0, 0, false, false, false}
+    {"EncryptedPrivateKeyInfo", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 0, false, false, false, ASN1_MATCH},
+    {"EncryptionAlgorithmIdentifier", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 1, false, false, false, ASN1_MATCH},
+    {"algorithm", ASN1_OBJECTID, 2, false, false, true, ASN1_MATCH},
+    {"parameters", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 2, false, false, false, ASN1_MATCH},
+    {"keyDerivFunc", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 3, false, false, false, ASN1_MATCH},
+    {"algorithm", ASN1_OBJECTID, 4, false, false, true, ASN1_MATCH},
+    {"parameters", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 4, false, false, false, ASN1_MATCH},
+    {"salt", ASN1_OCTETSTRING, 5, false, false, true, ASN1_MATCH},
+    {"rounds", ASN1_INTEGER, 5, false, false, true, ASN1_MATCH},
+    {"keylen", ASN1_INTEGER, 5, true, false, true, ASN1_MATCH},
+    {"prf", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 5, false, false, false, ASN1_MATCH},
+    {"algorithm", ASN1_OBJECTID, 6, false, false, true, ASN1_MATCH},
+    {"parameters", ASN1_NULL, 6, false, false, false, ASN1_MATCH},
+    {"encryptionScheme", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 3, false, false, false, ASN1_MATCH},
+    {"algorithm", ASN1_OBJECTID, 4, false, false, true, ASN1_MATCH},
+    {"iv", ASN1_OCTETSTRING, 4, false, false, true, ASN1_MATCH},
+    {"encryptedData", ASN1_OCTETSTRING, 1, false, false, true, ASN1_MATCH},
+    {NULL, 0, 0, false, false, false, ASN1_MATCH}
 };
-struct tls_asn1_serialization tls_pkcs8_encrypted_private_serialize[9];
 #define TLS_PKCS8_ENCRYPTED_IDX_PBES2   0
 #define TLS_PKCS8_ENCRYPTED_IDX_PBKDF2  1
 #define TLS_PKCS8_ENCRYPTED_IDX_SALT    2
@@ -179,14 +178,93 @@ struct tls_asn1_serialization tls_pkcs8_encrypted_private_serialize[9];
  }
  */
 struct tls_asn1_schema tls_pkcs8_pubkey_schema[] = {
-    {"SubjectPublicKeyInfo", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 0, false, false, false},
-    {"algorithm", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 1, false, false, false},
-    {"algorithm", ASN1_OBJECTID, 2, false, false, true},
-    {"parameters", ASN1_OBJECTID, 2, true, true, true},
-    {"subjectPublicKey", ASN1_BITSTRING, 1, false, false, true},
-    {NULL, 0, 0, false, false, false}
+    {"SubjectPublicKeyInfo", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 0, false, false, false, ASN1_MATCH},
+    {"algorithm", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 1, false, false, false, ASN1_MATCH},
+    {"algorithm", ASN1_OBJECTID, 2, false, false, true, ASN1_MATCH},
+    {"parameters", ASN1_OBJECTID, 2, true, true, true, ASN1_MATCH},
+    {"subjectPublicKey", ASN1_BITSTRING, 1, false, false, true, ASN1_MATCH},
+    {NULL, 0, 0, false, false, false, ASN1_MATCH}
 };
-struct tls_asn1_serialization tls_pkcs_public_serialize[3];
+
+/* --------------------------------------------------------------------------
+ Certificate ::= SEQUENCE {
+     tbsCertificate       SEQUENCE {
+         version             [0] EXPLICIT INTEGER DEFAULT v1,
+         serialNumber        INTEGER,
+         signature           SEQUENCE {
+             algorithm            OBJECT IDENTIFIER,
+             parameters           ANY DEFINED BY algorithm OPTIONAL -- Can be NULL
+         },
+         issuer              SEQUENCE OF SEQUENCE {
+             type              OBJECT IDENTIFIER,
+             value             ANY
+         },
+         validity            SEQUENCE {
+             notBefore          CHOICE {
+                 utcTime        UTCTime,
+                 generalTime    GeneralizedTime
+             },
+             notAfter           CHOICE {
+                 utcTime        UTCTime,
+                 generalTime    GeneralizedTime
+             }
+         },
+         subject             SEQUENCE OF SEQUENCE {
+             type              OBJECT IDENTIFIER,
+             value             ANY
+         },
+         subjectPublicKeyInfo SEQUENCE {
+             algorithm         SEQUENCE {
+                 algorithm      OBJECT IDENTIFIER,
+                 parameters     ANY DEFINED BY algorithm OPTIONAL -- Can be NULL
+             },
+             subjectPublicKey  BIT STRING
+         },
+         issuerUniqueID      [1] IMPLICIT BIT STRING OPTIONAL,  -- v2 or v3
+         subjectUniqueID     [2] IMPLICIT BIT STRING OPTIONAL,  -- v2 or v3
+         extensions          [3] EXPLICIT SEQUENCE OF SEQUENCE {  -- v3 only
+             extnID             OBJECT IDENTIFIER,
+             critical           BOOLEAN DEFAULT FALSE,
+             extnValue          OCTET STRING
+         } OPTIONAL
+     },
+     signatureAlgorithm   SEQUENCE {
+         algorithm            OBJECT IDENTIFIER,
+         parameters           ANY DEFINED BY algorithm OPTIONAL -- Can be NULL
+     },
+     signatureValue       BIT STRING
+ }
+ */
+struct tls_asn1_schema tls_x509_cert_schema[] = {
+    {"algorithm", ASN1_OBJECTID, 3, false, false, true, ASN1_SEEK},
+    // seek to issuer commonName
+    {"issuerName", ASN1_OBJECTID, 5, false, false, true, ASN1_SEEK},
+    {"issuerName", ASN1_UTF8STRING, 5, false, false, true, ASN1_MATCH},
+    // ignore until
+    {"validity", ASN1_SEQUENCE | ASN1_CONSTRUCTED, 2, false, false, false, ASN1_SEEK},
+    // select either or
+    {"valid-before", ASN1_UTCTIME, 3, false, false, true, ASN1_MATCH},
+    {"valid-before", ASN1_GENERALIZEDTIME, 3, false, false, true, ASN1_MATCH},
+    // select either or
+    {"valid-after", ASN1_UTCTIME, 3, false, false, true, ASN1_SEEK},
+    {"valid-after", ASN1_GENERALIZEDTIME, 3, false, false, true, ASN1_MATCH},
+    // ignore until, then read
+    {"subject", ASN1_SEQUENCE | ASN1_CONSTRUCTED, 2, false, false, false, ASN1_SEEK},
+    {"subjectName", ASN1_OBJECTID, 5, false, false, true, ASN1_SEEK},
+    {"subjectName", ASN1_UTF8STRING, 5, false, false, true, ASN1_MATCH},
+    // ignore until, then decode normally
+    {"SubjectPublicKeyInfo", ASN1_SEQUENCE | ASN1_CONSTRUCTED , 2, false, false, false, ASN1_SEEK},
+    {"algorithm", ASN1_SEQUENCE | ASN1_CONSTRUCTED, 3, false, false, false, ASN1_MATCH},
+    {"algorithm", ASN1_OBJECTID, 4, false, false, true, ASN1_MATCH},
+    {"parameters", ASN1_OBJECTID, 4, true, true, true, ASN1_MATCH},
+    {"subjectPublicKey", ASN1_BITSTRING, 3, false, false, true, ASN1_MATCH},
+    {"signatureAlgorithm", ASN1_SEQUENCE | ASN1_CONSTRUCTED, 1, false, false, false, ASN1_SEEK},
+    {"algorithm", ASN1_OBJECTID, 2, false, false, true, ASN1_MATCH},
+    {"parameters", ASN1_OBJECTID, 2, true, true, true, ASN1_MATCH},
+    {"signatureValue", ASN1_BITSTRING, 1, false, false, true, ASN1_MATCH},
+    // then decode using pkcs1/sec1 rules
+    {NULL, 0, 0, false, false, false, false}
+};
 
 
 struct tls_lookup_data {
@@ -202,7 +280,7 @@ struct tls_lookup_data pkcs_lookups[] = {
     {"-----BEGIN RSA PUBLIC KEY-----", tls_pkcs1_pubkey_schema},
     {"-----BEGIN EC PUBLIC KEY-----", tls_sec1_pubkey_schema},
     {"-----BEGIN PUBLIC KEY-----", tls_pkcs8_pubkey_schema},
-    //{ "-----BEGIN CERTIFICATE-----", NULL},
+    {"-----BEGIN CERTIFICATE-----", tls_x509_cert_schema},
     {NULL, NULL}
 };
 
@@ -392,7 +470,7 @@ struct tls_public_key_context *tls_public_key_import(const char *pem_data, size_
     size_t b64_size = b64_end - b64_start;
     
     // locate banner, load schema for format
-    for(int i=0; pkcs_lookups[i].banner != NULL; i++)
+    for(int i=4; pkcs_lookups[i].banner != NULL; i++)
         if(strncmp((char*)pem_data, pkcs_lookups[i].banner, strlen(pkcs_lookups[i].banner)) == 0){
             decoder_schema = pkcs_lookups[i].decoder_schema;
             goto file_type_ok;
@@ -477,6 +555,143 @@ file_type_ok:
         }
         return kf;
     }
+    
+error:
+    memset(kf, 0, kf->length);
+    mem_free(kf);
+    return NULL;
+}
+
+
+
+#define TLS_X509_IDX_HOSTSIGALG     0
+#define TLS_X509_IDX_ISSUERNAME     1
+#define TLS_X509_IDX_VALIDBEFORE    2
+#define TLS_X509_IDX_VALIDAFTER     3
+#define TLS_X509_IDX_SUBJECTNAME    4
+#define TLS_X509_IDX_PKEYALG        5
+#define TLS_X509_IDX_PKEYPARAM      6
+#define TLS_X509_IDX_PKEYBITS       7
+#define TLS_X509_IDX_CASIGALG       8
+#define TLS_X509_IDX_CASIGPARAM     9
+#define TLS_X509_IDX_CASIGVAL       10
+
+
+uint8_t common_name_oid[] = {0x55, 0x04, 0x03};
+struct tls_certificate_context *tls_x509_cert_import(const char *pem_data, size_t size){
+    if((pem_data==NULL) || (size==0)) return NULL;
+    struct tls_asn1_schema *decoder_schema;
+    struct tls_asn1_serialization tmp_serialize[TLS_X509_IDX_CASIGVAL+1] = {0};
+    uint8_t serialized_count = 0;
+    struct tls_asn1_decoder_context asn1_ctx;
+    uint8_t *b64_start = (uint8_t*)(strchr((char*)pem_data, '\n') + 1);
+    uint8_t *b64_end = (uint8_t*)strchr((char*)b64_start, '\n');
+    size_t b64_size = b64_end - b64_start;
+    
+    // locate banner, load schema for format
+    for(int i=7; pkcs_lookups[i].banner != NULL; i++)
+        if(strncmp((char*)pem_data, pkcs_lookups[i].banner, strlen(pkcs_lookups[i].banner)) == 0){
+            decoder_schema = pkcs_lookups[i].decoder_schema;
+            goto file_type_ok;
+        }
+    return NULL;        // if no matching banner found, fail
+    
+file_type_ok:
+    // compute start/end of base64 section, sanity checks on size
+    if(b64_size > size)
+        return NULL;
+    
+    // decode base64 into DER
+    uint8_t *asn1_buf = mem_malloc(b64_size / 3 * 4);
+    if(asn1_buf==NULL)
+        return NULL;
+    
+    size_t asn1_size = tls_base64_decode(b64_start, b64_size, asn1_buf);
+    size_t tot_len = sizeof(struct tls_certificate_context) + asn1_size;
+    // allocate context
+    struct tls_certificate_context *kf = mem_malloc(tot_len);
+    if(kf==NULL)
+        return NULL;
+    
+    kf->length = tot_len;
+    // copy ASN.1 data to struct data field
+    memcpy(kf->data, asn1_buf, asn1_size);
+    mem_free(asn1_buf);
+    if(!tls_asn1_decoder_init(&asn1_ctx, kf->data, asn1_size))
+        goto error;
+    
+    for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
+        if((i==1) || (i==9)) {
+            do {
+                if(!tls_asn1_decode_next(&asn1_ctx,
+                                         &decoder_schema[i],
+                                         &tmp_serialize[serialized_count].tag,
+                                         &tmp_serialize[serialized_count].data,
+                                         &tmp_serialize[serialized_count].len,
+                                         NULL))
+                    goto error;
+            } while (memcmp(common_name_oid, tmp_serialize[serialized_count].data, tmp_serialize[serialized_count].len));
+        }
+        else {
+            if(tls_asn1_decode_next(&asn1_ctx,
+                                     &decoder_schema[i],
+                                     &tmp_serialize[serialized_count].tag,
+                                     &tmp_serialize[serialized_count].data,
+                                     &tmp_serialize[serialized_count].len,
+                                    NULL)){
+                if((i==4) || (i==6)) i++;
+                if(decoder_schema[i].output) {
+                    tmp_serialize[serialized_count].name = decoder_schema[i].name;
+                    serialized_count++;
+                }
+            }
+            else {
+                if(!((i >= 4) && (i <= 7)))
+                    goto error;
+            }
+        }
+    }
+    
+    memcpy(&kf->algorithms.signature, &tmp_serialize[TLS_X509_IDX_HOSTSIGALG], sizeof(struct tls_asn1_serialization));
+    memcpy(&kf->issuer, &tmp_serialize[TLS_X509_IDX_ISSUERNAME], sizeof(struct tls_asn1_serialization));
+    memcpy(&kf->valid.before, &tmp_serialize[TLS_X509_IDX_VALIDBEFORE], sizeof(struct tls_asn1_serialization));
+    memcpy(&kf->valid.after, &tmp_serialize[TLS_X509_IDX_VALIDAFTER], sizeof(struct tls_asn1_serialization));
+    memcpy(&kf->subject, &tmp_serialize[TLS_X509_IDX_SUBJECTNAME], sizeof(struct tls_asn1_serialization));
+    memcpy(&kf->algorithms.ca_signature, &tmp_serialize[TLS_X509_IDX_CASIGALG], sizeof(struct tls_asn1_serialization));
+    memcpy(&kf->signature, &tmp_serialize[TLS_X509_IDX_CASIGVAL], sizeof(struct tls_asn1_serialization));
+    
+    if(memcmp(tmp_serialize[TLS_X509_IDX_PKEYALG].data, tls_objectids[TLS_OID_RSA_ENCRYPTION], tmp_serialize[0].len)==0){
+        if(!tls_asn1_decoder_init(&asn1_ctx, tmp_serialize[TLS_X509_IDX_PKEYBITS].data, tmp_serialize[TLS_X509_IDX_PKEYBITS].len))
+            goto error;
+        kf->type |= (TLS_KEY_RSA | 0);
+        decoder_schema = tls_pkcs1_pubkey_schema;
+        serialized_count = 0;
+        for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
+            if(!tls_asn1_decode_next(&asn1_ctx,
+                                     &decoder_schema[i],
+                                     &kf->pubkey.rsa.fields[serialized_count].tag,
+                                     &kf->pubkey.rsa.fields[serialized_count].data,
+                                     &kf->pubkey.rsa.fields[serialized_count].len,
+                                     NULL))
+                goto error;
+            
+            if(decoder_schema[i].output) {
+                kf->pubkey.rsa.fields[serialized_count].name = decoder_schema[i].name;
+                serialized_count++;
+            }
+        }
+        return kf;
+    }
+    else if(
+            (memcmp(tmp_serialize[TLS_X509_IDX_PKEYALG].data, tls_objectids[TLS_OID_EC_PUBLICKEY], tmp_serialize[TLS_X509_IDX_PKEYALG].len)==0) &&
+            (memcmp(tmp_serialize[TLS_X509_IDX_PKEYPARAM].data, tls_objectids[TLS_OID_EC_SECP256R1], tmp_serialize[TLS_X509_IDX_PKEYPARAM].len)==0)){
+                kf->type |= (TLS_KEY_ECC | 0);
+                kf->pubkey.ec.field.pubkey.tag = tmp_serialize[TLS_X509_IDX_PKEYBITS].tag;
+                kf->pubkey.ec.field.pubkey.data = tmp_serialize[TLS_X509_IDX_PKEYBITS].data;
+                kf->pubkey.ec.field.pubkey.len = tmp_serialize[TLS_X509_IDX_PKEYBITS].len;
+                kf->pubkey.ec.field.pubkey.name = tls_sec1_pubkey_schema[0].name;
+                return kf;
+            }
     
 error:
     memset(kf, 0, kf->length);

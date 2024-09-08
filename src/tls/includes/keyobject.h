@@ -33,10 +33,16 @@ enum tls_object_ids {
     // X.509 identifiers
     TLS_OID_SHA256_RSA_ENCRYPTION,      /**< sha256WithRSAEncryption => 1.2.840.113549.1.1.11 */
     TLS_OID_SHA384_RSA_ENCRYPTION,      /**< sha384WithRSAEncryption => 1.2.840.113549.1.1.12 */
+    TLS_OID_SHA256_ECDSA                /**< sha256WithECDSA => 1.2.840.10045.4.3.2 */
 };
 
 extern uint8_t tls_objectids[][10];
 
+#define TLS_PRIVKEY_RSA_FIELDS  8
+#define TLS_PRIVKEY_EC_FIELDS   3
+#define TLS_PUBKEY_RSA_FIELDS   2
+#define TLS_PUBKEY_EC_FIELDS    1
+#define TLS_CERTIFICATE_FIELDS  11
 
 /// @struct Output struct for private key files.
 struct tls_private_key_context {
@@ -44,7 +50,7 @@ struct tls_private_key_context {
     size_t type;
     union {
         union {
-            struct tls_asn1_serialization fields[8];
+            struct tls_asn1_serialization fields[TLS_PRIVKEY_RSA_FIELDS];
             struct {
                 struct tls_asn1_serialization modulus;
                 struct tls_asn1_serialization public_exponent;
@@ -57,7 +63,7 @@ struct tls_private_key_context {
             } field;
         } rsa;
         union {
-            struct tls_asn1_serialization fields[4];
+            struct tls_asn1_serialization fields[TLS_PRIVKEY_EC_FIELDS];
             struct {
                 struct tls_asn1_serialization privkey;
                 struct tls_asn1_serialization curve_id;
@@ -74,7 +80,38 @@ struct tls_public_key_context {
     size_t type;
     union {
         union {
-            struct tls_asn1_serialization fields[8];
+            struct tls_asn1_serialization fields[TLS_PUBKEY_RSA_FIELDS];
+            struct {
+                struct tls_asn1_serialization modulus;
+                struct tls_asn1_serialization exponent;
+            } field;
+        } rsa;
+        union {
+            struct tls_asn1_serialization fields[TLS_PUBKEY_EC_FIELDS];
+            struct {
+                struct tls_asn1_serialization pubkey;
+            } field;
+        } ec;
+    } meta;
+    uint8_t data[];
+};
+
+struct tls_certificate_context {
+    size_t length;
+    uint8_t type;
+    struct tls_asn1_serialization issuer;
+    struct tls_asn1_serialization subject;
+    struct {
+        struct tls_asn1_serialization before;
+        struct tls_asn1_serialization after;
+    } valid;
+    struct {
+        struct tls_asn1_serialization ca_signature;
+        struct tls_asn1_serialization signature;
+    } algorithms;
+    union {
+        union {
+            struct tls_asn1_serialization fields[2];
             struct {
                 struct tls_asn1_serialization modulus;
                 struct tls_asn1_serialization exponent;
@@ -86,16 +123,14 @@ struct tls_public_key_context {
                 struct tls_asn1_serialization pubkey;
             } field;
         } ec;
-    } meta;
+    } pubkey;
+    struct tls_asn1_serialization signature;
     uint8_t data[];
-};
-
-struct tls_certificate_context {
-  // no idea??
 };
 
 
 struct tls_private_key_context *tls_private_key_import(const char *pem_data, size_t size, const char *password);
 struct tls_public_key_context *tls_public_key_import(const char *pem_data, size_t size);
+struct tls_certificate_context *tls_x509_cert_import(const char *pem_data, size_t size);
 
 #endif
