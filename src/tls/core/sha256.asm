@@ -244,8 +244,8 @@ _tls_sha256_update:
 	pop ix
 	restore_interrupts _tls_sha256_update
 	ret
- 
- _sha256_update_loop:
+
+_sha256_update_loop:
 	inc a
 	ldi ;ld (de),(hl) / inc de / inc hl / dec bc
 	ret po ;return if bc==0 (ldi decrements bc and updates parity flag)
@@ -259,10 +259,9 @@ _sha256_update_apply_transform:
 	call _sha256_transform	  ; if we have one block (64-bytes), transform block
 	pop iy
 	ld bc, 512				  ; add 1 blocksize of bitlen to the bitlen field
-	push bc
-	pea iy + sha256_offset_bitlen
+	lea iy, iy + sha256_offset_bitlen
 	call u64_addi
-	pop bc, bc, bc, de, hl
+	pop bc, de, hl
 	xor a,a
 	ld de, (ix + 6)
 	ret
@@ -319,10 +318,8 @@ _sha256_final_done_pad:
 	ld c, (iy + sha256_offset_datalen)
 	ld b,8
 	mlt bc ;multiply 8-bit datalen by 8-bit value 8
-	push bc
-	pea iy + sha256_offset_bitlen
+	lea iy, iy + sha256_offset_bitlen
 	call u64_addi
-	pop bc,bc
 	lea iy, ix-_sha256ctx_size ;ctx
 	lea hl,iy + sha256_offset_bitlen
 	lea de,iy + sha256_offset_data + 63
