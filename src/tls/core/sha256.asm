@@ -222,48 +222,54 @@ _tls_sha256_update:
 	; (ix + 6) arg1: ctx
 	; (ix + 9) arg2: data
 	; (ix + 12) arg3: len
-	ld iy, (ix + 6)			; iy = context, reference
-		; start writing data to the right location in the data block
-	ld a, (iy + sha256_offset_datalen)
-	ld bc, 0
-	ld c, a
-	; scf
-	; sbc hl,hl
-	; ld (hl),2
+	ld iy, (ix + 6)			   ; iy = context
 	; get pointers to the things
-	ld de, (ix + 9)			; de = source data
-	ld hl, (ix + 6)			; hl = context, data ptr
-	add hl, bc
-	ex de, hl ;hl = source data, de = context / data ptr
-	ld bc, (ix + 12)		   ; bc = len
-	call _sha256_update_loop
-	cp a,64
-	call z,_sha256_update_apply_transform
-	ld iy, (ix + 6)
-	ld (iy + sha256_offset_datalen), a		   ;save current datalen
+	ld bc, 0
+	ld c, (iy + sha256_offset_datalen) ; bc = data block offset
+	lea hl, iy       ; hl = data ptr
+	add hl,bc        ; adjust data pointer by the current offset
+	ex de,hl         ; de = adjusted data ptr
+	ld a,64
+	sub a,c
+	ld c,a           ; bc = remaining bytes in block (always non-zero)
+	ld hl, (ix + 9)  ; hl = source data
+	push hl          ; push source data
+	ld hl, (ix + 12) ; hl = len
+	jq .loop_entry
+.loop:
+	ex (sp),hl  ; pop source data, push len
+	ldir        ; fill rest of block
+	push hl     ; push source data
+	push iy     ; context ptr
+	call _sha256_transform ; transform block
+	pop iy
+	ld bc, 512  ; add 1 blocksize of bitlen to the bitlen field
+	lea iy, iy + sha256_offset_bitlen
+	call u64_addi  ; preserves iy, bc
+	lea iy, iy - sha256_offset_bitlen
+	lea de, iy  ; de = data ptr
+	ld b,c      ; bc = 0
+	ld c, 64    ; remaining bytes in block is 64
+	pop hl      ; pop source data
+	ex (sp),hl  ; pop len, push source data
+.loop_entry:
+	; subtract remaining bytes in block and check whether the block gets filled
+	xor a,a
+	sbc hl,bc
+	jq nc,.loop
+
+	add hl,bc   ; restore len
+	ld c,l      ; bc = len
+	pop hl      ; pop source data
+	or a,c      ; check len == 0
+	jq z,.no_copy
+	ldir
+.no_copy:
+	ld a,e
+	sub a,iyl
+	ld (iy + sha256_offset_datalen), a   ;save current datalen
 	pop ix
 	restore_interrupts _tls_sha256_update
-	ret
-
-_sha256_update_loop:
-	inc a
-	ldi ;ld (de),(hl) / inc de / inc hl / dec bc
-	ret po ;return if bc==0 (ldi decrements bc and updates parity flag)
-	cp a,64
-	call z,_sha256_update_apply_transform
-	jq _sha256_update_loop
-_sha256_update_apply_transform:
-	push hl, de, bc
-	ld bc, (ix + 6)
-	push bc
-	call _sha256_transform	  ; if we have one block (64-bytes), transform block
-	pop iy
-	ld bc, 512				  ; add 1 blocksize of bitlen to the bitlen field
-	lea iy, iy + sha256_offset_bitlen
-	call u64_addi
-	pop bc, de, hl
-	xor a,a
-	ld de, (ix + 6)
 	ret
  
 ; return sha256 digest
