@@ -20,7 +20,6 @@ bool tls_asn1_decoder_init(struct tls_asn1_decoder_context *ctx, const uint8_t *
 bool tls_asn1_decode_next(struct tls_asn1_decoder_context *ctx, const struct tls_asn1_schema *schema,
                           uint8_t *tag, uint8_t **data, size_t *len, uint8_t *depth){
    
-
     if(ctx==NULL)
         return false;
     
@@ -38,10 +37,8 @@ restart:
         asn1_current++;
     }
         
-    if(ctx->depth >= ASN1_MAX_DEPTH){
-        printf("depth=%u\n", ctx->depth);
+    if(ctx->depth >= ASN1_MAX_DEPTH)
         return false;
-    }
         
     // get tag of element
     this_tag = *asn1_current++;
@@ -74,10 +71,8 @@ restart:
         if(schema->mode == ASN1_SEEK)
             goto seek_next;
         
-        if(schema->optional==false){
-            printf("schema marked not optional");
+        if(schema->optional==false)
             return false;    // stop with error if schema mismatch
-        }
         // if tag is optional
         if(data) *data = NULL;
         if(tag) *tag = 0;

@@ -652,6 +652,18 @@ file_type_ok:
         }
     }
     
+    if(!(
+         (memcmp(tmp_serialize[TLS_X509_IDX_HOSTSIGALG].data, tls_objectids[TLS_OID_SHA256_RSA_ENCRYPTION], tmp_serialize[TLS_X509_IDX_HOSTSIGALG].len) == 0) ||
+         (memcmp(tmp_serialize[TLS_X509_IDX_HOSTSIGALG].data, tls_objectids[TLS_OID_SHA256_ECDSA], tmp_serialize[TLS_X509_IDX_HOSTSIGALG].len) == 0)
+         ))
+        goto error;
+    
+    if(!(
+         (memcmp(tmp_serialize[TLS_X509_IDX_CASIGALG].data, tls_objectids[TLS_OID_SHA256_RSA_ENCRYPTION], tmp_serialize[TLS_X509_IDX_CASIGALG].len) == 0) ||
+         (memcmp(tmp_serialize[TLS_X509_IDX_CASIGALG].data, tls_objectids[TLS_OID_SHA256_ECDSA], tmp_serialize[TLS_X509_IDX_CASIGALG].len) == 0)
+         ))
+        goto error;
+    
     memcpy(&kf->algorithms.signature, &tmp_serialize[TLS_X509_IDX_HOSTSIGALG], sizeof(struct tls_asn1_serialization));
     memcpy(&kf->issuer, &tmp_serialize[TLS_X509_IDX_ISSUERNAME], sizeof(struct tls_asn1_serialization));
     memcpy(&kf->valid.before, &tmp_serialize[TLS_X509_IDX_VALIDBEFORE], sizeof(struct tls_asn1_serialization));
