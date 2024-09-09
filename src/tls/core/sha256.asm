@@ -282,65 +282,60 @@ _tls_sha256_digest:
 	; (ix + 3) saved IX
 	; (ix + 6) arg1: ctx
 	; (ix + 9) arg2: outbuf
-	ld iy, (ix + 6)					; iy =  context block
-	lea hl, iy
-	lea de, ix-_sha256ctx_size
+	ld hl, (ix + 6)             ; hl = original ctx
+	lea de, ix-_sha256ctx_size  ; de = local ctx
+	push de ; ctx
 	ld bc, _sha256ctx_size
 	ldir
-	ld bc, 0
-	ld c, (iy + sha256_offset_datalen)     ; data length
-	lea hl, ix-_sha256ctx_size					; ld hl, context_block_cache_addr
-	add hl, bc						; hl + bc (context_block_cache_addr + bytes cached)
-	ld a,55
-	sub a,c ;c is set to datalen earlier
+	pop hl
+	push hl ; ctx
+	ld c, (ix-_sha256ctx_size + sha256_offset_datalen) ; data length
+	add hl,bc ; hl + bc (context_block_cache_addr + bytes cached)
 	ld (hl),$80
-	jq c, _sha256_final_over_56
-	inc a
-_sha256_final_under_56:
-	ld b,a
-	xor a,a
-_sha256_final_pad_loop2:
 	inc hl
-	ld (hl), a
-	djnz _sha256_final_pad_loop2
-	jq _sha256_final_done_pad
-_sha256_final_over_56:
-	ld a, 64
-	sub a,c
-	ld b,a
-	xor a,a
-_sha256_final_pad_loop1:
-	inc hl
-	ld (hl), a
-	djnz _sha256_final_pad_loop1
-	push iy
+	ex de,hl
+	ld a,55
+	sub a,c ; c is set to datalen earlier
+	ld c,a
+	inc c   ; zeroing data + 56 is okay
+	jq nc, .pad2
+.pad1:
+	add a,63-55
+	jq z, .done_pad1   ; zeroing data + 64 is not okay
+	ld c,a
+	ld hl,$FF0000
+	ldir
+.done_pad1:
 	call _sha256_transform
 	pop de
-	ld hl,$FF0000
+	push de ; ctx
 	ld bc,56
+.pad2:
+	ld hl,$FF0000
 	ldir
-_sha256_final_done_pad:
-	lea iy, ix-_sha256ctx_size
-	ld c, (iy + sha256_offset_datalen)
+.done_pad2:
+	ld c, (ix-_sha256ctx_size + sha256_offset_datalen)
 	ld b,8
 	mlt bc ;multiply 8-bit datalen by 8-bit value 8
-	lea iy, iy + sha256_offset_bitlen
-	call u64_addi
-	lea iy, ix-_sha256ctx_size ;ctx
-	lea hl,iy + sha256_offset_bitlen
-	lea de,iy + sha256_offset_data + 63
-	ld b,8
-_sha256_final_pad_message_len_loop:
-	ld a,(hl)
-	ld (de),a
-	inc hl
-	dec de
-	djnz _sha256_final_pad_message_len_loop
-	push iy ;ctx
+	lea iy, ix-_sha256ctx_size + sha256_offset_bitlen
+	call u64_addi ; preserves iy
+	; fast 64-bit endian swap
+	ld hl, (iy + 0)
+	ld e,h
+	ld d,l
+	ld (ix-_sha256ctx_size + sha256_offset_data + 62), de ; trashes sha256_offset_datalen, but it's no longer needed
+	ld de, (iy + 3)
+	ld l,d
+	ld h,e
+	ld (ix-_sha256ctx_size + sha256_offset_data + 59), hl
+	ld hl, (iy + 6)
+	ld e,h
+	ld d,l
+	ld (ix-_sha256ctx_size + sha256_offset_data + 56), de
 	call _sha256_transform
-	pop iy
+	pop hl
 	ld hl, (ix + 9)
-	lea iy, iy + sha256_offset_state
+	lea iy, ix-_sha256ctx_size + sha256_offset_state
 	ld b, 8
 	call _sha256_reverse_endianness
 	ld sp,ix
