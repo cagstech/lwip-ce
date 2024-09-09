@@ -3,29 +3,26 @@ assume adl=1
 
 section .text
 public u64_addi
-; void u64_addi(uint64_t *a, uint64_t *b);
+; add unsigned 24-bit BC to the 64-bit integer pointed to by IY
+; destroys AF, DE, HL
 u64_addi:
-	pop bc,hl,de
-	push de,hl,bc
 	xor a,a
-	ld bc,(hl)
-	ex hl,de
-	adc hl,bc
-	ex hl,de
-	ld (hl),de
-	inc hl
-	inc hl
-	inc hl
-	ld b,5
-	ld c,a
-.loop:
-	ld a,(hl)
-	adc a,c
+	sbc hl,hl
+	ex de,hl
+	ld hl,(iy)
+	add hl,bc
+	ld (iy),hl
+	ld hl,(iy+3)
+	adc hl,de
+	ld (iy+3),hl
+	lea hl,iy+6
+	adc a,(hl)
 	ld (hl),a
 	inc hl
-	djnz .loop
+	ld a,(hl)
+	adc a,e
+	ld (hl),a
 	ret
-
 
 section .text
 public _gf128_mul
