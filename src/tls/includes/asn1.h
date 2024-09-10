@@ -50,28 +50,28 @@ enum tls_asn1_forms {
     ASN1_CONSTRUCTED    = (1<<5)        /**< this element contains nested elements. */
 };
 
-enum tls_asn1_parse_mode {
-    ASN1_MATCH = false,
-    ASN1_SEEK = true
-};
-
-/// @struct Can be chained to create schemas for decoding ASN.1 structures. See keyfiles.c.
+/// @struct Can be chained to create schemas for decoding ASN.1 structures. See @b keyfiles.c.
 struct tls_asn1_schema {
     char *name;
     uint8_t tag;
     uint8_t depth;
-    bool optional:1;
-    bool allow_null:1;
-    bool output:1;
-    bool mode:1;
+    bool optional:1;        /**< flag indicating if item in schema is optional. */
+    bool allow_null:1;      /**< flag indicating if item in schema can be NULL. */
+    bool output:1;          /**< flag indicating if item in schema should be returned. */
+    bool mode:1;            /**< flag indicating if this tag should be parsed as MATCH or SEEK. See \p tls_asn1_parse_mode */
+};
+
+enum tls_asn1_parse_mode {
+    ASN1_MATCH = false,     /**< next decoded item returned should match schema index.*/
+    ASN1_SEEK = true        /**< skip over decoded items until next item matches schema index. */
 };
 
 /// @struct Can be chained in parallel to schema to create an output chain for decoding ANS.1 structures. See keyfiles.c
 struct tls_asn1_serialization {
-    char *name;
-    uint8_t tag;
-    size_t len;
-    uint8_t *data;
+    char *name;             /**< name of the field returned. Same as \p tls_asn1_schema->name for item returned. */
+    uint8_t tag;            /**< tag value returned. */
+    size_t len;             /**< length of item. */
+    uint8_t *data;          /**< pointer to item value. */
 };
 
 
@@ -79,9 +79,7 @@ struct _asn1_node {
     const uint8_t *start;
     const uint8_t *next;
 };
-
 #define ASN1_MAX_DEPTH  16
-
 /** @struct ASN.1 decoder state. */
 struct tls_asn1_decoder_context {
     uint8_t depth;                              /**< Current location in the ASN.1 tree. */

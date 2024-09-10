@@ -29,8 +29,8 @@ int main(void)
     char buf[128];
     mem_configure(&conf);
     
-    struct tls_certificate_context *pk = NULL;
-    pk = tls_x509_cert_import(test1, strlen(test1));
+    struct tls_keyobject *pk = NULL;
+    pk = tls_keyobject_import_certificate(test1, strlen(test1));
     if(pk==NULL){
         printf("error");
         os_GetKey();
@@ -41,58 +41,57 @@ int main(void)
 
     char *sigalg = "unknown";
     char *casigalg = "unknown";
-    if(memcmp(pk->algorithms.signature.data, tls_objectids[TLS_OID_SHA256_RSA_ENCRYPTION], pk->algorithms.signature.len) == 0)
+    if(memcmp(pk->meta.certificate.field.subj_signature_alg.data, tls_objectid_bytes[TLS_OID_SHA256_RSA_ENCRYPTION], pk->meta.certificate.field.subj_signature_alg.len) == 0)
         sigalg = "rsa-sha256";
-    else if(memcmp(pk->algorithms.signature.data, tls_objectids[TLS_OID_SHA256_ECDSA], pk->algorithms.signature.len) == 0)
+    else if(memcmp(pk->meta.certificate.field.subj_signature_alg.data, tls_objectid_bytes[TLS_OID_SHA256_ECDSA], pk->meta.certificate.field.subj_signature_alg.len) == 0)
         sigalg = "ecdsa-sha256";
     
-    if(memcmp(pk->algorithms.ca_signature.data, tls_objectids[TLS_OID_SHA256_RSA_ENCRYPTION], pk->algorithms.ca_signature.len) == 0)
+    if(memcmp(pk->meta.certificate.field.ca_signature_alg.data, tls_objectid_bytes[TLS_OID_SHA256_RSA_ENCRYPTION], pk->meta.certificate.field.ca_signature_alg.len) == 0)
         casigalg = "rsa-sha256";
-    else if(memcmp(pk->algorithms.ca_signature.data, tls_objectids[TLS_OID_SHA256_ECDSA], pk->algorithms.ca_signature.len) == 0)
+    else if(memcmp(pk->meta.certificate.field.ca_signature_alg.data, tls_objectid_bytes[TLS_OID_SHA256_ECDSA], pk->meta.certificate.field.ca_signature_alg.len) == 0)
         casigalg = "ecdsa-sha256";
    
     sprintf(buf, "sigAlg: %s", sigalg);
     os_FontDrawText(buf, 10, 52);
-    sprintf(buf, "issuer: %.*s", pk->issuer.len, pk->issuer.data);
+    sprintf(buf, "issuer: %.*s", pk->meta.certificate.field.issuer.len, pk->meta.certificate.field.issuer.data);
     os_FontDrawText(buf, 10, 64);
-    sprintf(buf, "subject: %.*s", pk->subject.len, pk->subject.data);
+    sprintf(buf, "subject: %.*s", pk->meta.certificate.field.subject.len, pk->meta.certificate.field.subject.data);
     os_FontDrawText(buf, 10, 76);
     os_FontDrawText("expiry:", 10, 88);
-    sprintf(buf, "before: %.*s", pk->valid.before.len, pk->valid.before.data);
+    sprintf(buf, "before: %.*s", pk->meta.certificate.field.valid_before.len, pk->meta.certificate.field.valid_before.data);
     os_FontDrawText(buf, 20, 100);
-    sprintf(buf, "after: %.*s", pk->valid.after.len, pk->valid.after.data);
+    sprintf(buf, "after: %.*s", pk->meta.certificate.field.valid_after.len, pk->meta.certificate.field.valid_after.data);
     os_FontDrawText(buf, 20, 112);
     sprintf(buf, "caSigAlg: %s", casigalg);
     os_FontDrawText(buf, 10, 124);
     for(i=0; i < 2; i++){
         sprintf(buf, "%s:tag=%u, size=%u: %02x%02x..%02x%02x",
-                pk->pubkey.rsa.fields[i].name,
-                pk->pubkey.rsa.fields[i].tag,
-                pk->pubkey.rsa.fields[i].len,
-                pk->pubkey.rsa.fields[i].data[0],
-                pk->pubkey.rsa.fields[i].data[1],
-                pk->pubkey.rsa.fields[i].data[pk->pubkey.rsa.fields[i].len - 2],
-                pk->pubkey.rsa.fields[i].data[pk->pubkey.rsa.fields[i].len - 1]
+                pk->meta.certificate.field.pubkey.rsa.fields[i].name,
+                pk->meta.certificate.field.pubkey.rsa.fields[i].tag,
+                pk->meta.certificate.field.pubkey.rsa.fields[i].len,
+                pk->meta.certificate.field.pubkey.rsa.fields[i].data[0],
+                pk->meta.certificate.field.pubkey.rsa.fields[i].data[1],
+                pk->meta.certificate.field.pubkey.rsa.fields[i].data[pk->meta.certificate.field.pubkey.rsa.fields[i].len - 2],
+                pk->meta.certificate.field.pubkey.rsa.fields[i].data[pk->meta.certificate.field.pubkey.rsa.fields[i].len - 1]
                 );
         os_FontDrawText(buf, 10, 136+i*12);
     }
     sprintf(buf, "%s:tag=%u, size=%u: %02x%02x..%02x%02x",
-            pk->signature.name,
-            pk->signature.tag,
-            pk->signature.len,
-            pk->signature.data[0],
-            pk->signature.data[1],
-            pk->signature.data[pk->signature.len - 2],
-            pk->signature.data[pk->signature.len - 1]
+            pk->meta.certificate.field.ca_signature.name,
+            pk->meta.certificate.field.ca_signature.tag,
+            pk->meta.certificate.field.ca_signature.len,
+            pk->meta.certificate.field.ca_signature.data[0],
+            pk->meta.certificate.field.ca_signature.data[1],
+            pk->meta.certificate.field.ca_signature.data[pk->meta.certificate.field.ca_signature.len - 2],
+            pk->meta.certificate.field.ca_signature.data[pk->meta.certificate.field.ca_signature.len - 1]
             );
     os_FontDrawText(buf, 10, 136+i*12);
-    free(pk);
-    pk = NULL;
+    tls_keyobject_destroy(pk);
     
     os_GetKey();
     os_ClrHome();
     
-    pk = tls_x509_cert_import(test2, strlen(test2));
+    pk = tls_keyobject_import_certificate(test2, strlen(test2));
     if(pk==NULL){
         printf("error");
         os_GetKey();
@@ -103,53 +102,50 @@ int main(void)
     
     sigalg = "unknown";
     casigalg = "unknown";
-    if(memcmp(pk->algorithms.signature.data, tls_objectids[TLS_OID_SHA256_RSA_ENCRYPTION], pk->algorithms.signature.len) == 0)
+    if(memcmp(pk->meta.certificate.field.subj_signature_alg.data, tls_objectid_bytes[TLS_OID_SHA256_RSA_ENCRYPTION], pk->meta.certificate.field.subj_signature_alg.len) == 0)
         sigalg = "rsa-sha256";
-    else if(memcmp(pk->algorithms.signature.data, tls_objectids[TLS_OID_SHA256_ECDSA], pk->algorithms.signature.len) == 0)
+    else if(memcmp(pk->meta.certificate.field.subj_signature_alg.data, tls_objectid_bytes[TLS_OID_SHA256_ECDSA], pk->meta.certificate.field.subj_signature_alg.len) == 0)
         sigalg = "ecdsa-sha256";
     
-    if(memcmp(pk->algorithms.ca_signature.data, tls_objectids[TLS_OID_SHA256_RSA_ENCRYPTION], pk->algorithms.ca_signature.len) == 0)
+    if(memcmp(pk->meta.certificate.field.ca_signature_alg.data, tls_objectid_bytes[TLS_OID_SHA256_RSA_ENCRYPTION], pk->meta.certificate.field.ca_signature_alg.len) == 0)
         casigalg = "rsa-sha256";
-    else if(memcmp(pk->algorithms.ca_signature.data, tls_objectids[TLS_OID_SHA256_ECDSA], pk->algorithms.ca_signature.len) == 0)
+    else if(memcmp(pk->meta.certificate.field.ca_signature_alg.data, tls_objectid_bytes[TLS_OID_SHA256_ECDSA], pk->meta.certificate.field.ca_signature_alg.len) == 0)
         casigalg = "ecdsa-sha256";
    
     sprintf(buf, "sigAlg: %s", sigalg);
     os_FontDrawText(buf, 10, 52);
-    sprintf(buf, "issuer: %.*s", pk->issuer.len, pk->issuer.data);
+    sprintf(buf, "issuer: %.*s", pk->meta.certificate.field.issuer.len, pk->meta.certificate.field.issuer.data);
     os_FontDrawText(buf, 10, 64);
-    sprintf(buf, "subject: %.*s", pk->subject.len, pk->subject.data);
+    sprintf(buf, "subject: %.*s", pk->meta.certificate.field.subject.len, pk->meta.certificate.field.subject.data);
     os_FontDrawText(buf, 10, 76);
     os_FontDrawText("expiry:", 10, 88);
-    sprintf(buf, "before: %.*s", pk->valid.before.len, pk->valid.before.data);
+    sprintf(buf, "before: %.*s", pk->meta.certificate.field.valid_before.len, pk->meta.certificate.field.valid_before.data);
     os_FontDrawText(buf, 20, 100);
-    sprintf(buf, "after: %.*s", pk->valid.after.len, pk->valid.after.data);
+    sprintf(buf, "after: %.*s", pk->meta.certificate.field.valid_after.len, pk->meta.certificate.field.valid_after.data);
     os_FontDrawText(buf, 20, 112);
     sprintf(buf, "caSigAlg: %s", casigalg);
     os_FontDrawText(buf, 10, 124);
-    for(i=0; i < 1; i++){
-        sprintf(buf, "%s:tag=%u, size=%u: %02x%02x..%02x%02x",
-                pk->pubkey.ec.fields[i].name,
-                pk->pubkey.ec.fields[i].tag,
-                pk->pubkey.ec.fields[i].len,
-                pk->pubkey.ec.fields[i].data[0],
-                pk->pubkey.ec.fields[i].data[1],
-                pk->pubkey.ec.fields[i].data[pk->pubkey.ec.fields[i].len - 2],
-                pk->pubkey.ec.fields[i].data[pk->pubkey.ec.fields[i].len - 1]
-                );
-        os_FontDrawText(buf, 10, 136+i*12);
-    }
     sprintf(buf, "%s:tag=%u, size=%u: %02x%02x..%02x%02x",
-            pk->signature.name,
-            pk->signature.tag,
-            pk->signature.len,
-            pk->signature.data[0],
-            pk->signature.data[1],
-            pk->signature.data[pk->signature.len - 2],
-            pk->signature.data[pk->signature.len - 1]
+        pk->meta.certificate.field.pubkey.ec.ec_point.name,
+        pk->meta.certificate.field.pubkey.ec.ec_point.tag,
+        pk->meta.certificate.field.pubkey.ec.ec_point.len,
+        pk->meta.certificate.field.pubkey.ec.ec_point.data[0],
+        pk->meta.certificate.field.pubkey.ec.ec_point.data[1],
+        pk->meta.certificate.field.pubkey.ec.ec_point.data[pk->meta.certificate.field.pubkey.ec.ec_point.len - 2],
+        pk->meta.certificate.field.pubkey.ec.ec_point.data[pk->meta.certificate.field.pubkey.ec.ec_point.len - 1]
+    );
+        os_FontDrawText(buf, 10, 136);
+    sprintf(buf, "%s:tag=%u, size=%u: %02x%02x..%02x%02x",
+            pk->meta.certificate.field.ca_signature.name,
+            pk->meta.certificate.field.ca_signature.tag,
+            pk->meta.certificate.field.ca_signature.len,
+            pk->meta.certificate.field.ca_signature.data[0],
+            pk->meta.certificate.field.ca_signature.data[1],
+            pk->meta.certificate.field.ca_signature.data[pk->meta.certificate.field.ca_signature.len - 2],
+            pk->meta.certificate.field.ca_signature.data[pk->meta.certificate.field.ca_signature.len - 1]
             );
-    os_FontDrawText(buf, 10, 136+i*12);
-    free(pk);
-    pk = NULL;
+    os_FontDrawText(buf, 10, 148);
+    tls_keyobject_destroy(pk);
     
     os_GetKey();
     os_ClrHome();

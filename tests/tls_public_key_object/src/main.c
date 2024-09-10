@@ -29,7 +29,7 @@ int main(void)
     char buf[128];
     mem_configure(&conf);
     
-    struct tls_public_key_context *pk = tls_public_key_import(test1, strlen(test1));
+    struct tls_keyobject *pk = tls_keyobject_import_public(test1, strlen(test1));
     if(pk==NULL){
         printf("error");
         os_GetKey();
@@ -38,25 +38,24 @@ int main(void)
     }
     for(int i=0; i < 2; i++){
         sprintf(buf, "%s:tag=%u, size=%u: %02x%02x..%02x%02x",
-                pk->meta.rsa.fields[i].name,
-                pk->meta.rsa.fields[i].tag,
-                pk->meta.rsa.fields[i].len,
-                pk->meta.rsa.fields[i].data[0],
-                pk->meta.rsa.fields[i].data[1],
-                pk->meta.rsa.fields[i].data[pk->meta.rsa.fields[i].len - 2],
-                pk->meta.rsa.fields[i].data[pk->meta.rsa.fields[i].len - 1]
+                pk->meta.pubkey.rsa.fields[i].name,
+                pk->meta.pubkey.rsa.fields[i].tag,
+                pk->meta.pubkey.rsa.fields[i].len,
+                pk->meta.pubkey.rsa.fields[i].data[0],
+                pk->meta.pubkey.rsa.fields[i].data[1],
+                pk->meta.pubkey.rsa.fields[i].data[pk->meta.pubkey.rsa.fields[i].len - 2],
+                pk->meta.pubkey.rsa.fields[i].data[pk->meta.pubkey.rsa.fields[i].len - 1]
                 );
         os_FontDrawText(buf, 5, 40+i*12);
     }
-    free(pk);
-    pk = NULL;
+    tls_keyobject_destroy(pk);
     
     os_GetKey();
     os_ClrHome();
     
     
     // PKCS#8 EC key
-    pk = tls_public_key_import(test2, strlen(test2));
+    pk = tls_keyobject_import_public(test2, strlen(test2));
     if(pk==NULL){
         printf("error");
         os_GetKey();
@@ -65,18 +64,17 @@ int main(void)
     }
     for(int i=0; i < 1; i++){
         sprintf(buf, "%s:tag=%u, size=%u: %02x%02x..%02x%02x",
-                pk->meta.ec.fields[i].name,
-                pk->meta.ec.fields[i].tag,
-                pk->meta.ec.fields[i].len,
-                pk->meta.ec.fields[i].data[0],
-                pk->meta.ec.fields[i].data[1],
-                pk->meta.ec.fields[i].data[pk->meta.rsa.fields[i].len - 2],
-                pk->meta.ec.fields[i].data[pk->meta.rsa.fields[i].len - 1]
+                pk->meta.pubkey.ec.fields[i].name,
+                pk->meta.pubkey.ec.fields[i].tag,
+                pk->meta.pubkey.ec.fields[i].len,
+                pk->meta.pubkey.ec.fields[i].data[0],
+                pk->meta.pubkey.ec.fields[i].data[1],
+                pk->meta.pubkey.ec.fields[i].data[pk->meta.pubkey.rsa.fields[i].len - 2],
+                pk->meta.pubkey.ec.fields[i].data[pk->meta.pubkey.rsa.fields[i].len - 1]
                 );
         os_FontDrawText(buf, 5, 40+i*12);
     }
-    free(pk);
-    pk = NULL;
+    tls_keyobject_destroy(pk);
     
     os_GetKey();
     os_ClrHome();

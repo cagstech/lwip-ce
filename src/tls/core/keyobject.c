@@ -12,7 +12,7 @@
 
 void rmemcpy(void *dest, void *src, size_t len);
 
-uint8_t tls_objectids[][10] = {
+uint8_t tls_objectid_bytes[][10] = {
     // PKCS and SECG object ids
     {0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x01,0x01},     // TLS_OID_RSA_ENCRYPTION
     {0x2A,0x86,0x48,0xCE,0x3D,0x02,0x01},               // TLS_OID_EC_PUBLICKEY
@@ -273,19 +273,22 @@ struct tls_lookup_data {
 };
 
 struct tls_lookup_data pkcs_lookups[] = {
+#define PKCS_LOOKUP_PRIVATE 0
     {"-----BEGIN RSA PRIVATE KEY-----", tls_pkcs1_privkey_schema},
     {"-----BEGIN EC PRIVATE KEY-----", tls_sec1_privkey_schema},
     {"-----BEGIN PRIVATE KEY-----", tls_pkcs8_privkey_schema},
     {"-----BEGIN ENCRYPTED PRIVATE KEY-----", tls_pkcs8_encrypted_privkey_schema},
+#define PKCS_LOOKUP_PUBLIC 4
     {"-----BEGIN RSA PUBLIC KEY-----", tls_pkcs1_pubkey_schema},
     {"-----BEGIN EC PUBLIC KEY-----", tls_sec1_pubkey_schema},
     {"-----BEGIN PUBLIC KEY-----", tls_pkcs8_pubkey_schema},
+#define PKCS_LOOKUP_CERTIFICATE 7
     {"-----BEGIN CERTIFICATE-----", tls_x509_cert_schema},
-    {NULL, NULL}
+#define PKCS_LOOKUP_END 8
 };
 
 
-struct tls_private_key_context *tls_private_key_import(const char *pem_data, size_t size, const char *password){
+struct tls_keyobject *tls_keyobject_import_private(const char *pem_data, size_t size, const char *password){
     if((pem_data==NULL) || (size==0)) return NULL;
     struct tls_asn1_schema *decoder_schema;
     struct tls_asn1_serialization tmp_serialize[9] = {0};
@@ -296,7 +299,7 @@ struct tls_private_key_context *tls_private_key_import(const char *pem_data, siz
     size_t b64_size = b64_end - b64_start;
     
     // locate banner, load schema for format
-    for(int i=0; pkcs_lookups[i].banner != NULL; i++)
+    for(int i=PKCS_LOOKUP_PRIVATE; i < PKCS_LOOKUP_PUBLIC; i++)
         if(strncmp((char*)pem_data, pkcs_lookups[i].banner, strlen(pkcs_lookups[i].banner)) == 0){
             decoder_schema = pkcs_lookups[i].decoder_schema;
             goto file_type_ok;
@@ -314,9 +317,9 @@ file_type_ok:
         return NULL;
     
     size_t asn1_size = tls_base64_decode(b64_start, b64_size, asn1_buf);
-    size_t tot_len = sizeof(struct tls_private_key_context) + asn1_size;
+    size_t tot_len = sizeof(struct tls_keyobject) + asn1_size;
     // allocate context
-    struct tls_private_key_context *kf = mem_malloc(tot_len);
+    struct tls_keyobject *kf = mem_malloc(tot_len);
     if(kf==NULL)
         return NULL;
     
@@ -343,11 +346,11 @@ file_type_ok:
                 serialized_count++;
         }
         if(
-           (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_PBES2].data, tls_objectids[TLS_OID_PBES2], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_PBES2].len)==0) &&
-           (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_PBKDF2].data, tls_objectids[TLS_OID_PBKDF2], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_PBKDF2].len)==0) &&
-           (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_HMAC].data, tls_objectids[TLS_OID_HMAC_SHA256], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_HMAC].len)==0) && 
-           ((memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].data, tls_objectids[TLS_OID_AES_128_CBC], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].len)==0) ||
-            (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].data, tls_objectids[TLS_OID_AES_256_CBC], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].len)==0))
+           (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_PBES2].data, tls_objectid_bytes[TLS_OID_PBES2], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_PBES2].len)==0) &&
+           (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_PBKDF2].data, tls_objectid_bytes[TLS_OID_PBKDF2], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_PBKDF2].len)==0) &&
+           (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_HMAC].data, tls_objectid_bytes[TLS_OID_HMAC_SHA256], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_HMAC].len)==0) &&
+           ((memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].data, tls_objectid_bytes[TLS_OID_AES_128_CBC], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].len)==0) ||
+            (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].data, tls_objectid_bytes[TLS_OID_AES_256_CBC], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].len)==0))
            ){
                size_t keylen = 0, rounds = 0;
                uint8_t derived_key[32];
@@ -356,7 +359,7 @@ file_type_ok:
                if(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_KEYLEN].data)
                    rmemcpy(&keylen, tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_KEYLEN].data, tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_KEYLEN].len);
                else // else derive from AES algorithm
-                   keylen = (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].data, tls_objectids[TLS_OID_AES_128_CBC], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].len)==0) ? 16 : 32;
+                   keylen = (memcmp(tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].data, tls_objectid_bytes[TLS_OID_AES_128_CBC], tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_AES].len)==0) ? 16 : 32;
                // get rounds from rounds field
                rmemcpy(&rounds, tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_ROUNDS].data, tmp_serialize[TLS_PKCS8_ENCRYPTED_IDX_ROUNDS].len);
                // derive key
@@ -406,11 +409,11 @@ file_type_ok:
         // set decoder to start at private key bit/octet string
         if(!tls_asn1_decoder_init(&asn1_ctx, tmp_serialize[2].data, tmp_serialize[2].len)) goto error;
         
-        if(memcmp(tmp_serialize[0].data, tls_objectids[TLS_OID_RSA_ENCRYPTION], tmp_serialize[0].len)==0)
+        if(memcmp(tmp_serialize[0].data, tls_objectid_bytes[TLS_OID_RSA_ENCRYPTION], tmp_serialize[0].len)==0)
             decoder_schema = tls_pkcs1_privkey_schema;
         else if(
-                (memcmp(tmp_serialize[0].data, tls_objectids[TLS_OID_EC_PUBLICKEY], tmp_serialize[0].len)==0) &&
-                (memcmp(tmp_serialize[1].data, tls_objectids[TLS_OID_EC_SECP256R1], tmp_serialize[1].len)==0))
+                (memcmp(tmp_serialize[0].data, tls_objectid_bytes[TLS_OID_EC_PUBLICKEY], tmp_serialize[0].len)==0) &&
+                (memcmp(tmp_serialize[1].data, tls_objectid_bytes[TLS_OID_EC_SECP256R1], tmp_serialize[1].len)==0))
             decoder_schema = tls_sec1_privkey_schema;
         else
             goto error;
@@ -422,13 +425,13 @@ file_type_ok:
         for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
             if(!tls_asn1_decode_next(&asn1_ctx,
                                      &decoder_schema[i],
-                                     &kf->meta.rsa.fields[serialized_count].tag,
-                                     &kf->meta.rsa.fields[serialized_count].data,
-                                     &kf->meta.rsa.fields[serialized_count].len,
+                                     &kf->meta.privkey.rsa.fields[serialized_count].tag,
+                                     &kf->meta.privkey.rsa.fields[serialized_count].data,
+                                     &kf->meta.privkey.rsa.fields[serialized_count].len,
                                      NULL))
                 goto error;
             if(decoder_schema[i].output) {
-                kf->meta.rsa.fields[serialized_count].name = decoder_schema[i].name;
+                kf->meta.privkey.rsa.fields[serialized_count].name = decoder_schema[i].name;
                 serialized_count++;
             }
         }
@@ -440,13 +443,13 @@ file_type_ok:
         for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
             if(!tls_asn1_decode_next(&asn1_ctx,
                                      &decoder_schema[i],
-                                     &kf->meta.ec.fields[serialized_count].tag,
-                                     &kf->meta.ec.fields[serialized_count].data,
-                                     &kf->meta.ec.fields[serialized_count].len,
+                                     &kf->meta.privkey.ec.fields[serialized_count].tag,
+                                     &kf->meta.privkey.ec.fields[serialized_count].data,
+                                     &kf->meta.privkey.ec.fields[serialized_count].len,
                                      NULL))
                 goto error;
             if(decoder_schema[i].output) {
-                kf->meta.ec.fields[serialized_count].name = decoder_schema[i].name;
+                kf->meta.privkey.ec.fields[serialized_count].name = decoder_schema[i].name;
                 serialized_count++;
             }
         }
@@ -459,7 +462,7 @@ error:
     return NULL;
 }
 
-struct tls_public_key_context *tls_public_key_import(const char *pem_data, size_t size){
+struct tls_keyobject *tls_keyobject_import_public(const char *pem_data, size_t size){
     if((pem_data==NULL) || (size==0)) return NULL;
     struct tls_asn1_schema *decoder_schema;
     struct tls_asn1_serialization tmp_serialize[9] = {0};
@@ -470,7 +473,7 @@ struct tls_public_key_context *tls_public_key_import(const char *pem_data, size_
     size_t b64_size = b64_end - b64_start;
     
     // locate banner, load schema for format
-    for(int i=4; pkcs_lookups[i].banner != NULL; i++)
+    for(int i=PKCS_LOOKUP_PUBLIC; i < PKCS_LOOKUP_CERTIFICATE; i++)
         if(strncmp((char*)pem_data, pkcs_lookups[i].banner, strlen(pkcs_lookups[i].banner)) == 0){
             decoder_schema = pkcs_lookups[i].decoder_schema;
             goto file_type_ok;
@@ -488,9 +491,9 @@ file_type_ok:
         return NULL;
     
     size_t asn1_size = tls_base64_decode(b64_start, b64_size, asn1_buf);
-    size_t tot_len = sizeof(struct tls_public_key_context) + asn1_size;
+    size_t tot_len = sizeof(struct tls_keyobject) + asn1_size;
     // allocate context
-    struct tls_public_key_context *kf = mem_malloc(tot_len);
+    struct tls_keyobject *kf = mem_malloc(tot_len);
     if(kf==NULL)
         return NULL;
     
@@ -520,16 +523,16 @@ file_type_ok:
         if(!tls_asn1_decoder_init(&asn1_ctx, tmp_serialize[2].data, tmp_serialize[2].len)) goto error;
     }
     
-    if(memcmp(tmp_serialize[0].data, tls_objectids[TLS_OID_RSA_ENCRYPTION], tmp_serialize[0].len)==0)
+    if(memcmp(tmp_serialize[0].data, tls_objectid_bytes[TLS_OID_RSA_ENCRYPTION], tmp_serialize[0].len)==0)
         decoder_schema = tls_pkcs1_pubkey_schema;
     else if(
-            (memcmp(tmp_serialize[0].data, tls_objectids[TLS_OID_EC_PUBLICKEY], tmp_serialize[0].len)==0) &&
-            (memcmp(tmp_serialize[1].data, tls_objectids[TLS_OID_EC_SECP256R1], tmp_serialize[1].len)==0)){
+            (memcmp(tmp_serialize[0].data, tls_objectid_bytes[TLS_OID_EC_PUBLICKEY], tmp_serialize[0].len)==0) &&
+            (memcmp(tmp_serialize[1].data, tls_objectid_bytes[TLS_OID_EC_SECP256R1], tmp_serialize[1].len)==0)){
                 kf->type |= TLS_KEY_ECC;
-                kf->meta.ec.field.pubkey.tag = tmp_serialize[2].tag;
-                kf->meta.ec.field.pubkey.data = tmp_serialize[2].data;
-                kf->meta.ec.field.pubkey.len = tmp_serialize[2].len;
-                kf->meta.ec.field.pubkey.name = tls_sec1_pubkey_schema[0].name;
+                kf->meta.pubkey.ec.field.pubkey.tag = tmp_serialize[2].tag;
+                kf->meta.pubkey.ec.field.pubkey.data = tmp_serialize[2].data;
+                kf->meta.pubkey.ec.field.pubkey.len = tmp_serialize[2].len;
+                kf->meta.pubkey.ec.field.pubkey.name = tls_sec1_pubkey_schema[0].name;
                 return kf;
             }
     else {
@@ -543,13 +546,13 @@ file_type_ok:
         for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
             if(!tls_asn1_decode_next(&asn1_ctx,
                                      &decoder_schema[i],
-                                     &kf->meta.rsa.fields[serialized_count].tag,
-                                     &kf->meta.rsa.fields[serialized_count].data,
-                                     &kf->meta.rsa.fields[serialized_count].len,
+                                     &kf->meta.pubkey.rsa.fields[serialized_count].tag,
+                                     &kf->meta.pubkey.rsa.fields[serialized_count].data,
+                                     &kf->meta.pubkey.rsa.fields[serialized_count].len,
                                      NULL))
                 goto error;
             if(decoder_schema[i].output) {
-                kf->meta.rsa.fields[serialized_count].name = decoder_schema[i].name;
+                kf->meta.pubkey.rsa.fields[serialized_count].name = decoder_schema[i].name;
                 serialized_count++;
             }
         }
@@ -564,7 +567,7 @@ error:
 
 
 
-#define TLS_X509_IDX_HOSTSIGALG     0
+#define TLS_X509_IDX_SUBJSIGALG     0
 #define TLS_X509_IDX_ISSUERNAME     1
 #define TLS_X509_IDX_VALIDBEFORE    2
 #define TLS_X509_IDX_VALIDAFTER     3
@@ -578,7 +581,7 @@ error:
 
 
 uint8_t common_name_oid[] = {0x55, 0x04, 0x03};
-struct tls_certificate_context *tls_x509_cert_import(const char *pem_data, size_t size){
+struct tls_keyobject *tls_keyobject_import_certificate(const char *pem_data, size_t size){
     if((pem_data==NULL) || (size==0)) return NULL;
     struct tls_asn1_schema *decoder_schema;
     struct tls_asn1_serialization tmp_serialize[TLS_X509_IDX_CASIGVAL+1] = {0};
@@ -589,7 +592,7 @@ struct tls_certificate_context *tls_x509_cert_import(const char *pem_data, size_
     size_t b64_size = b64_end - b64_start;
     
     // locate banner, load schema for format
-    for(int i=7; pkcs_lookups[i].banner != NULL; i++)
+    for(int i=PKCS_LOOKUP_CERTIFICATE; i < PKCS_LOOKUP_END; i++)
         if(strncmp((char*)pem_data, pkcs_lookups[i].banner, strlen(pkcs_lookups[i].banner)) == 0){
             decoder_schema = pkcs_lookups[i].decoder_schema;
             goto file_type_ok;
@@ -607,9 +610,9 @@ file_type_ok:
         return NULL;
     
     size_t asn1_size = tls_base64_decode(b64_start, b64_size, asn1_buf);
-    size_t tot_len = sizeof(struct tls_certificate_context) + asn1_size;
+    size_t tot_len = sizeof(struct tls_keyobject) + asn1_size;
     // allocate context
-    struct tls_certificate_context *kf = mem_malloc(tot_len);
+    struct tls_keyobject *kf = mem_malloc(tot_len);
     if(kf==NULL)
         return NULL;
     
@@ -619,6 +622,8 @@ file_type_ok:
     mem_free(asn1_buf);
     if(!tls_asn1_decoder_init(&asn1_ctx, kf->data, asn1_size))
         goto error;
+    
+    kf->type = 0 | TLS_CERTIFICATE;
     
     for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
         if((i==1) || (i==9)) {
@@ -653,26 +658,24 @@ file_type_ok:
     }
     
     if(!(
-         (memcmp(tmp_serialize[TLS_X509_IDX_HOSTSIGALG].data, tls_objectids[TLS_OID_SHA256_RSA_ENCRYPTION], tmp_serialize[TLS_X509_IDX_HOSTSIGALG].len) == 0) ||
-         (memcmp(tmp_serialize[TLS_X509_IDX_HOSTSIGALG].data, tls_objectids[TLS_OID_SHA256_ECDSA], tmp_serialize[TLS_X509_IDX_HOSTSIGALG].len) == 0)
+         (memcmp(tmp_serialize[TLS_X509_IDX_SUBJSIGALG].data, tls_objectid_bytes[TLS_OID_SHA256_RSA_ENCRYPTION], tmp_serialize[TLS_X509_IDX_SUBJSIGALG].len) == 0) ||
+         (memcmp(tmp_serialize[TLS_X509_IDX_SUBJSIGALG].data, tls_objectid_bytes[TLS_OID_SHA256_ECDSA], tmp_serialize[TLS_X509_IDX_SUBJSIGALG].len) == 0)
          ))
         goto error;
     
     if(!(
-         (memcmp(tmp_serialize[TLS_X509_IDX_CASIGALG].data, tls_objectids[TLS_OID_SHA256_RSA_ENCRYPTION], tmp_serialize[TLS_X509_IDX_CASIGALG].len) == 0) ||
-         (memcmp(tmp_serialize[TLS_X509_IDX_CASIGALG].data, tls_objectids[TLS_OID_SHA256_ECDSA], tmp_serialize[TLS_X509_IDX_CASIGALG].len) == 0)
+         (memcmp(tmp_serialize[TLS_X509_IDX_CASIGALG].data, tls_objectid_bytes[TLS_OID_SHA256_RSA_ENCRYPTION], tmp_serialize[TLS_X509_IDX_CASIGALG].len) == 0) ||
+         (memcmp(tmp_serialize[TLS_X509_IDX_CASIGALG].data, tls_objectid_bytes[TLS_OID_SHA256_ECDSA], tmp_serialize[TLS_X509_IDX_CASIGALG].len) == 0)
          ))
         goto error;
     
-    memcpy(&kf->algorithms.signature, &tmp_serialize[TLS_X509_IDX_HOSTSIGALG], sizeof(struct tls_asn1_serialization));
-    memcpy(&kf->issuer, &tmp_serialize[TLS_X509_IDX_ISSUERNAME], sizeof(struct tls_asn1_serialization));
-    memcpy(&kf->valid.before, &tmp_serialize[TLS_X509_IDX_VALIDBEFORE], sizeof(struct tls_asn1_serialization));
-    memcpy(&kf->valid.after, &tmp_serialize[TLS_X509_IDX_VALIDAFTER], sizeof(struct tls_asn1_serialization));
-    memcpy(&kf->subject, &tmp_serialize[TLS_X509_IDX_SUBJECTNAME], sizeof(struct tls_asn1_serialization));
-    memcpy(&kf->algorithms.ca_signature, &tmp_serialize[TLS_X509_IDX_CASIGALG], sizeof(struct tls_asn1_serialization));
-    memcpy(&kf->signature, &tmp_serialize[TLS_X509_IDX_CASIGVAL], sizeof(struct tls_asn1_serialization));
+    // copy first 5 fields at once since they're sequential
+    memcpy(&kf->meta.certificate.field.subj_signature_alg, &tmp_serialize[TLS_X509_IDX_SUBJSIGALG], sizeof(struct tls_asn1_serialization) * 5);
+    // these two are not sequential
+    memcpy(&kf->meta.certificate.field.ca_signature_alg, &tmp_serialize[TLS_X509_IDX_CASIGALG], sizeof(struct tls_asn1_serialization));
+    memcpy(&kf->meta.certificate.field.ca_signature, &tmp_serialize[TLS_X509_IDX_CASIGVAL], sizeof(struct tls_asn1_serialization));
     
-    if(memcmp(tmp_serialize[TLS_X509_IDX_PKEYALG].data, tls_objectids[TLS_OID_RSA_ENCRYPTION], tmp_serialize[0].len)==0){
+    if(memcmp(tmp_serialize[TLS_X509_IDX_PKEYALG].data, tls_objectid_bytes[TLS_OID_RSA_ENCRYPTION], tmp_serialize[0].len)==0){
         if(!tls_asn1_decoder_init(&asn1_ctx, tmp_serialize[TLS_X509_IDX_PKEYBITS].data, tmp_serialize[TLS_X509_IDX_PKEYBITS].len))
             goto error;
         kf->type |= (TLS_KEY_RSA | 0);
@@ -681,27 +684,27 @@ file_type_ok:
         for(uint24_t i=0; decoder_schema[i].name != NULL; i++){
             if(!tls_asn1_decode_next(&asn1_ctx,
                                      &decoder_schema[i],
-                                     &kf->pubkey.rsa.fields[serialized_count].tag,
-                                     &kf->pubkey.rsa.fields[serialized_count].data,
-                                     &kf->pubkey.rsa.fields[serialized_count].len,
+                                     &kf->meta.certificate.field.pubkey.rsa.fields[serialized_count].tag,
+                                     &kf->meta.certificate.field.pubkey.rsa.fields[serialized_count].data,
+                                     &kf->meta.certificate.field.pubkey.rsa.fields[serialized_count].len,
                                      NULL))
                 goto error;
             
             if(decoder_schema[i].output) {
-                kf->pubkey.rsa.fields[serialized_count].name = decoder_schema[i].name;
+                kf->meta.certificate.field.pubkey.rsa.fields[serialized_count].name = decoder_schema[i].name;
                 serialized_count++;
             }
         }
         return kf;
     }
     else if(
-            (memcmp(tmp_serialize[TLS_X509_IDX_PKEYALG].data, tls_objectids[TLS_OID_EC_PUBLICKEY], tmp_serialize[TLS_X509_IDX_PKEYALG].len)==0) &&
-            (memcmp(tmp_serialize[TLS_X509_IDX_PKEYPARAM].data, tls_objectids[TLS_OID_EC_SECP256R1], tmp_serialize[TLS_X509_IDX_PKEYPARAM].len)==0)){
+            (memcmp(tmp_serialize[TLS_X509_IDX_PKEYALG].data, tls_objectid_bytes[TLS_OID_EC_PUBLICKEY], tmp_serialize[TLS_X509_IDX_PKEYALG].len)==0) &&
+            (memcmp(tmp_serialize[TLS_X509_IDX_PKEYPARAM].data, tls_objectid_bytes[TLS_OID_EC_SECP256R1], tmp_serialize[TLS_X509_IDX_PKEYPARAM].len)==0)){
                 kf->type |= (TLS_KEY_ECC | 0);
-                kf->pubkey.ec.field.pubkey.tag = tmp_serialize[TLS_X509_IDX_PKEYBITS].tag;
-                kf->pubkey.ec.field.pubkey.data = tmp_serialize[TLS_X509_IDX_PKEYBITS].data;
-                kf->pubkey.ec.field.pubkey.len = tmp_serialize[TLS_X509_IDX_PKEYBITS].len;
-                kf->pubkey.ec.field.pubkey.name = tls_sec1_pubkey_schema[0].name;
+                kf->meta.certificate.field.pubkey.ec.ec_point.tag = tmp_serialize[TLS_X509_IDX_PKEYBITS].tag;
+                kf->meta.certificate.field.pubkey.ec.ec_point.data = tmp_serialize[TLS_X509_IDX_PKEYBITS].data;
+                kf->meta.certificate.field.pubkey.ec.ec_point.len = tmp_serialize[TLS_X509_IDX_PKEYBITS].len;
+                kf->meta.certificate.field.pubkey.ec.ec_point.name = tls_sec1_pubkey_schema[0].name;
                 return kf;
             }
     
@@ -709,4 +712,12 @@ error:
     memset(kf, 0, kf->length);
     mem_free(kf);
     return NULL;
+}
+
+
+void tls_keyobject_destroy(struct tls_keyobject *kf){
+    // securely unrefs the keyobject
+    memset(kf, 0, kf->length);
+    mem_free(kf);
+    kf = NULL;
 }
