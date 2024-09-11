@@ -84,6 +84,6 @@ Updates will be provided to fix known vulnerabilities and keep the cryptographic
 Due to the nature of the TI-84+ CE platform, true security cannot be guaranteed. Resource limitations (memory, processing power) mean that full security measures (e.g., logging, real-time monitoring, advanced cryptographic operations) are not feasible.
 Applications that handle sensitive data should consider external review and additional layers of security, especially when TLS is required.
 
-8. Disclaimers
+## 8. Disclaimers ##
 
 This policy provides best-effort security under the constraints of the platform. Neither lwIP-CE maintainers nor the TI-84+ CE platform developers can be held liable for breaches or vulnerabilities resulting from misuse of the platform.
