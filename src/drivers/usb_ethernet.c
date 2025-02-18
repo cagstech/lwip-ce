@@ -32,12 +32,10 @@
 #include "lwip/dhcp.h"
 #include "usb_ethernet.h" /* Communications Data Class header file */
 
-#define NETIFS_MAX_ALLOWED 8
-#define CHECK_BIT(var, pos) ((var) & (1 << (pos)))
-
 /// Define Default Hostname for NETIFs
 const char hostname[] = "ti84plusce";
 static uint8_t ifnums_used = 0;
+bool eth_disabled_with_error = false;
 
 struct eth_configurator eth_conf = {
     ETH_CONFIGURATOR_V1,
@@ -63,56 +61,18 @@ nibble(uint16_t c)
     return 0xff;
 }
 
-void eth_device_teardown(eth_device_t *dev){
-    usb_SetDeviceData(dev->device, NULL);
-    ifnums_used &= ~(1 << dev->iface.num);
-    netif_remove(&dev->iface);
-    free(dev);
-}
 
 bool eth_xmit_fatal_error(eth_device_t *dev, uint8_t retries){
     if(retries == eth_conf.max_retries){
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
-                    ("ERROR: device ptr=%p: fatal error", dev->device));
-        if(eth_conf.do_reset_on_error){
-            LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
-                        ("INFO: device ptr=%p: resetting", dev->device));
-            if(usb_ResetDevice(dev->device)){
-                eth_device_teardown(dev);
-                LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
-                            ("ERROR: device ptr=%p: reset fail, teardown", dev->device));
-            }
-        }
+                    ("int: endpoint failure, giving up"));
+        // if it fails repeatedly, free the pbuf, disable the device,
+        // and set driver error state
+        usb_DisableDevice(dev->device);
+        eth_disabled_with_error = true;
         return true;
     }
     return false;
-}
-
-void timeout_change_default_netif(void *arg){
-    // if link is stale for 5000ms, disable device, unregister interface
-    eth_device_t *dev = (eth_device_t *)arg;
-    if(netif_is_link_up(&dev->iface)) return;
-    if(netif_default != &dev->iface) return;
-    
-    // if this is the default interface
-    uint8_t ifname[] = "en0";       // try to set a new one
-    uint8_t ifnum_check = 0;
-    for (ifnum_check = 0; ifnum_check < NETIFS_MAX_ALLOWED; ifnum_check++){
-        if(dev->iface.num == ifnum_check) continue;     // skip netif now offline
-        if (CHECK_BIT(ifnums_used, ifnum_check)){       // if netif is registered
-            ifname[2] = ifnum_check;
-            struct netif *new_default = netif_find(ifname);
-            if(netif_is_link_up(new_default)) {         // if link is up
-                netif_set_default(new_default);         // set new default
-                LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                            ("INFO: setting new default, netif=%c%c%u", new_default->name[0], new_default->name[1], new_default->num));
-                return;
-            }
-        }
-    }
-    netif_set_default(NULL);
-    LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                ("INFO: setting new default, netif=NULL"));
 }
 
 
@@ -127,13 +87,14 @@ interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
     eth_device_t *dev = (eth_device_t *)data;
     uint8_t *ibuf = dev->interrupt.buf;
     static uint8_t int_retries = 0;
+    static bool default_netif_set = false;
     if (status)
     {
         // much like RX, we will retry a INT USB_CDC_MAX_RETRIES times
         if(eth_xmit_fatal_error(dev, int_retries))
             return USB_ERROR_FAILED;
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
-                    ("ERROR: int endpoint failure, retry=%u", int_retries));
+                    ("int: endpoint failure, retry=%u", int_retries));
         // increment TX retry counter and queue the transfer again
         int_retries++;
     } else if ((status == USB_TRANSFER_COMPLETED) && transferred)
@@ -148,23 +109,21 @@ interrupt_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint,
                 switch (notify->bRequest)
                 {
                     case NOTIFY_NETWORK_CONNECTION:
-                        if (notify->wValue && (!netif_is_link_up(&dev->iface))){
+                        if (notify->wValue){
                             netif_set_link_up(&dev->iface);
-                            LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                                        ("INFO: netif=%c%c%u, link up", dev->iface.name[0], dev->iface.name[1], dev->iface.num));
-                            if(eth_conf.do_dhcp_auto)
+                            if(eth_conf.do_start_dhcp_on_all_netifs)
                                 dhcp_start(&dev->iface);
-                            if(!netif_default){
-                                LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                                            ("INFO: setting new default, netif=%c%c%u", dev->iface.name[0], dev->iface.name[1], dev->iface.num));
+                            if(!default_netif_set){
                                 netif_set_default(&dev->iface);
+                                default_netif_set = true;
                             }
                         }
-                        else if((!notify->wValue) && netif_is_link_up(&dev->iface)){
+                        else {
                             netif_set_link_down(&dev->iface);
-                            LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                                        ("INFO: netif=%c%c%u, link down", dev->iface.name[0], dev->iface.name[1], dev->iface.num));
-                            sys_timeout(5000, timeout_change_default_netif, dev);
+                            if(netif_default == &dev->iface){
+                                netif_default = NULL;
+                                default_netif_set = false;
+                            }
                         }
                         break;
                     case NOTIFY_CONNECTION_SPEED_CHANGE:
@@ -199,7 +158,7 @@ usb_error_t bulk_transmit_callback(__attribute__((unused)) usb_endpoint_t endpoi
             return USB_ERROR_FAILED;
         }
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
-                    ("INFO: tx endpoint failure, retry=%u", tx_retries));
+                    ("tx: endpoint failure, retry=%u", tx_retries));
         // increment TX retry counter and queue the transfer again
         tx_retries++;
         usb_ScheduleBulkTransfer(dev->tx.endpoint, tbuf->payload, tbuf->tot_len, bulk_transmit_callback, tbuf);
@@ -227,7 +186,7 @@ usb_error_t ecm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
             return USB_ERROR_FAILED;
         
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
-                    ("INFO: rx endpoint failure, retry=%u", rx_retries));
+                    ("ecm_rx: endpoint failure, retry=%u", rx_retries));
         rx_retries++;
         usb_ScheduleBulkTransfer(dev->rx.endpoint, dev->rx.buf, ETHERNET_MTU, dev->rx.callback, data);
         return USB_SUCCESS;
@@ -368,7 +327,7 @@ usb_error_t ncm_receive_callback(__attribute__((unused)) usb_endpoint_t endpoint
             return USB_ERROR_FAILED;
         }
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
-                        ("INFO: rx endpoint failure, retry=%u", rx_retries));
+                        ("ncm_rx: endpoint failure, retry=%u", rx_retries));
         rx_retries++;
         usb_ScheduleBulkTransfer(dev->rx.endpoint, dev->rx.buf, NCM_RX_NTB_MAX_SIZE, dev->rx.callback, data);
         return USB_SUCCESS;
@@ -773,6 +732,8 @@ init_success:
     
     // better ifnum assignment
     uint8_t ifnum_assigned;
+#define NETIFS_MAX_ALLOWED 8
+#define CHECK_BIT(var, pos) ((var) & (1 << (pos)))
     for (ifnum_assigned = 0; ifnum_assigned < NETIFS_MAX_ALLOWED; ifnum_assigned++)
         if (!CHECK_BIT(ifnums_used, ifnum_assigned))
             break;
@@ -793,7 +754,7 @@ init_success:
         // copy new usb config without destroying netif config
         memcpy(eth, &tmp, sizeof(eth_device_t) - sizeof(struct netif));
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                    ("INFO: netif=%c%c%u <- device=%p, RESUMED", eth->iface.name[0], eth->iface.name[1], eth->iface.num, device));
+                    ("RESUME, netif=%c%c%u <- device=%p", eth->iface.name[0], eth->iface.name[1], eth->iface.num, device));
         eth_netif_init(&eth->iface);
     }
     else {
@@ -806,7 +767,7 @@ init_success:
         if (netif_add_noaddr(iface, eth, eth_netif_init, netif_input) == NULL)
         {
             LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
-                        ("ERROR: netif= <- device=%p, netif add failed", device));
+                        ("ERROR, ? netif= <- device=%p, netif add failed", device));
             free(eth);
             return false;
         }
@@ -826,7 +787,7 @@ init_success:
         ifnums_used |= 1 << ifnum_assigned;  // set flag marking the ifnum used
         netif_set_hostname(iface, hostname); // set default hostname
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                    ("INFO: netif=%c%c%u <- device=%p, CREATED", iface->name[0], iface->name[1], iface->num, device));
+                    ("NEW, netif=%c%c%u <- device=%p", iface->name[0], iface->name[1], iface->num, device));
     }
     
     netif_set_up(&eth->iface); // tell lwIP that the interface is ready to receive
@@ -835,6 +796,8 @@ init_success:
     usb_ScheduleBulkTransfer(eth->rx.endpoint, eth->rx.buf, (tmp.type == USB_NCM_SUBCLASS) ? NCM_RX_NTB_MAX_SIZE : ETHERNET_MTU, eth->rx.callback, eth);
     return true;
 }
+
+
 
 usb_error_t
 eth_usb_event_callback(usb_event_t event, void *event_data,
@@ -845,10 +808,8 @@ eth_usb_event_callback(usb_event_t event, void *event_data,
     switch (event)
     {
         case USB_DEVICE_CONNECTED_EVENT:
-            if (!(usb_GetRole() & USB_ROLE_DEVICE)){
-                usb_RefDevice(usb_device);
+            if (!(usb_GetRole() & USB_ROLE_DEVICE))
                 usb_ResetDevice(usb_device);
-            }
             break;
         case USB_DEVICE_ENABLED_EVENT:
             if(usb_GetDeviceFlags(usb_device) & USB_IS_HUB){
@@ -864,7 +825,7 @@ eth_usb_event_callback(usb_event_t event, void *event_data,
                 if(desc_len != xferd) break;
                 usb_SetConfiguration(usb_device, &descriptor.conf, desc_len);
                 LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                            ("INFO: hub=%p", usb_device));
+                            ("NEW device=%p, type=hub", usb_device));
                 break;
             }
             if (init_ethernet_usb_device(usb_device))
@@ -876,15 +837,24 @@ eth_usb_event_callback(usb_event_t event, void *event_data,
             eth_device_t *eth_device = (eth_device_t *)usb_GetDeviceData(usb_device);
             netif_set_link_down(&eth_device->iface);
             netif_set_down(&eth_device->iface);
+            if(eth_disabled_with_error && eth_conf.do_reset_on_error){
+                LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
+                            ("device ptr=%p: disabled with error, resetting!", usb_device));
+                usb_ResetDevice(usb_device);
+                eth_disabled_with_error = false;
+                break;
+            }
             if (eth_device)
             {
-                eth_device_teardown(eth_device);
+                ifnums_used &= ~(1 << eth_device->iface.num);
+                netif_remove(&eth_device->iface);
+                free(eth_device);
+                eth_device = NULL;
+                usb_SetDeviceData(usb_device, eth_device);
                 LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
-                            ("INFO: device ptr=%p: disconnected", usb_device));
+                            ("device ptr=%p: disconnected", usb_device));
             }
         }
-            if(event == USB_DEVICE_DISCONNECTED_EVENT)
-                usb_UnrefDevice(usb_device);
             break;
         case USB_HOST_PORT_CONNECT_STATUS_CHANGE_INTERRUPT:
             return USB_ERROR_NO_DEVICE;

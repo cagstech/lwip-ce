@@ -178,7 +178,7 @@ struct eth_configurator {
     size_t version;
     uint8_t max_retries;                    /** < default == 3 */
     bool do_reset_on_error;                 /** < default = true */
-    bool do_dhcp_auto;       /** < default = true */
+    bool do_start_dhcp_on_all_netifs;       /** < default = true */
 };
 
 #define ETH_CONFIGURATOR_V1 sizeof(struct eth_configurator)
