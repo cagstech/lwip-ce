@@ -341,8 +341,14 @@ PACK_STRUCT_END
  * Use this in NO_SYS mode. Use tcpip_init() otherwise.
  */
 err_t
-lwip_init(void)
+lwip_init(struct lwip_configurator *cfg)
 {
+    if(cfg==NULL) return ERR_ARG;
+    lwip_send_fn = cfg->lwip_send_fn;
+    lwip_open_dev_fn = cfg->lwip_open_dev_fn;
+    lwip_close_dev_fn = cfg->lwip_close_dev_fn;
+    usr_malloc = cfg->input_malloc;
+    usr_free = cfg->input_free;
 #ifndef LWIP_SKIP_CONST_CHECK
   int a = 0;
   LWIP_UNUSED_ARG(a);

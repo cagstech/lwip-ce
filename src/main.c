@@ -3,6 +3,7 @@
 #endif
 
 #include <usbdrvce.h>
+#include <ethdrvce.h>
 #include <ti/getcsc.h>
 #include <ti/screen.h>
 
@@ -65,35 +66,28 @@ void __attribute__((optnone)) outchar(char c)
 #endif
 
 
-void ethif_status_callback_fn(struct netif *netif)
-{
-    if (dhcp_supplied_address(netif) && (!httpd_running))
-    {
-        httpd_init();
-        printf("httpd listen on %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
-        httpd_running = true;
-    }
-}
-
 int main(void)
 {
-    uint8_t key;
-    struct mem_configurator memcfg = {
-        MEM_CONFIGURATOR_V1,
-        malloc,
-        free,
-        1024*20
-    };
-    if(!mem_configure(&memcfg))
-        return 1;
-    if(lwip_init()!= ERR_OK)
-        return 1;
+    
     os_ClrLCDFull();
     os_HomeUp();
     os_FontSelect(os_SmallFont);
     gfx_Begin();
     gfx_FillScreen(255);
-    struct netif *ethif = NULL;
+    uint8_t key;
+#define LWIP_CONFIG_V1  0
+    struct lwip_configurator lwip_cfg = {
+        LWIP_CONFIG_V1,
+        eth_send,
+        eth_open,
+        eth_close,
+        malloc,
+        free
+    };
+    netif_default = NULL;
+    
+    if(lwip_init(&lwip_cfg)!= ERR_OK)
+        return 1;
 
     /* You should probably handle this function failing */
     if (usb_Init(eth_usb_event_callback, NULL, NULL, USB_DEFAULT_INIT_FLAGS))
@@ -111,22 +105,21 @@ int main(void)
         {
             run_main = false;
         }
-        if (netif_default && (!dhcp_started))
+        if (netif_default)
         {
             // run this code if netif exists
             // eg: dhcp_start(ethif);
-            printf("default if=%c%c%u registered\n", netif_default->name[0], netif_default->name[1], netif_default->num);
-            netif_set_status_callback(netif_default, ethif_status_callback_fn);
-            dhcp_start(netif_default);
-            dhcp_started = true;
-        }
-        if(!netif_default) {
-            dhcp_started = false;
+            if (dhcp_supplied_address(netif_default) && (!httpd_running))
+            {
+                httpd_init();
+                printf("httpd listen on %s\n", ip4addr_ntoa(netif_ip4_addr(netif_default)));
+                httpd_running = true;
+            }
         }
         usb_HandleEvents();   // usb events
         sys_check_timeouts(); // lwIP timers/event callbacks
     } while (run_main);
-    dhcp_release_and_stop(ethif);
+    dhcp_release_and_stop(netif_default);
 exit:
     usb_Cleanup();
     gfx_End();

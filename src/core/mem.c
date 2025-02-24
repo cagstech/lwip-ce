@@ -86,45 +86,15 @@
 
 #if MEM_CUSTOM_ALLOCATOR==1
 
-#define LWIP_HEAP_MAX_DEFAULT   (1024*16)
-#define MEM_MALLOC_HELPER_SIZE  2
-
-bool mem_inited = false;
-
-void *function_unset(size_t size){
-    LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("internal_error: user malloc/free unset\n"));
-    return NULL;
-}
-
-struct mem_configurator mem_conf = {
-    sizeof(struct mem_configurator),
-    function_unset,
-    function_unset,
-    LWIP_HEAP_MAX_DEFAULT
-};
-size_t lwip_heap_usage = 0;
+void* (*usr_malloc)(size_t) = NULL;
+void (*usr_free)(void *ptr) = NULL;
 
 void *custom_malloc(size_t size) {
-    if(lwip_heap_usage >= mem_conf.heap_max) {
-        LWIP_DEBUGF(MEM_DEBUG | LWIP_DBG_LEVEL_SERIOUS, ("mem_malloc: did not allocate %"SZT_F" bytes, %"SZT_F"/%"SZT_F" of user-defined heap limit used.\n", size, lwip_heap_usage, mem_conf.heap_max));
-        return NULL;
-    }
-    void *ptr = mem_conf.in_malloc(size + MEM_MALLOC_HELPER_SIZE);
-    if (ptr) {
-        *(uint16_t*)ptr = size + MEM_MALLOC_HELPER_SIZE;
-        lwip_heap_usage += size + MEM_MALLOC_HELPER_SIZE;
-        return ptr + MEM_MALLOC_HELPER_SIZE;
-    }
-    return NULL;
+    return usr_malloc(size);
 }
 
 void custom_free(void *ptr){
-    if(ptr){
-        uint16_t size = *(uint16_t*)(ptr - MEM_MALLOC_HELPER_SIZE);
-        LWIP_ASSERT("mem_free: heap underflow occurred", size <= lwip_heap_usage);
-        mem_conf.in_free(ptr - MEM_MALLOC_HELPER_SIZE);
-        lwip_heap_usage -= size;
-    }
+    if(ptr) usr_free(ptr);
 }
 
 void* custom_calloc(mem_size_t count, mem_size_t size)
@@ -144,19 +114,6 @@ void* custom_calloc(mem_size_t count, mem_size_t size)
         memset(p, 0, alloc_size);
     }
     return p;
-}
-
-bool mem_configure(struct mem_configurator *conf){
-    if(conf==NULL || (!conf->version)) return false;
-    if(conf->version > sizeof(struct mem_configurator)) {
-        LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_WARNING,
-                    ("Newer configuration passed than supported. Some options will have no effect."));
-    }
-    memcpy(&mem_conf, conf, LWIP_MIN(conf->version, sizeof(struct mem_configurator)));
-    if(mem_conf.heap_max < LWIP_HEAP_MAX_DEFAULT)
-        mem_conf.heap_max = LWIP_HEAP_MAX_DEFAULT;
-    mem_inited = true;
-    return true;
 }
 
 #endif
@@ -237,7 +194,7 @@ mem_overflow_init_raw(void *p, size_t size)
 bool
 mem_init(void)
 {
-    return mem_inited;
+    return true;
 }
 
 /** mem_trim is not used when using pools instead of a heap or using

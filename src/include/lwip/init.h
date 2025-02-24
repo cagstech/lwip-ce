@@ -39,6 +39,7 @@
 
 #include "lwip/opt.h"
 #include "lwip/err.h"
+#include <ethdrvce.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -91,8 +92,18 @@ extern "C" {
  * @}
  */
 
+// Adding a configurator struct
+struct lwip_configurator {
+    uint8_t version;
+    eth_error_t (*lwip_send_fn)();
+    eth_error_t (*lwip_open_dev_fn)();
+    eth_error_t (*lwip_close_dev_fn)();
+    void* (*input_malloc)();
+    void (*input_free)();
+};
+
 /* Modules initialization */
-err_t lwip_init(void);
+err_t lwip_init(struct lwip_configurator *cfg);
 
 
 #ifdef __cplusplus
