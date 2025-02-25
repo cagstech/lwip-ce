@@ -63,7 +63,6 @@ eth_error_t lwip_int_rx_callback(struct eth_device *eth, struct eth_transfer_dat
                     netif_set_link_up(netif);
                     LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
                                 ("INFO: netif=%c%c%u, link up", netif->name[0], netif->name[1], netif->num));
-                    dhcp_start(netif);
                 }
                 else if((!notify->wValue) && netif_is_link_up(netif)){
                     netif_set_link_down(netif);
@@ -153,7 +152,8 @@ err_t eth_netif_init(struct netif *netif)
     netif->output_ip6 = ethip6_output;
     netif->mtu = ETHERNET_MTU;
     netif->mtu6 = ETHERNET_MTU;
-    netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP | NETIF_FLAG_MLD6;
+    netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP;
+    netif->flags &= ~NETIF_FLAG_MLD6;
     MIB2_INIT_NETIF(netif, snmp_ifType_ethernet_csmacd, 100000000);
     memcpy(netif->hwaddr, eth->hwaddr, NETIF_MAX_HWADDR_LEN);
     netif->hwaddr_len = NETIF_MAX_HWADDR_LEN;
@@ -211,7 +211,11 @@ eth_usb_event_callback(usb_event_t event, void *event_data,
             }
             struct netif *netif = MEM_CUSTOM_MALLOC(sizeof(struct netif));
             eth->user_data = netif;
-            if (netif_add_noaddr(netif, eth, eth_netif_init, netif_input) == NULL)
+            ip4_addr_t ipaddr, netmask, gw;
+            IP4_ADDR(&ipaddr, 0, 0, 0, 0);  // Example static IP
+            IP4_ADDR(&netmask, 0, 0, 0, 0);
+            IP4_ADDR(&gw, 0, 0, 0, 0);
+            if (netif_add(netif, &ipaddr, &netmask, &gw, eth, eth_netif_init, netif_input) == NULL)
             {
                 LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
                             ("ERROR: netif= <- device=%p, netif add failed", usb_device));
@@ -222,13 +226,13 @@ eth_usb_event_callback(usb_event_t event, void *event_data,
             }
             netif->name[0] = 'e';
             netif->name[1] = 'n';
-            netif_create_ip6_linklocal_address(netif, 1);
-            netif->ip6_autoconfig_enabled = 1;
+            
             netif_set_hostname(netif, hostname);
             netif_set_up(netif);
             netif_set_default(netif);
+            dhcp_start(netif);
             LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
-                ("INFO: netif=%c%c%u, default", netif->name[0], netif->name[1], netif->num));
+                ("INFO: netif=%c%c%u", netif->name[0], netif->name[1], netif->num));
             break;
         }
             

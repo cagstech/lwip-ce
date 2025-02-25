@@ -91,6 +91,7 @@
 #endif
 
 #define LWIP_DBG_TYPES_ON (LWIP_DBG_ON | LWIP_DBG_TRACE | LWIP_DBG_STATE | LWIP_DBG_FRESH | LWIP_DBG_HALT)
+#define LWIP_DHCP_CHECK_IP 0
 
 /* ---------- Memory options ---------- */
 // Disable using pools entirely, use user malloc
