@@ -44,7 +44,7 @@
 
 #define LWIP_HAVE_LOOPIF 1
 #define LWIP_NETIF_LOOPBACK 1
-#define LWIP_LOOPBACK_MAX_PBUFS 5
+#define LWIP_LOOPBACK_MAX_PBUFS 0
 
 #define TCP_LISTEN_BACKLOG 1
 
@@ -74,7 +74,7 @@
 #define AUTOIP_DEBUG LWIP_DBG_OFF
 #define ACD_DEBUG LWIP_DBG_OFF
 #define DHCP_DEBUG LWIP_DBG_OFF
-#define IP_DEBUG LWIP_DBG_OFF
+#define IP_DEBUG LWIP_DBG_ON
 #define IP_REASS_DEBUG LWIP_DBG_OFF
 #define ICMP_DEBUG LWIP_DBG_OFF
 #define IGMP_DEBUG LWIP_DBG_OFF
@@ -91,7 +91,6 @@
 #endif
 
 #define LWIP_DBG_TYPES_ON (LWIP_DBG_ON | LWIP_DBG_TRACE | LWIP_DBG_STATE | LWIP_DBG_FRESH | LWIP_DBG_HALT)
-#define LWIP_DHCP_CHECK_IP 0
 
 /* ---------- Memory options ---------- */
 // Disable using pools entirely, use user malloc

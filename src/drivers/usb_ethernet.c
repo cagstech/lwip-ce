@@ -63,6 +63,7 @@ eth_error_t lwip_int_rx_callback(struct eth_device *eth, struct eth_transfer_dat
                     netif_set_link_up(netif);
                     LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
                                 ("INFO: netif=%c%c%u, link up", netif->name[0], netif->name[1], netif->num));
+                    dhcp_start(netif);
                 }
                 else if((!notify->wValue) && netif_is_link_up(netif)){
                     netif_set_link_down(netif);
@@ -80,6 +81,7 @@ eth_error_t lwip_int_rx_callback(struct eth_device *eth, struct eth_transfer_dat
 eth_error_t lwip_eth_rx_callback(struct eth_device *eth, struct eth_transfer_data *xfer, eth_error_t error){
     // Ethernet RX callback function. Allocates a buffer for the datagram, passes to netif->input
     struct netif *netif = (struct netif *)eth->user_data;
+    if(!netif_is_up(netif)) return ERR_IF;
     if(netif==NULL) {
         LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
                     ("INFO: RX no netif"));
@@ -209,12 +211,20 @@ eth_usb_event_callback(usb_event_t event, void *event_data,
                 MEM_CUSTOM_FREE(eth);
                 return USB_ERROR_NO_MEMORY;
             }
+            LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                        ("INFO: ETH dev=%p, mac=%02X:%02X:%02X:%02X:%02X:%02X", usb_device, eth->hwaddr[0], eth->hwaddr[1], eth->hwaddr[2], eth->hwaddr[3], eth->hwaddr[4], eth->hwaddr[5]));
             struct netif *netif = MEM_CUSTOM_MALLOC(sizeof(struct netif));
+            if(netif == NULL){
+                LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SEVERE,
+                            ("INFO: netif alloc failed dev=%p", usb_device));
+                return USB_ERROR_NO_MEMORY;
+            }
             eth->user_data = netif;
             ip4_addr_t ipaddr, netmask, gw;
-            IP4_ADDR(&ipaddr, 0, 0, 0, 0);  // Example static IP
-            IP4_ADDR(&netmask, 0, 0, 0, 0);
-            IP4_ADDR(&gw, 0, 0, 0, 0);
+            ipaddr.addr = IPADDR_ANY;  // Use lwIP’s predefined unassigned address
+            netmask.addr = IPADDR_ANY; // Prevent subnet conflicts before DHCP
+            gw.addr = IPADDR_ANY;      // No gateway before DHCP
+
             if (netif_add(netif, &ipaddr, &netmask, &gw, eth, eth_netif_init, netif_input) == NULL)
             {
                 LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
@@ -226,11 +236,16 @@ eth_usb_event_callback(usb_event_t event, void *event_data,
             }
             netif->name[0] = 'e';
             netif->name[1] = 'n';
-            
-            netif_set_hostname(netif, hostname);
-            netif_set_up(netif);
+            LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
+                        ("INFO: ETH link-to NETIF ON %c%c%u", netif->name[0], netif->name[1], netif->num));
             netif_set_default(netif);
-            dhcp_start(netif);
+            netif_set_hostname(netif, hostname);
+            
+            // allow IPv4 and IPv6 on device
+            netif_create_ip6_linklocal_address(netif, 1);
+            netif->ip6_autoconfig_enabled = 1;
+            
+            netif_set_up(netif);
             LWIP_DEBUGF(ETH_DEBUG | LWIP_DBG_STATE,
                 ("INFO: netif=%c%c%u", netif->name[0], netif->name[1], netif->num));
             break;

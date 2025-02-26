@@ -134,10 +134,7 @@ _app_library_table:
     dl _netif_ip6_addr_set
     dl _netif_ip6_addr_set_parts
     dl _netif_ip6_addr_set_state
-    dl _netif_loop_output
     dl _netif_name_to_index
-    dl _netif_poll
-    dl _netif_poll_all
     dl _netif_remove
     dl _netif_remove_ext_callback
     dl _netif_set_addr
@@ -396,10 +393,7 @@ extern _netif_invoke_ext_callback
 extern _netif_ip6_addr_set
 extern _netif_ip6_addr_set_parts
 extern _netif_ip6_addr_set_state
-extern _netif_loop_output
 extern _netif_name_to_index
-extern _netif_poll
-extern _netif_poll_all
 extern _netif_remove
 extern _netif_remove_ext_callback
 extern _netif_set_addr
