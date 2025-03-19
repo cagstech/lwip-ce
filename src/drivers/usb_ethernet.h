@@ -174,17 +174,45 @@ extern eth_device_t eth;
 usb_error_t eth_usb_event_callback(usb_event_t event, void *event_data, usb_callback_data_t *callback_data);
 
 
-struct eth_configurator {
-    size_t version;
-    uint8_t max_retries;                    /** < default == 3 */
-    bool do_reset_on_error;                 /** < default = true */
-    bool do_start_dhcp_on_all_netifs;       /** < default = true */
+struct usb_configurator {
+    // device interfacing
+    usb_error_t (*reset_device)(usb_device_t device);
+    usb_error_t (*disable_device)(usb_device_t device);
+    usb_device_t (*ref_device)(usb_device_t device);
+    usb_device_t (*unref_device)(usb_device_t device);
+    void (*set_device_data)(usb_device_t device, usb_device_data_t *data);
+    usb_device_data_t* (*get_device_data)(usb_device_t device);
+    usb_role_t (*get_role)(void);
+    usb_device_flags_t (*get_device_flags)(usb_device_t device);
+    usb_error_t (*schedule_transfer)(usb_endpoint_t endpoint, void *buffer, size_t length,
+                                     usb_transfer_callback_t handler,
+                                     usb_transfer_data_t *data);
+    usb_error_t (*control_transfer)(usb_endpoint_t device,
+                                    const usb_control_setup_t *setup,
+                                    void *buffer, unsigned retries,
+                                    size_t *transferred);
+    
+    // descriptor interfacing
+    size_t (*get_config_descriptor_len)(usb_device_t device, uint8_t index);
+    usb_error_t (*get_descriptor)(usb_device_t device, usb_descriptor_type_t type, uint8_t index, void *descriptor, size_t length, size_t *transferred);
+    usb_error_t (*get_string_descriptor)(usb_device_t device, uint8_t index, uint16_t langid, usb_string_descriptor_t *descriptor, size_t length, size_t *transferred);
+    
+    // configuration/interface interfacing
+    usb_error_t (*set_configuration)(usb_device_t device,
+                                     const usb_configuration_descriptor_t *descriptor,
+                                     size_t length);
+    usb_error_t (*set_interface)(usb_device_t device,
+                                 const usb_interface_descriptor_t *descriptor,
+                                 size_t length);
+    
+    // endpoint interfacing
+    usb_endpoint_t (*get_device_endpoint)(usb_device_t device, uint8_t address);
+    void (*set_endpoint_data)(usb_endpoint_t endpoint, usb_endpoint_data_t *data);
+    usb_endpoint_data_t* (*get_endpoint_data)(usb_endpoint_t endpoint);
+    void (*set_endpoint_flags)(usb_endpoint_t endpoint, usb_endpoint_flags_t flags);
 };
+extern struct usb_configurator usb_fn;
 
-#define ETH_CONFIGURATOR_V1 sizeof(struct eth_configurator)
-
-
-bool eth_configure(struct eth_configurator *conf);
 
 /// @brief Polls for the registration status of interfaces.
 /// @return A bitmap indicating what NETIFs are registered (netif->num)

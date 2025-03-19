@@ -2,7 +2,6 @@ section .rodata
 public _app_library_table
 
 _app_library_table:
-    dl _eth_configure
     dl _eth_get_interfaces
     dl _eth_usb_event_callback
     dl _etharp_acd_announce
@@ -112,7 +111,6 @@ _app_library_table:
     dl _custom_free
     dl _custom_malloc
     dl _mem_calloc
-    dl _mem_configure
     dl _mem_free
     dl _mem_init
     dl _mem_malloc
@@ -267,7 +265,6 @@ _app_library_table:
     dl _udp_sendto_if_src
 
 
-extern _eth_configure
 extern _eth_get_interfaces
 extern _eth_usb_event_callback
 extern _etharp_acd_announce

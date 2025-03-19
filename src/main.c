@@ -2,7 +2,6 @@
 #include "lwip/timeouts.h"
 #endif
 
-#include <usbdrvce.h>
 #include <ti/getcsc.h>
 #include <ti/screen.h>
 
@@ -20,7 +19,9 @@
 #include "lwip/apps/httpd.h"
 // due to the build structure of lwIP, "lwip/file.h" corresponds to "include/lwip/file.h"
 
+#include <usbdrvce.h>
 #include "drivers/usb_ethernet.h"
+
 
 bool run_main = false;
 bool dhcp_started = false;
@@ -29,6 +30,38 @@ bool httpd_running = false;
 #define LWIP_USE_CONSOLE_STYLE_PRINTF
 #ifdef LWIP_USE_CONSOLE_STYLE_PRINTF
 bool outchar_scroll_up = true;
+
+struct lwip_configurator lwip_conf = {
+    LWIP_CONFIGURATOR_V1,
+    {
+        // device interfacing
+        usb_ResetDevice,
+        usb_DisableDevice,
+        usb_RefDevice,
+        usb_UnrefDevice,
+        usb_SetDeviceData,
+        usb_GetDeviceData,
+        usb_GetRole,
+        usb_GetDeviceFlags,
+        usb_ScheduleTransfer,
+        usb_ControlTransfer,
+        // descriptor interfacing
+        usb_GetConfigurationDescriptorTotalLength,
+        usb_GetDescriptor,
+        usb_GetStringDescriptor,
+        // configuration/interface interfacing
+        usb_SetConfiguration,
+        usb_SetInterface,
+        // endpoint interfacing
+        usb_GetDeviceEndpoint,
+        usb_SetEndpointData,
+        usb_GetEndpointData,
+        usb_SetEndpointFlags
+    },
+    {
+        malloc, free
+    }
+};
 
 static void newline(void)
 {
@@ -78,15 +111,7 @@ void ethif_status_callback_fn(struct netif *netif)
 int main(void)
 {
     uint8_t key;
-    struct mem_configurator memcfg = {
-        MEM_CONFIGURATOR_V1,
-        malloc,
-        free,
-        1024*20
-    };
-    if(!mem_configure(&memcfg))
-        return 1;
-    if(lwip_init()!= ERR_OK)
+    if(lwip_init(&lwip_conf)!= ERR_OK)
         return 1;
     os_ClrLCDFull();
     os_HomeUp();

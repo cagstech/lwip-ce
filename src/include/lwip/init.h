@@ -39,6 +39,7 @@
 
 #include "lwip/opt.h"
 #include "lwip/err.h"
+#include "drivers/usb_ethernet.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -91,8 +92,18 @@ extern "C" {
  * @}
  */
 
+struct lwip_configurator {
+    uint24_t version;
+    struct usb_configurator usb_conf;
+    struct {
+        void* (*caller_malloc)(size_t);
+        void (*caller_free)(void*);
+    } malloc_conf;
+};
+#define LWIP_CONFIGURATOR_V1 sizeof(struct lwip_configurator)
+
 /* Modules initialization */
-err_t lwip_init(void);
+err_t lwip_init(struct lwip_configurator *conf);
 
 
 #ifdef __cplusplus

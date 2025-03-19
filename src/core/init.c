@@ -341,8 +341,12 @@ PACK_STRUCT_END
  * Use this in NO_SYS mode. Use tcpip_init() otherwise.
  */
 err_t
-lwip_init(void)
+lwip_init(struct lwip_configurator *conf)
 {
+    if(conf==NULL) return ERR_ARG;
+    memcpy(&usb_fn, &conf->usb_conf, sizeof(struct usb_configurator));
+    caller_malloc_ref = conf->malloc_conf.caller_malloc;
+    caller_free_ref = conf->malloc_conf.caller_free;
 #ifndef LWIP_SKIP_CONST_CHECK
   int a = 0;
   LWIP_UNUSED_ARG(a);
@@ -357,7 +361,7 @@ lwip_init(void)
 #if !NO_SYS
   sys_init();
 #endif /* !NO_SYS */
-  if(!mem_init()) return ERR_MEM_CONFIG_UNSET;
+  mem_init();
   memp_init();
   pbuf_init();
   netif_init();
